@@ -81,7 +81,7 @@ Still unread: `CodedbyAKSA/VLC`, `CyberQore`, `PlaceIQ`, `TensorTrail`, `DataFor
 | **DebtEase** | 6,851 | React+Vite dashboard over a greedy debt-settlement optimiser. Net balances, settlement plan, what-if, OCR wizard, D3 force-graph visualiser, vault. | Public |
 | **NSEGPT** | ~10K own delta | Fork of the Odysseus on-prem coding assistant (AGPL). **See the fork caveat in §4.** | Private |
 
-### Tier B — supporting assets (5)
+### Tier B — supporting assets (7)
 
 | Repo | Own LOC | Relevance |
 |---|---|---|
