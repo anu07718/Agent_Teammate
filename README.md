@@ -31,9 +31,14 @@ Runner-up: Merchant Growth AI, on the strength of `VendorConnect`.
 **Read §4a first** — it covers what nse-guardrail actually contains versus what its README claims.
 **§11** has the open questions, including what you are permitted to reuse from the NSE work.
 
+[**ppt.md**](ppt.md) — the Track 3 deck (title, problem, solution, stack, USP, impact, business
+model) plus a build plan, and a source-level audit of twelve public agent repositories scored
+against the track. Its §0.4 closes §11's second open question: `Svayom/Svayom` has now been read,
+and it is the licence-clean fallback substrate if NSE reuse permission does not come through.
+
 ### Not yet read
 
-`CodedbyAKSA/{TensorTrail, CyberQore, PlaceIQ, VLC, DataForge, ExamGEN}` and `Svayom/Svayom`.
+`CodedbyAKSA/{TensorTrail, CyberQore, PlaceIQ, VLC, DataForge, ExamGEN}`.
 Organisation repos cannot be attached to a session already scoped to `karthikj30` — start a fresh
 session against one of them. Reading the private `karthikj30` repos reordered this analysis once
 already, so this is worth doing before committing to a track.
