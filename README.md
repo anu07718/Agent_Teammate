@@ -39,7 +39,7 @@ Slide-ready 16:9 exports: 3840×2160 PNGs in [`architecture/png/`](architecture/
 (full system, resolution loop, durable runtime, decision science, stack detail) are in
 [`architecture/png/appendix/`](architecture/png/appendix/).
 
-Editable source: [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — seven pages.
+Editable source: [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — eight pages: three slide-ready, five appendix.
 [Open it in diagrams.net](https://app.diagrams.net/#Hkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio) (signs in with GitHub while the repo is private)
 or in VS Code with the Draw.io extension.
 

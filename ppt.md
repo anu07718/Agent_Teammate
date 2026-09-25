@@ -254,10 +254,10 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 
 ### Reading it
 
-- **Customer → five stages → humans.** ① Sentry guards the door · ② Understand gathers evidence and plans, but cannot act · ③ Decide chooses ACT / HEDGE / ESCALATE / REFUSE · ④ Verify runs the plan on the Shadow Ledger first · ⑤ Seal binds approval to the exact state and commits once
-- **Only escalations reach a person** — the red line from Decide to the Agent Workspace
-- **Only a sealed commit touches money** — the red dashed boundary holds Seal and the Tool Gateway, nothing else
-- **It learns, and fails closed** — ⑥ feeds labels back into Decide and tightens automatically on drift
+- **Input → Data → Engine → Humans**, left to right — the way a case travels
+- **Six stages in the engine:** ① Intake & Sentry · ② Understand & Ground · ③ Calibrated Decision · ④ Verify-before-Gate · ⑤ Guard & Respond · ⑥ Learn & Observe
+- **Gold = unique to Nirnay.** The red dashed band is the money boundary — only Commit, through a matching Seal, crosses it
+- **The red arrow is the only way a case reaches a person:** Decide routes it to ESCALATE, with an evidence packet
 
 ### Six invariants it enforces
 
@@ -269,6 +269,7 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 |---|---|---|
 | **1 · Architecture** | the architecture slide | `png/01-architecture-slide.png` · `svg/01-architecture-slide.svg` |
 | **2 · Tech stack** | the tech-stack slide | `png/02-tech-stack-slide.png` · `svg/02-tech-stack-slide.svg` |
+| 3 · Architecture, flow view | optional “how a case moves” slide | `png/03-architecture-flow-slide.png` · `svg/03-architecture-flow-slide.svg` |
 | A1 · Detailed system | backup slide for deep questions | `png/appendix/A1-detailed-system-architecture.png` |
 | A2 · Resolution loop | backup — seventeen steps, fallbacks as edges (§2.3) | `png/appendix/A2-resolution-loop.png` |
 | A3 · Durable runtime | backup — supersteps, Seal lifecycle (§2.4) | `png/appendix/A3-durable-runtime.png` |
