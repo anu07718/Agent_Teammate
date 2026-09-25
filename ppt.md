@@ -102,7 +102,7 @@ Nirnay: **decide → act in the Shadow Ledger → Recheck → compare to baselin
 - **Bounded retry**, not infinite. Three attempts, then a human — with all three attempts attached.
 - A human is only ever shown **a result that already passed verification**.
 
-![Nirnay — resolution loop, seventeen steps](architecture/png/02-resolution-loop.png)
+![Nirnay — resolution loop, seventeen steps](architecture/png/appendix/A2-resolution-loop.png)
 
 - Every fallback is an explicit edge, not an exception: rails disagree → escalate · same fingerprint → stop · rejected → report only · seal broken at commit → re-request.
 - The parked approval is keyed by **case id + seal**, so a response to a stale state can't resolve a newer one — it isn't the same interrupt.
@@ -135,7 +135,7 @@ seal = H( payload ‖ recheck ‖ ledger_version ‖ policy_hash )
 > **You approve *this exact action, in this exact state* — not "the refund step".**
 > That distinction is the whole difference between a demo and a system that touches money.
 
-![Continuum — the durable runtime](architecture/png/03-durable-runtime.png)
+![Continuum — the durable runtime](architecture/png/appendix/A3-durable-runtime.png)
 
 - Cases execute as **supersteps**: state commits atomically at each barrier and a checkpoint is written there — never mid-step, so a resume can't observe a half-applied state.
 - Checkpoints are **chained** and stamped with the policy graph hash; the parked approval lives inside the checkpoint, not in memory.
@@ -187,7 +187,7 @@ Plus deterministic primitives that **never ask a model a safety question**: tool
 | **9** | **PII Tokeniser + Promise Guard** — format-preserving tokens in, deterministic promise check out | The model **never sees raw PII**; the customer is **never promised** what policy doesn't allow. |
 | **10** | **Fail-closed drift + counterfactual packets** | A degrading model gets **more cautious, never less**; every escalation names the one piece of evidence that would change the decision. |
 
-![Decision science — from a score to a guarantee with a price](architecture/png/04-decision-science.png)
+![Decision science — from a score to a guarantee with a price](architecture/png/appendix/A4-decision-science.png)
 
 ### The one-line claim
 
@@ -235,7 +235,7 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 - **Model-neutral:** the reasoning model is served in-house; any hosted provider plugs in behind the same client without a rewrite.
 - **Deliberately absent:** no hosted-only dependency and no agent-orchestration library — the runtime, gateway, Shadow Ledger and Seal are ours, which is why their guarantees are ours to state.
 
-![Nirnay — tech stack](architecture/png/05-tech-stack.png)
+![Nirnay — tech stack](architecture/png/02-tech-stack-slide.png)
 
 ### Three choices a technical judge will press on
 
@@ -247,30 +247,33 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 
 ## 3.2 · Architecture
 
-![Nirnay — system architecture](architecture/png/01-system-architecture.png)
+![Nirnay — system architecture](architecture/png/01-architecture-slide.png)
 
-**Editable source:** [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — five pages · [open in diagrams.net](https://app.diagrams.net/#Hkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio) (signs in with GitHub)
+**Slide-ready:** 16:9, 3840×2160 PNG in [`architecture/png/`](architecture/png/) · vector SVG in [`architecture/svg/`](architecture/svg/) — insert the SVG in PowerPoint and it stays sharp at any size.
+**Editable source:** [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) · [open in diagrams.net](https://app.diagrams.net/#Hkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio) (signs in with GitHub)
 
-### Reading it left to right
+### Reading it
 
-- **Input** — customer channels, transaction systems (read only through the Tool Gateway), knowledge & policy, evaluation data, compliance constraints
-- **Data layer** — six stores; three are ours: ★ Shadow Ledger · ★ Continuum Checkpoints · ★ hash-chained Ledger Trail
-- **Resolution engine** — ① Intake & Sentry → ② Understand & Ground → ③ Calibrated Decision → ④ Verify-before-Gate → ⑤ Guard & Respond → ⑥ Learn & Observe
-- **Frontend** — Agent Workspace (escalation packets, shadow diffs, sealed decisions) and Supervisor Console (autonomy dial, live reliability, drift alerts)
+- **Customer → five stages → humans.** ① Sentry guards the door · ② Understand gathers evidence and plans, but cannot act · ③ Decide chooses ACT / HEDGE / ESCALATE / REFUSE · ④ Verify runs the plan on the Shadow Ledger first · ⑤ Seal binds approval to the exact state and commits once
+- **Only escalations reach a person** — the red line from Decide to the Agent Workspace
+- **Only a sealed commit touches money** — the red dashed boundary holds Seal and the Tool Gateway, nothing else
+- **It learns, and fails closed** — ⑥ feeds labels back into Decide and tightens automatically on drift
 
 ### Six invariants it enforces
 
 ① Agents think, executors act · ② PII never reaches a model · ③ No unverified outcome is shown to a human · ④ No approval outlives its state · ⑤ Nothing is lost on restart · ⑥ Fail closed
 
-### The five diagram pages
+### Diagram pages
 
-| Page | Shows | In this deck |
+| Page | Use it for | File |
 |---|---|---|
-| 1 · System architecture | the whole system, one screen | §3.2 |
-| 2 · Resolution loop | seventeen steps, fallbacks as edges | §2.3 |
-| 3 · Durable runtime | supersteps, interception layers, Seal lifecycle | §2.4 |
-| 4 · Decision science | calibration → conformal → money → earned autonomy | §2.7 |
-| 5 · Tech stack | seven layers, ★ = in-house | §3.1 |
+| **1 · Architecture** | the architecture slide | `png/01-architecture-slide.png` · `svg/01-architecture-slide.svg` |
+| **2 · Tech stack** | the tech-stack slide | `png/02-tech-stack-slide.png` · `svg/02-tech-stack-slide.svg` |
+| A1 · Detailed system | backup slide for deep questions | `png/appendix/A1-detailed-system-architecture.png` |
+| A2 · Resolution loop | backup — seventeen steps, fallbacks as edges (§2.3) | `png/appendix/A2-resolution-loop.png` |
+| A3 · Durable runtime | backup — supersteps, Seal lifecycle (§2.4) | `png/appendix/A3-durable-runtime.png` |
+| A4 · Decision science | backup — calibration → conformal → earned autonomy (§2.7) | `png/appendix/A4-decision-science.png` |
+| A5 · Tech stack detail | backup — each layer with how Nirnay uses it | `png/appendix/A5-tech-stack-detail.png` |
 
 ---
 

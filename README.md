@@ -32,12 +32,16 @@ case survives process restarts.
 
 ## Architecture
 
-![Nirnay — system architecture](architecture/png/01-system-architecture.png)
+![Nirnay — system architecture](architecture/png/01-architecture-slide.png)
 
-Editable source: [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — five pages:
-system architecture · resolution loop · durable runtime · decision science · tech stack.
+Slide-ready 16:9 exports: 3840×2160 PNGs in [`architecture/png/`](architecture/png/) and vector SVGs in
+[`architecture/svg/`](architecture/svg/) for the **architecture** and **tech stack** slides. Detailed backup pages
+(full system, resolution loop, durable runtime, decision science, stack detail) are in
+[`architecture/png/appendix/`](architecture/png/appendix/).
+
+Editable source: [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — seven pages.
 [Open it in diagrams.net](https://app.diagrams.net/#Hkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio) (signs in with GitHub while the repo is private)
-or in VS Code with the Draw.io extension. PNG exports of every page are in [`architecture/png/`](architecture/png/).
+or in VS Code with the Draw.io extension.
 
 ## Read the deck
 
