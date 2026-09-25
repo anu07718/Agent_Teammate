@@ -271,6 +271,7 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 | **2 · Tech stack** | the tech-stack slide | `png/02-tech-stack-slide.png` · `svg/02-tech-stack-slide.svg` |
 | 3 · Architecture, flow view | optional “how a case moves” slide | `png/03-architecture-flow-slide.png` · `svg/03-architecture-flow-slide.svg` |
 | 4 · Tech stack panel | bottom-right slot of the *Technical Approach & Tech Stack* slide — 18 key open-source technologies + the 9 in-house components | `png/04-tech-stack-panel.png` · `svg/04-tech-stack-panel.svg` |
+| 5 · Business model | the business-model slide; head-only transparent version for your own template | `png/05-business-model-slide.png` · `png/05-business-model-infographic.png` · matching SVGs |
 | A1 · Detailed system | backup slide for deep questions | `png/appendix/A1-detailed-system-architecture.png` |
 | A2 · Resolution loop | backup — seventeen steps, fallbacks as edges (§2.3) | `png/appendix/A2-resolution-loop.png` |
 | A3 · Durable runtime | backup — supersteps, Seal lifecycle (§2.4) | `png/appendix/A3-durable-runtime.png` |
@@ -429,6 +430,19 @@ The loop back to P1 is deliberate: **a benchmark pass means the eval set was too
 ---
 
 # 6 · Business Model
+
+![Nirnay — business model](architecture/png/05-business-model-slide.png)
+
+| Around the head | Point |
+|---|---|
+| **Customers** | Payment platforms, banks, NBFCs and insurers with heavy dispute volume |
+| **Value** | Safe autonomy from ~30% to 55–65% of cases, with a guaranteed error ceiling |
+| **Pay-per-Resolution** | ₹6–12 per ticket resolved on its own — billed only when it was right to act |
+| **Confidence Layer** | Score, router and Seal around a bot already in place — priced per decision |
+| **On-Prem Licence** | Annual licence + tuning retainer for banks and PSPs that can't send data out |
+| **Go-to-Market** | Land on failed-UPI disputes: a free 60-day pilot that ends in a reliability report |
+| **Unit Economics** | ₹3–6 per autonomous resolution vs ₹40–60 for a human agent |
+| **Data Flywheel** | Every case becomes a label — the second customer is cheaper than the first |
 
 ## 6.1 · The wedge
 
