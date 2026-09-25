@@ -435,14 +435,16 @@ The loop back to P1 is deliberate: **a benchmark pass means the eval set was too
 
 | Around the head | Point |
 |---|---|
-| **Customers** | Payment platforms, banks, NBFCs and insurers with heavy dispute volume |
-| **Value** | Safe autonomy from ~30% to 55–65% of cases, with a guaranteed error ceiling |
-| **Pay-per-Resolution** | ₹6–12 per ticket resolved on its own — billed only when it was right to act |
-| **Confidence Layer** | Score, router and Seal around a bot already in place — priced per decision |
-| **On-Prem Licence** | Annual licence + tuning retainer for banks and PSPs that can't send data out |
-| **Go-to-Market** | Land on failed-UPI disputes: a free 60-day pilot that ends in a reliability report |
-| **Unit Economics** | ₹3–6 per autonomous resolution vs ₹40–60 for a human agent |
-| **Data Flywheel** | Every case becomes a label — the second customer is cheaper than the first |
+| **Customers** | **24.5 billion** UPI payments a month — even **0.1%** going wrong is **24 million** problems. For platforms, banks, NBFCs and insurers |
+| **Value** | **~2×** more cases closed with no human: safe autonomy from **~30%** to **55–65%**, under a guaranteed error ceiling as low as **0.2%** |
+| **Pay-per-Resolution** | **₹6–12** per ticket resolved on its own, **₹0** on escalations — paid only when we were right to act |
+| **Confidence Layer** | No rip-and-replace: score, router and Seal wrap the existing bot — each decision scored in **< 200 ms**, priced per decision |
+| **On-Prem Licence** | **100%** of data stays in-house: annual licence + tuning retainer for banks and PSPs, from **₹6–8** per resolution at **100,000+** a month |
+| **Go-to-Market** | Free **60-day** pilot on failed-UPI disputes, up to **5,000** resolutions — ending in a reliability report no competitor can produce |
+| **Unit Economics** | **₹3–6** per resolution vs **₹40–60** for a human: **85–95%** cheaper, and a first reply in **under 5 seconds** instead of hours |
+| **Data Flywheel** | **100%** of human decisions become training labels — the curve tightens with every case, so customer **#2** costs less than customer **#1** |
+
+<sub>UPI volume: record 24.51 billion transactions in August 2026. The error ceiling α is a per-action-type setting (0.2% for chargebacks in the illustrative table); the cost range is the deck's own model (§5.2).</sub>
 
 ## 6.1 · The wedge
 
