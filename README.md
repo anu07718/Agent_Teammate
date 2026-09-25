@@ -31,10 +31,15 @@ Runner-up: Merchant Growth AI, on the strength of `VendorConnect`.
 **Read §4a first** — it covers what nse-guardrail actually contains versus what its README claims.
 **§11** has the open questions, including what you are permitted to reuse from the NSE work.
 
-[**ppt.md**](ppt.md) — the Track 3 deck (title, problem, solution, stack, USP, impact, business
-model) plus a build plan, and a source-level audit of twelve public agent repositories scored
-against the track. Its §0.4 closes §11's second open question: `Svayom/Svayom` has now been read,
-and it is the licence-clean fallback substrate if NSE reuse permission does not come through.
+[**ppt.md**](ppt.md) — **Nirnay**, the Track 3 submission deck: problem statement, proposed
+solution, innovation and uniqueness, technologies, methodology and prototype plan, feasibility
+with risks and mitigations, impact and benefits, business model, and references.
+
+The architecture is a *verify-before-gate* resolution loop — shadow-execute, re-run the intake
+check, and only then ask a human — running on a production agent framework's checkpointed,
+tool-level approval workflow, with a calibrated four-state escalation policy on top.
+`Svayom/Svayom` has now been read and is the licence-clean substrate if reuse permission for the
+prior internship work does not come through.
 
 ### Not yet read
 
