@@ -1,49 +1,55 @@
-# Paytm AI Hackathon — Idea Selection
+# Nirnay
 
-Working repo for choosing and building a Paytm AI Hackathon submission.
+**The support teammate that verifies before it acts — and knows when to stop.**
 
-## Tracks under consideration
+Paytm AI Hackathon · **Track 3 — Autonomous AI Teammates**
 
-1. **AI-Powered Financial Journeys** — simplify Insurance, Lending and Fintech journeys
-2. **Autonomous AI Teammates** — AI that gets the job done, not just responds
-3. **Merchant Growth AI** — the AI business partner for every Paytm merchant
+---
 
-## Current state
+## The problem
 
-[**TRACK_SELECTION_ANALYSIS.md**](TRACK_SELECTION_ANALYSIS.md) — audit of all 49 repos across
-`karthikj30`, `CodedbyAKSA` and `Svayom`, scored against the three tracks, plus a survey of
-public prior art and the competing hackathon field. 17 repos read at source level.
+Support automation is stuck at roughly 30% autonomous resolution. Not because the model can't
+resolve the rest — because nobody can bound the cost of being wrong, so "escalate" is the safe
+default. Every production support agent draws its boundary on hardcoded thresholds that are not
+wrong so much as **unmeasurable**: when the agent says it is 80% sure, nobody can say whether it
+is right 80% of the time.
 
-**Recommendation: Autonomous AI Teammates.**
+## The idea
 
-The field uniformly hardcodes its escalation boundary. You have built the alternative twice:
+Two rules, applied together:
 
-- **`nse-guardrail`** (31,502 LOC — the largest codebase in the account) routes every message to
-  NSE's internal LLM into allow / soft-block→human-queue / hard-block on a calibrated risk score,
-  in under 200 ms, with 405 passing tests and SEBI/OWASP grounding.
-- **`Failure-Aware-Search-Agents`** post-trains a calibrated confidence signal with a measured
-  Expected Calibration Error.
+> **① Never ask a human to approve an unverified outcome.**
+> **② Never let an approval outlive the state it was given for.**
 
-`RAG-with-LangGraph-Guardrails-LLM-Gateway` supplies the production substrate around both.
+Four decisions instead of two — **ACT · HEDGE · ESCALATE · REFUSE** — routed on a confidence
+score that is *post-trained for calibration* and reported as an Expected Calibration Error, not
+asserted as a threshold.
 
-Runner-up: Merchant Growth AI, on the strength of `VendorConnect`.
+Every proposed action is applied to a **Shadow Ledger** first, re-checked by the same code that
+found the problem, and only then sealed to a human's approval — bound to a hash of the payload,
+the verification result and the ledger version, so the approval voids if any of them move. The
+case survives process restarts.
 
-**Read §4a first** — it covers what nse-guardrail actually contains versus what its README claims.
-**§11** has the open questions, including what you are permitted to reuse from the NSE work.
+## Read the deck
 
-[**ppt.md**](ppt.md) — **Nirnay**, the Track 3 submission deck: problem statement, proposed
-solution, innovation and uniqueness, technologies, methodology and prototype plan, feasibility
-with risks and mitigations, impact and benefits, business model, and references.
+**[ppt.md](ppt.md)** — the full submission:
 
-The architecture is a *verify-before-gate* resolution loop — shadow-execute, re-run the intake
-check, and only then ask a human — running on a production agent framework's checkpointed,
-tool-level approval workflow, with a calibrated four-state escalation policy on top.
-`Svayom/Svayom` has now been read and is the licence-clean substrate if reuse permission for the
-prior internship work does not come through.
+| Section | Contents |
+|---|---|
+| 1 | Problem statement |
+| 2 | Proposed solution — components, mechanism, sealed approvals, innovation, scope boundaries |
+| 3 | Technologies, architecture, methodology, prototype demo script |
+| 4 | Feasibility analysis, with ten scored risks and mitigations |
+| 5 | Impact and benefits — social, economic, environmental |
+| 6 | Business model and go-to-market |
+| 7 | References and research |
 
-### Not yet read
+## Status
 
-`CodedbyAKSA/{TensorTrail, CyberQore, PlaceIQ, VLC, DataForge, ExamGEN}`.
-Organisation repos cannot be attached to a session already scoped to `karthikj30` — start a fresh
-session against one of them. Reading the private `karthikj30` repos reordered this analysis once
-already, so this is worth doing before committing to a track.
+Design stage. The build order is deliberate and documented in §3.3 of the deck: **the evaluation
+set is built before the agent**, because a calibration metric measured on easy cases is worthless.
+
+---
+
+<sub>[`TRACK_SELECTION_ANALYSIS.md`](TRACK_SELECTION_ANALYSIS.md) is retained as background — the
+earlier survey of the three hackathon tracks and the competing field that led to this one.</sub>
