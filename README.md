@@ -30,6 +30,15 @@ found the problem, and only then sealed to a human's approval — bound to a has
 the verification result and the ledger version, so the approval voids if any of them move. The
 case survives process restarts.
 
+## Architecture
+
+![Nirnay — system architecture](architecture/png/01-system-architecture.png)
+
+Editable source: [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — five pages:
+system architecture · resolution loop · durable runtime · decision science · tech stack.
+[Open it in diagrams.net](https://app.diagrams.net/#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio)
+or in VS Code with the Draw.io extension. PNG exports of every page are in [`architecture/png/`](architecture/png/).
+
 ## Read the deck
 
 **[ppt.md](ppt.md)** — the full submission:
@@ -39,7 +48,7 @@ case survives process restarts.
 | 1 | Problem statement |
 | 2 | Proposed solution — components, mechanism, sealed approvals, innovation, scope boundaries |
 | 3 | Technologies, architecture, methodology, prototype demo script |
-| 4 | Feasibility analysis, with ten scored risks and mitigations |
+| 4 | Feasibility analysis, with eleven scored risks and mitigations |
 | 5 | Impact and benefits — social, economic, environmental |
 | 6 | Business model and go-to-market |
 | 7 | References and research |
