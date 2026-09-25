@@ -271,7 +271,7 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 | **2 · Tech stack** | the tech-stack slide | `png/02-tech-stack-slide.png` · `svg/02-tech-stack-slide.svg` |
 | 3 · Architecture, flow view | optional “how a case moves” slide | `png/03-architecture-flow-slide.png` · `svg/03-architecture-flow-slide.svg` |
 | 4 · Tech stack panel | bottom-right slot of the *Technical Approach & Tech Stack* slide — 18 key open-source technologies + the 9 in-house components | `png/04-tech-stack-panel.png` · `svg/04-tech-stack-panel.svg` |
-| 5 · Business model | the business-model slide; head-only transparent version for your own template | `png/05-business-model-slide.png` · `png/05-business-model-infographic.png` · matching SVGs |
+| 5 · Business Model Canvas | the business-model slide — nine-box canvas for Nirnaya | `png/06-business-model-canvas.png` |
 | A1 · Detailed system | backup slide for deep questions | `png/appendix/A1-detailed-system-architecture.png` |
 | A2 · Resolution loop | backup — seventeen steps, fallbacks as edges (§2.3) | `png/appendix/A2-resolution-loop.png` |
 | A3 · Durable runtime | backup — supersteps, Seal lifecycle (§2.4) | `png/appendix/A3-durable-runtime.png` |
@@ -431,20 +431,21 @@ The loop back to P1 is deliberate: **a benchmark pass means the eval set was too
 
 # 6 · Business Model
 
-![Nirnay — business model](architecture/png/05-business-model-slide.png)
+![Nirnaya — Business Model Canvas](architecture/png/06-business-model-canvas.png)
 
-| Around the head | Point |
+| Box | Nirnaya |
 |---|---|
-| **Customers** | **24.5 billion** UPI payments a month — even **0.1%** going wrong is **24 million** problems. For platforms, banks, NBFCs and insurers |
-| **Value** | **~2×** more cases closed with no human: safe autonomy from **~30%** to **55–65%**, under a guaranteed error ceiling as low as **0.2%** |
-| **Pay-per-Resolution** | **₹6–12** per ticket resolved on its own, **₹0** on escalations — paid only when we were right to act |
-| **Confidence Layer** | No rip-and-replace: score, router and Seal wrap the existing bot — each decision scored in **< 200 ms**, priced per decision |
-| **On-Prem Licence** | **100%** of data stays in-house: annual licence + tuning retainer for banks and PSPs, from **₹6–8** per resolution at **100,000+** a month |
-| **Go-to-Market** | Free **60-day** pilot on failed-UPI disputes, up to **5,000** resolutions — ending in a reliability report no competitor can produce |
-| **Unit Economics** | **₹3–6** per resolution vs **₹40–60** for a human: **85–95%** cheaper, and a first reply in **under 5 seconds** instead of hours |
-| **Data Flywheel** | **100%** of human decisions become training labels — the curve tightens with every case, so customer **#2** costs less than customer **#1** |
+| **Key Partners** | Payment apps, wallets & PSPs (pilot hosts) · Banks & NBFCs (dispute data, policy rules) · Helpdesk & CRM platforms · Cloud & data-centre providers · System integrators & BFSI consultancies · Compliance & legal advisors · Open-weights model community · Research labs |
+| **Key Activities** | Training & calibrating risk and confidence models · Building adversarial and ambiguity eval sets · Running 60-day shadow-mode pilots · Integrating ledgers, UPI rails & ticketing via the Tool Gateway · Per-customer threshold (α) tuning · Monitoring drift, reliability & cost per resolution · Red-teaming, security & compliance audits |
+| **Key Resources** | Calibrated risk & confidence models · In-house core (Sentry, Shadow Ledger, Seal, Continuum) · Adversarial eval set + simulated-customer benchmark · Labelled resolution data · ML + payments-domain team · Self-hostable platform & inference infrastructure |
+| **Value Proposition** | *Platforms & banks:* ~2× more cases closed with no human (30% → 55–65%), error ceiling as low as 0.2%, 85–95% lower cost per resolution, every action dry-run and re-checked, exactly-once commits with undo, self-hostable · *Support agents:* only hard cases, as evidence packets; sealed one-click decisions · *Customers:* first reply in < 5 s, honest answers with undo · *Risk & compliance:* hash-chained audit trail, reliability report |
+| **Customer Relationships** | *Enterprise:* free 60-day pilot, threshold-tuning retainer, monthly reliability & ROI reports, SLA support · *Support teams:* training; their decisions train the system · *Developers:* API docs & sandbox |
+| **Channels** | Direct enterprise sales to fintech & BFSI · Pilot-led growth · System integrators & cloud marketplaces · Fintech summits & hackathons · Case studies & reliability reports · Website, webinars & LinkedIn |
+| **Customer Segments** | Payment platforms & wallets · Banks & NBFCs (failed-transaction, refund, chargeback, loan/EMI & card disputes) · Insurers · E-commerce & marketplaces · Teams with an existing chatbot stuck at ~30% automation |
+| **Cost Structure** | ML R&D · Cloud/GPU inference & hosting (₹3–6 per autonomous case) · Engineering & domain talent · Security & compliance (PCI-DSS, ISO 27001, DPDP) · Data labelling & red-teaming · Pilot delivery & onboarding · Sales, partnerships & marketing |
+| **Revenue Streams** | Pay-per-resolution (₹6–12 per case resolved on its own, ₹0 on escalations) · Confidence Layer licence (per scored decision) · On-prem enterprise licence (annual + deployment) · Tuning & compliance retainer · Premium services (reliability audits, custom risk models) |
 
-<sub>UPI volume: record 24.51 billion transactions in August 2026. The error ceiling α is a per-action-type setting (0.2% for chargebacks in the illustrative table); the cost range is the deck's own model (§5.2).</sub>
+---
 
 ## 6.1 · The wedge
 
