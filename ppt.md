@@ -249,7 +249,7 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 
 ![Nirnay — system architecture](architecture/png/01-system-architecture.png)
 
-**Editable source:** [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — five pages · [open in diagrams.net](https://app.diagrams.net/#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio)
+**Editable source:** [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — five pages · [open in diagrams.net](https://app.diagrams.net/#Hkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio) (signs in with GitHub)
 
 ### Reading it left to right
 

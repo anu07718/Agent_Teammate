@@ -36,7 +36,7 @@ case survives process restarts.
 
 Editable source: [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) — five pages:
 system architecture · resolution loop · durable runtime · decision science · tech stack.
-[Open it in diagrams.net](https://app.diagrams.net/#Uhttps%3A%2F%2Fraw.githubusercontent.com%2Fkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio)
+[Open it in diagrams.net](https://app.diagrams.net/#Hkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio) (signs in with GitHub while the repo is private)
 or in VS Code with the Draw.io extension. PNG exports of every page are in [`architecture/png/`](architecture/png/).
 
 ## Read the deck
