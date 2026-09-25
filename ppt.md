@@ -270,6 +270,7 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 | **1 · Architecture** | the architecture slide | `png/01-architecture-slide.png` · `svg/01-architecture-slide.svg` |
 | **2 · Tech stack** | the tech-stack slide | `png/02-tech-stack-slide.png` · `svg/02-tech-stack-slide.svg` |
 | 3 · Architecture, flow view | optional “how a case moves” slide | `png/03-architecture-flow-slide.png` · `svg/03-architecture-flow-slide.svg` |
+| 4 · Tech stack panel | bottom-right slot of the *Technical Approach & Tech Stack* slide — twelve key technologies | `png/04-tech-stack-panel.png` · `svg/04-tech-stack-panel.svg` |
 | A1 · Detailed system | backup slide for deep questions | `png/appendix/A1-detailed-system-architecture.png` |
 | A2 · Resolution loop | backup — seventeen steps, fallbacks as edges (§2.3) | `png/appendix/A2-resolution-loop.png` |
 | A3 · Durable runtime | backup — supersteps, Seal lifecycle (§2.4) | `png/appendix/A3-durable-runtime.png` |
