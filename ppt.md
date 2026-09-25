@@ -490,6 +490,54 @@ Banks, insurers, exchanges and PSPs cannot send dispute traffic to a hosted endp
 
 # 7 · References & Research
 
+## 7.1 · Comparison with existing systems
+
+| Features | Salesforce (Agentforce + Fin) | Sierra | Yellow.ai | **Nirnay** |
+|---|:-:|:-:|:-:|:-:|
+| Takes Actions in Live Systems | ✅ | ✅ | ✅ | ✅ |
+| Pay Only for Resolved Cases | ✅ | ✅ | ✅ | ✅ |
+| Self-Hosted / On-Prem Option | ❌ | ❌ | 🟡 | ✅ |
+| Calibrated Confidence (ECE reported) | ❌ | ❌ | ❌ | ✅ |
+| Guaranteed Error Ceiling (≤ α) | ❌ | ❌ | ❌ | ✅ |
+| Shadow Dry-Run + Re-Check Before Approval | ❌ | ❌ | ❌ | ✅ |
+| Approval Sealed to the Exact State | ❌ | ❌ | ❌ | ✅ |
+| Exactly-Once Commit + One-Click Undo | ❌ | ❌ | ❌ | ✅ |
+
+<sub>✅ available · 🟡 partial · ❌ not described in public product documentation (as of September 2026). Nirnay column = as designed.
+Salesforce completed its acquisition of Fin (formerly Intercom) on 10 Sep 2026; Fin is priced at $0.99 per outcome, Agentforce at $0.10 per action.
+Sierra prices on outcomes; Yellow.ai lists $0.99 per resolution on its free tier. Yellow.ai advertises private and on-prem options, but third-party
+reviews report processing in its own cloud — hence partial.</sub>
+
+## 7.2 · References (IEEE)
+
+[1] C. Guo, G. Pleiss, Y. Sun, and K. Q. Weinberger, "On calibration of modern neural networks," in *Proc. 34th Int. Conf. Mach. Learn. (ICML)*, 2017, pp. 1321–1330.
+
+[2] M. Xiong, Z. Hu, X. Lu, Y. Li, J. Fu, J. He, and B. Hooi, "Can LLMs express their uncertainty? An empirical evaluation of confidence elicitation in LLMs," in *Proc. 12th Int. Conf. Learn. Represent. (ICLR)*, 2024.
+
+[3] A. N. Angelopoulos, S. Bates, A. Fisch, L. Lei, and T. Schuster, "Conformal risk control," 2022, *arXiv:2208.02814*.
+
+[4] A. N. Angelopoulos, S. Bates, E. J. Candès, M. I. Jordan, and L. Lei, "Learn then test: Calibrating predictive algorithms to achieve risk control," *Ann. Appl. Statist.*, vol. 19, no. 2, 2025, doi: 10.1214/24-AOAS1998.
+
+[5] Y. Geifman and R. El-Yaniv, "Selective classification for deep neural networks," in *Proc. Adv. Neural Inf. Process. Syst. (NeurIPS)*, vol. 30, 2017.
+
+[6] J. Huang, X. Chen, S. Mishra, H. S. Zheng, A. W. Yu, X. Song, and D. Zhou, "Large language models cannot self-correct reasoning yet," in *Proc. 12th Int. Conf. Learn. Represent. (ICLR)*, 2024.
+
+[7] S. Yao, N. Shinn, P. Razavi, and K. Narasimhan, "τ-bench: A benchmark for tool-agent-user interaction in real-world domains," 2024, *arXiv:2406.12045*.
+
+[8] R. Rafailov, A. Sharma, E. Mitchell, S. Ermon, C. D. Manning, and C. Finn, "Direct preference optimization: Your language model is secretly a reward model," in *Proc. Adv. Neural Inf. Process. Syst. (NeurIPS)*, vol. 36, 2023, pp. 53728–53741, doi: 10.52202/075280-2338.
+
+[9] K. Greshake, S. Abdelnabi, S. Mishra, C. Endres, T. Holz, and M. Fritz, "Not what you've signed up for: Compromising real-world LLM-integrated applications with indirect prompt injection," in *Proc. 16th ACM Workshop Artif. Intell. Secur. (AISec)*, 2023, pp. 79–90, doi: 10.1145/3605764.3623985.
+
+[10] S. Es, J. James, L. Espinosa-Anke, and S. Schockaert, "RAGAs: Automated evaluation of retrieval augmented generation," in *Proc. 18th Conf. Eur. Chapter Assoc. Comput. Linguistics: Syst. Demonstrations (EACL)*, 2024, pp. 150–158, doi: 10.18653/v1/2024.eacl-demo.16.
+
+[11] G. Malewicz, M. H. Austern, A. J. C. Bik, J. C. Dehnert, I. Horn, N. Leiser, and G. Czajkowski, "Pregel: A system for large-scale graph processing," in *Proc. ACM SIGMOD Int. Conf. Manage. Data*, 2010, pp. 135–146, doi: 10.1145/1807167.1807184.
+
+[12] H. Garcia-Molina and K. Salem, "Sagas," in *Proc. ACM SIGMOD Int. Conf. Manage. Data*, 1987, pp. 249–259, doi: 10.1145/38713.38742.
+
+[13] M. Dworkin, "Recommendation for block cipher modes of operation: Methods for format-preserving encryption," Nat. Inst. Standards Technol., Gaithersburg, MD, USA, NIST SP 800-38G Rev. 1 (Initial Public Draft), 2019.
+
+## 7.3 · Further reading
+
 ### Calibration and abstention — the research behind the moat
 
 - **"Can LLMs Express Their Uncertainty?"** (ICLR 2024) — key finding: a model's **stated confidence is systematically higher than its accuracy**. The argument for a trained alternative. — [arxiv.org/abs/2306.13063](https://arxiv.org/abs/2306.13063)
@@ -512,7 +560,7 @@ Banks, insurers, exchanges and PSPs cannot send dispute traffic to a hosted endp
 ### Agent evaluation
 
 - **"τ-bench: Benchmarking AI Agents for Real-World Tool-Agent-User Interaction"** — the simulated-customer methodology, and the **pass^k** metric that scores reliability across repeated trials rather than a single run — [arxiv.org/abs/2406.12045](https://arxiv.org/abs/2406.12045)
-- **"Agents That Verify"** — self-verification and the limits of self-critique — [arxiv.org/abs/2310.01798](https://arxiv.org/abs/2310.01798)
+- **"Large Language Models Cannot Self-Correct Reasoning Yet"** (ICLR 2024) — why a model must not grade its own work; the case for a deterministic Recheck — [arxiv.org/abs/2310.01798](https://arxiv.org/abs/2310.01798)
 - **Groundedness and faithfulness scoring for retrieval systems** — [arxiv.org/abs/2309.15217](https://arxiv.org/abs/2309.15217)
 
 ### Security and governance
