@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+backend/data/
+
+# Web
+node_modules/
+web/dist/
+web/e2e/shots/
+
+# OS
+.DS_Store
+*.tsbuildinfo

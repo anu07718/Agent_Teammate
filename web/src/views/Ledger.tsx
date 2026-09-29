@@ -1,0 +1,106 @@
+import { PlugZap, RefreshCw, RotateCcw, Waves } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api";
+import { Badge, Button, Card, cx } from "../components/ui";
+import { inr } from "../lib/format";
+import { refresh, toast, useUI } from "../store";
+
+const SYSTEMS = ["UPI switch", "Core banking", "Refund engine", "CRM", "Wallet ledger", "Dispute desk", "Card & UPI control", "Messaging"];
+
+export function LedgerView() {
+  const [data, setData] = useState<any>(null);
+  const [failed, setFailed] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const theme = useUI((s) => s.theme);
+  const rev = useUI((s) => s.events.filter((e) => e.kind === "rail.event" || e.kind === "rail.reset" || e.kind === "case.finished" || e.kind === "approval.granted").length);
+  const load = () => api.ledger().then(setData).catch((e) => toast(e.message, "bad"));
+  useEffect(() => { void load(); }, [rev]);
+
+  useEffect(() => {
+    if (!data || !box.current) return;
+    let dispose: (() => void) | null = null;
+    let cancelled = false;
+    // Univer gets a node React does not manage, so neither removes the other's children
+    const el = document.createElement("div");
+    el.style.width = "100%";
+    el.style.height = "100%";
+    box.current.appendChild(el);
+    import("./univerSheet").then(({ mountWorkbook }) => {
+      if (cancelled) return;
+      try {
+        dispose = mountWorkbook(el, [
+          { id: "txns", name: "Transactions", header: ["Txn", "Customer", "Account (token)", "Amount ₹", "Merchant", "UTR", "UPI switch", "Debit", "Reversal", "Refund", "Dispute", "Version"],
+            widths: [70, 80, 130, 90, 150, 120, 90, 80, 90, 90, 80, 70],
+            rows: data.transactions.map((t: any) => [t.id, t.customer_id, t.account, t.amount, t.merchant, t.utr, t.npci_status, t.debit_status, t.reversal, t.refund, t.dispute ?? "", t.version]) },
+          { id: "accts", name: "Accounts", header: ["Account (token)", "Customer", "Balance ₹", "Version"], widths: [150, 90, 120, 80],
+            rows: data.accounts.map((a: any) => [a.account, a.customer_id, a.balance, a.version]) },
+          { id: "credits", name: "Credits & disputes", header: ["Id", "Customer / Txn", "Kind", "Amount ₹", "Status"], widths: [80, 120, 150, 100, 100],
+            rows: [...data.wallet_credits.map((w: any) => [w.id, w.customer_id, w.reason, w.amount, w.status]),
+                   ...data.disputes.map((d: any) => [d.id, d.txn_id, d.kind, "", d.status]),
+                   ...data.blocks.map((b: any) => [b.id, b.customer_id, `block ${b.instrument}`, "", b.status])] },
+        ], theme === "dark");
+      } catch {
+        setFailed(true);
+      }
+    }).catch(() => setFailed(true));
+    return () => {
+      cancelled = true;
+      try { dispose?.(); } catch { /* already torn down */ }
+      el.remove();
+    };
+  }, [data, theme]);
+
+  const outage = async (s: string, down: boolean) => {
+    await api.outage(s, down);
+    toast(down ? `${s} is now failing. Watch the breaker open after 3 calls.` : `${s} restored`, down ? "warn" : "good");
+    await load();
+    await refresh();
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-4 py-2.5">
+        <h2 className="mr-2 text-[14px] font-semibold">Live systems (simulated)</h2>
+        <Button size="sm" onClick={load}><RefreshCw size={13} /> Refresh</Button>
+        <Button size="sm" variant="ghost" onClick={async () => { await api.resetWorld(); toast("World reset to the seeded state", "info"); await load(); }}><RotateCcw size={13} /> Reset world</Button>
+        <span className="mx-1 h-5 w-px bg-line" />
+        <PlugZap size={13} className="text-muted" />
+        {SYSTEMS.map((s) => {
+          const down = data?.down?.includes(s);
+          return (
+            <button key={s} onClick={() => outage(s, !down)} title={down ? "Restore" : "Simulate an outage"}
+              className={cx("h-6 cursor-pointer rounded-full border px-2 text-[11px]", down ? "border-escalate/40 bg-escalate/15 text-escalate" : "border-line-strong text-muted hover:text-fg")}>
+              {s}{down ? " · down" : ""}
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid min-h-0 flex-1 gap-3 p-3 lg:grid-cols-[1fr_320px]">
+        <div className="min-h-[420px] overflow-hidden rounded-lg border border-line bg-panel">
+          {failed ? <div className="p-4 text-[12.5px] text-muted">The spreadsheet view could not load; the tables are on the right.</div> : <div ref={box} className="h-full w-full" />}
+        </div>
+        <div className="min-h-0 space-y-3 overflow-y-auto">
+          <Card title="Move the ground" pad>
+            <p className="mb-2 text-[12px] text-muted">Change the live ledger under a parked case, then try to approve it. The Seal will not match, so the old approval is not applied.</p>
+            <ul className="space-y-1.5">
+              {data?.transactions.map((t: any) => (
+                <li key={t.id} className="flex items-center gap-2 text-[12px]">
+                  <span className="w-14 font-mono">{t.id}</span>
+                  <span className="flex-1 truncate text-muted">{inr(t.amount)} · {t.merchant}</span>
+                  <Button size="sm" variant="ghost" title="Bank auto-reversal lands" onClick={async () => { await api.railEvent(t.id, "reversal_lands"); toast(`${t.id}: auto-reversal landed`, "warn"); }}><Waves size={12} /></Button>
+                </li>
+              ))}
+            </ul>
+          </Card>
+          <Card title="Accounts">
+            <ul className="space-y-1 text-[12px]">
+              {data?.accounts.map((a: any) => (
+                <li key={a.account} className="flex justify-between gap-2"><span className="font-mono text-muted">{a.account}</span><span className="tabular">{inr(a.balance, true)}</span><Badge>v{a.version}</Badge></li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
