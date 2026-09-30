@@ -2,7 +2,7 @@
 
 ## Standing rules from the owner
 - Commit and push as **karthikj30 <karthikjanardhan5@gmail.com>**. Work on **main** and push to main; main is the default branch.
-- The product is **Nirnaya** (not "Nirnay"; older files in `architecture/` and `ppt.md` still say Nirnay).
+- The product is **Nirnaya** (never "Nirnay"; the deck and diagrams were renamed too).
 - Deck and slide text: never name other projects' owners or organisations, no framework names, nothing from the earlier NSE idea. It is a new project.
 - Slide copy is short points, and each slide says something new. Keep deck numbers consistent: autonomy ~30% → 55–65% (target), ₹3–6 vs ₹40–60 per case, ₹6–12 per resolution and ₹0 on escalations, first reply under 5 s, risk check under 200 ms, α as low as 0.2%.
 

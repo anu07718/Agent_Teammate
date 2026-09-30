@@ -1,4 +1,4 @@
-# Nirnay
+# Nirnaya
 
 ### The support teammate that verifies before it acts — and knows when to stop
 
@@ -50,7 +50,7 @@ Three numbers chosen in a meeting. Not wrong — **unmeasurable**. Nobody can an
 
 ## 2.1 · The idea in one screen
 
-**Nirnay is a customer-resolution teammate built on two rules nobody else applies together:**
+**Nirnaya is a customer-resolution teammate built on two rules nobody else applies together:**
 
 > **① Never ask a human to approve an unverified outcome.**
 > **② Never let an approval outlive the state it was given for.**
@@ -87,7 +87,7 @@ Four supporting guards sit around them: **Tool Gateway** (the only path to live 
 ## 2.3 · The mechanism: act in a shadow, verify, *then* gate
 
 Most agents: **decide → act → report.**
-Nirnay: **decide → act in the Shadow Ledger → Recheck → compare to baseline → gate on the verified delta.**
+Nirnaya: **decide → act in the Shadow Ledger → Recheck → compare to baseline → gate on the verified delta.**
 
 ```
  propose  ──▶  Shadow Ledger  ──▶  RECHECK  ──▶  compare vs baseline
@@ -102,7 +102,7 @@ Nirnay: **decide → act in the Shadow Ledger → Recheck → compare to baselin
 - **Bounded retry**, not infinite. Three attempts, then a human — with all three attempts attached.
 - A human is only ever shown **a result that already passed verification**.
 
-![Nirnay — resolution loop, seventeen steps](architecture/png/appendix/A2-resolution-loop.png)
+![Nirnaya — resolution loop, seventeen steps](architecture/png/appendix/A2-resolution-loop.png)
 
 - Every fallback is an explicit edge, not an exception: rails disagree → escalate · same fingerprint → stop · rejected → report only · seal broken at commit → re-request.
 - The parked approval is keyed by **case id + seal**, so a response to a stale state can't resolve a newer one — it isn't the same interrupt.
@@ -222,7 +222,7 @@ Scope discipline is a design decision, and saying it first disarms the obvious q
 
 Open source end to end, self-hostable for data residency. **★ = built in-house.**
 
-| Layer | Technologies | Role in Nirnay |
+| Layer | Technologies | Role in Nirnaya |
 |---|---|---|
 | **Experience** | React · TypeScript · Vite · Tailwind CSS · TanStack Query · Socket.io | Agent Workspace + Supervisor Console as one app; live queue and SLA clocks |
 | **Services & runtime** | Python 3.12 · FastAPI · Pydantic · NGINX · ★ Continuum runtime · ★ Tool Gateway | Typed contracts at every boundary; supersteps with checkpoints; the only path to live systems |
@@ -235,7 +235,7 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 - **Model-neutral:** the reasoning model is served in-house; any hosted provider plugs in behind the same client without a rewrite.
 - **Deliberately absent:** no hosted-only dependency and no agent-orchestration library — the runtime, gateway, Shadow Ledger and Seal are ours, which is why their guarantees are ours to state.
 
-![Nirnay — tech stack](architecture/png/02-tech-stack-slide.png)
+![Nirnaya — tech stack](architecture/png/02-tech-stack-slide.png)
 
 ### Three choices a technical judge will press on
 
@@ -247,16 +247,16 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 
 ## 3.2 · Architecture
 
-![Nirnay — system architecture](architecture/png/01-architecture-slide.png)
+![Nirnaya — system architecture](architecture/png/01-architecture-slide.png)
 
 **Slide-ready:** 16:9, 3840×2160 PNG in [`architecture/png/`](architecture/png/) · vector SVG in [`architecture/svg/`](architecture/svg/) — insert the SVG in PowerPoint and it stays sharp at any size.
-**Editable source:** [`architecture/nirnay-architecture.drawio`](architecture/nirnay-architecture.drawio) · [open in diagrams.net](https://app.diagrams.net/#Hkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnay-architecture.drawio) (signs in with GitHub)
+**Editable source:** [`architecture/nirnaya-architecture.drawio`](architecture/nirnaya-architecture.drawio) · [open in diagrams.net](https://app.diagrams.net/#Hkarthikj30%2FAgent_Teammate%2Fmain%2Farchitecture%2Fnirnaya-architecture.drawio) (signs in with GitHub)
 
 ### Reading it
 
 - **Input → Data → Engine → Humans**, left to right — the way a case travels
 - **Six stages in the engine:** ① Intake & Sentry · ② Understand & Ground · ③ Calibrated Decision · ④ Verify-before-Gate · ⑤ Guard & Respond · ⑥ Learn & Observe
-- **Gold = unique to Nirnay.** The red dashed band is the money boundary — only Commit, through a matching Seal, crosses it
+- **Gold = unique to Nirnaya.** The red dashed band is the money boundary — only Commit, through a matching Seal, crosses it
 - **The red arrow is the only way a case reaches a person:** Decide routes it to ESCALATE, with an evidence packet
 
 ### Six invariants it enforces
@@ -276,7 +276,7 @@ Open source end to end, self-hostable for data residency. **★ = built in-house
 | A2 · Resolution loop | backup — seventeen steps, fallbacks as edges (§2.3) | `png/appendix/A2-resolution-loop.png` |
 | A3 · Durable runtime | backup — supersteps, Seal lifecycle (§2.4) | `png/appendix/A3-durable-runtime.png` |
 | A4 · Decision science | backup — calibration → conformal → earned autonomy (§2.7) | `png/appendix/A4-decision-science.png` |
-| A5 · Tech stack detail | backup — each layer with how Nirnay uses it | `png/appendix/A5-tech-stack-detail.png` |
+| A5 · Tech stack detail | backup — each layer with how Nirnaya uses it | `png/appendix/A5-tech-stack-detail.png` |
 
 ---
 
@@ -383,7 +383,7 @@ The loop back to P1 is deliberate: **a benchmark pass means the eval set was too
 
 ## 5.1 · Target audiences and what changes for each
 
-| Audience | Today | With Nirnay |
+| Audience | Today | With Nirnaya |
 |---|---|---|
 | **Support agent** | Queue full of cases a bot could have closed; each arrives as a raw transcript | Sees only genuinely hard cases, each as a **structured packet** — findings, evidence, proposed action, reason it stopped |
 | **Customer** | Minutes to hours; a bot that either guesses or gives up | Seconds for clear cases; **honest uncertainty with an undo** for ambiguous ones; a prepared human for hard ones |
@@ -395,7 +395,7 @@ The loop back to P1 is deliberate: **a benchmark pass means the eval set was too
 
 ## 5.2 · Economic benefit
 
-| Metric | Today | With Nirnay | Mechanism |
+| Metric | Today | With Nirnaya | Mechanism |
 |---|---|---|---|
 | Automated resolution | ~30% | **55–65%** | Cases the bot *can* handle stop being escalated "just in case" |
 | Escalation precision | unmeasured | **reported, with a curve** | The reliability diagram is the instrument |
@@ -493,7 +493,7 @@ Banks, insurers, exchanges and PSPs cannot send dispute traffic to a hosted endp
 
 ## 7.1 · Comparison with existing systems
 
-| Features | Salesforce (Agentforce + Fin) | Sierra | Yellow.ai | **Nirnay** |
+| Features | Salesforce (Agentforce + Fin) | Sierra | Yellow.ai | **Nirnaya** |
 |---|:-:|:-:|:-:|:-:|
 | Takes Actions in Live Systems | ✅ | ✅ | ✅ | ✅ |
 | Pay Only for Resolved Cases | ✅ | ✅ | ✅ | ✅ |
@@ -504,7 +504,7 @@ Banks, insurers, exchanges and PSPs cannot send dispute traffic to a hosted endp
 | Approval Sealed to the Exact State | ❌ | ❌ | ❌ | ✅ |
 | Exactly-Once Commit + One-Click Undo | ❌ | ❌ | ❌ | ✅ |
 
-<sub>✅ available · 🟡 partial · ❌ not described in public product documentation (as of September 2026). Nirnay column = as designed.
+<sub>✅ available · 🟡 partial · ❌ not described in public product documentation (as of September 2026). Nirnaya column = as designed.
 Salesforce completed its acquisition of Fin (formerly Intercom) on 10 Sep 2026; Fin is priced at $0.99 per outcome, Agentforce at $0.10 per action.
 Sierra prices on outcomes; Yellow.ai lists $0.99 per resolution on its free tier. Yellow.ai advertises private and on-prem options, but third-party
 reviews report processing in its own cloud — hence partial.</sub>
@@ -586,7 +586,7 @@ reviews report processing in its own cloud — hence partial.</sub>
 <div align="center">
 <sub>
 
-**Nirnay** — verify, then gate. Durably.
+**Nirnaya** — verify, then gate. Durably.
 Paytm AI Hackathon · Track 3 — Autonomous AI Teammates · September 2026
 
 </sub>
