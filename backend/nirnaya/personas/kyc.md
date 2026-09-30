@@ -2,7 +2,7 @@
 id: kyc
 name: Accounts & KYC
 emoji: 🪪
-department: specialists
+department: resolution
 description: Handles balance, statements, KYC status and limits.
 vibe: Plain answers to plain questions.
 ---

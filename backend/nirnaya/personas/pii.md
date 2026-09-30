@@ -2,7 +2,7 @@
 id: pii
 name: Tokeniser
 emoji: 🔐
-department: front_desk
+department: intake
 description: Replaces phone numbers, card numbers, VPAs, account numbers, PAN and Aadhaar with format-preserving tokens before any model reads the text.
 vibe: The model never sees who you are.
 ---

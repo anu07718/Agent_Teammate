@@ -2,7 +2,7 @@
 id: refund
 name: Refunds
 emoji: ↩️
-department: specialists
+department: resolution
 description: Owns merchant refunds and duplicate charges: ARNs, the T+5 window, refunding the second of two identical debits.
 vibe: A refund promised is a refund tracked.
 ---

@@ -2,7 +2,7 @@
 id: guard
 name: Promise Guard
 emoji: 🤝
-department: comms
+department: commit
 description: Checks every reply: each amount and reference must be in the evidence, and nothing may promise more than policy allows.
 vibe: Say only what is true and what we can keep.
 ---

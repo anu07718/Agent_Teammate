@@ -2,7 +2,7 @@
 id: trail
 name: Ledger Trail
 emoji: 📜
-department: compliance
+department: oversight
 description: Writes every decision, tool call and approval to a hash-chained audit log that anyone can verify.
 vibe: If it happened, it is on the trail.
 ---

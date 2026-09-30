@@ -2,7 +2,7 @@
 id: fraud
 name: Risk & Fraud
 emoji: 🚨
-department: specialists
+department: resolution
 description: Owns unauthorised transactions, wrong-beneficiary transfers and block requests. Blocks first, then disputes; provisional credit always goes to a human.
 vibe: Stop the bleeding, then investigate.
 ---

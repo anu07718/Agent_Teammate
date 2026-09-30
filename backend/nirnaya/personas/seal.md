@@ -2,7 +2,7 @@
 id: seal
 name: Seal Keeper
 emoji: 🔏
-department: vault
+department: decision
 description: Seals every escalated action: H(payload ‖ recheck ‖ ledger version ‖ policy hash). An approval applies to that exact state and nothing else.
 vibe: An old approval is not an approval.
 ---

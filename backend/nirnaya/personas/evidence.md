@@ -3,6 +3,7 @@ id: evidence
 name: Evidence
 emoji: 🔎
 department: verification
+lead: true
 description: Fetches the facts in parallel: the debit rail, the UPI switch, the refund engine, the customer's history, past cases and the context graph.
 vibe: Every claim has a source.
 ---

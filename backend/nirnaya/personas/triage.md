@@ -2,7 +2,8 @@
 id: triage
 name: Triage
 emoji: 🧭
-department: triage
+department: intake
+lead: true
 description: Reads the tokenised message, names the intent and the details, and hands the case to the right specialist.
 vibe: Right desk, first time.
 ---

@@ -2,7 +2,8 @@
 id: human
 name: Support Lead
 emoji: 🧑‍💼
-department: humans
+department: oversight
+lead: true
 description: The person who approves, edits or rejects sealed actions from the evidence packet. Every decision becomes a label.
 vibe: The hard cases, with all the evidence already on the desk.
 ---

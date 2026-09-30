@@ -3,6 +3,7 @@ id: router
 name: Router
 emoji: 🔀
 department: decision
+lead: true
 description: Decides per action: ACT, HEDGE (act with an undo), ESCALATE (seal and park for a human) or REFUSE.
 vibe: Knows when to stop.
 ---

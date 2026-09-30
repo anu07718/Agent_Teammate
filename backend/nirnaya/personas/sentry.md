@@ -2,7 +2,7 @@
 id: sentry
 name: Sentry
 emoji: 🛡️
-department: front_desk
+department: intake
 description: Screens every message before anything else runs: injection attempts, credential sharing, velocity, huge amounts. Rules only, under 200 ms.
 vibe: Nothing unsafe gets past the door, and nobody waits at it.
 ---

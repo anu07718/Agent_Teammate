@@ -157,6 +157,8 @@ class Engine:
                 "intent": case.get("intent"), "step": case.get("step"), "created_at": case["created_at"],
                 "updated_at": case.get("updated_at"), "amount": txn.get("amount"), "txn_id": txn.get("id"),
                 "preview": (case.get("text") or "")[:120], "specialist": (case.get("plan") or {}).get("specialist"),
+                "owner": (case.get("plan") or {}).get("specialist")
+                or specialists.SPECIALIST.get(case.get("intent") or "", "triage"),
                 "pending": bool(case.get("pending")), "seal_broken": bool(case.get("seal_broken")),
                 "first_reply_s": case.get("first_reply_s")}
 
@@ -312,6 +314,9 @@ class Engine:
             ev["novelty"] = 0.0
         self.graph.link_case(case["id"], u["intent"], tid, cid)
         case["evidence"] = ev
+        read = [n["id"] for n in self.graph.neighbors(f"case:{case['id']}")["nodes"] if n["id"] != f"case:{case['id']}"]
+        read += [f"case:{h['case_id']}" if h["case_id"].startswith("NR-") else f"memory:{h['case_id']}" for h in hits[:3]]
+        self.bus.publish("brain.read", case_id=case["id"], agent="evidence", nodes=read)
         rec["note"] = (f"matched {tid} ({', '.join(match['why'])})" if tid else "no transaction matched") + \
                       f" · {len(hits)} similar case(s)" + (f" · {len(ev['errors'])} read error(s)" if ev["errors"] else "")
 
@@ -459,7 +464,7 @@ class Engine:
                              actions=[p["type"] for p in payload])
             self.roster.waiting("human", case["id"], "approval needed")
             self.bus.publish("agent.status", agent="human", status="waiting", case_id=case["id"],
-                             doing="approval needed", department="humans")
+                             doing="approval needed", department="oversight")
             notes.append(f"sealed {len(payload)} action(s) · seal {s[:12]}…")
             await self._pause(0.6)
             self._idle("seal")

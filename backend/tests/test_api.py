@@ -27,7 +27,7 @@ def test_health_and_state(client):
     h = client.get("/api/health").json()
     assert h["ok"] and len(h["policy_hash"]) == 16
     s = client.get("/api/state").json()
-    assert len(s["agents"]) == 19 and len(s["departments"]) == 9 and len(s["presets"]) >= 10
+    assert len(s["agents"]) == 19 and len(s["departments"]) == 6 and len(s["presets"]) >= 10
     assert any(t["name"] == "bank.reverse" and t["moves_money"] for t in s["tools"])
 
 
