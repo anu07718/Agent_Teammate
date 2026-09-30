@@ -154,7 +154,7 @@ export function SupervisorView() {
                 <li key={r.id} className="flex items-center gap-3 px-3.5 py-2.5">
                   <div className="min-w-0 flex-1">
                     <div className="text-[12.5px] font-medium">{r.name}</div>
-                    <div className="text-[11.5px] text-muted">every {r.every_s >= 3600 ? `${r.every_s / 3600}h` : `${r.every_s}s`} · last {r.last ? ago(r.last) : "never"}{r.result ? ` · ${JSON.stringify(r.result)}` : ""}</div>
+                    <div className="text-[11.5px] text-muted">{r.desc}{r.paused ? " · paused" : ""} · last {r.last ? ago(r.last) : "never"}{r.result ? ` · ${typeof r.result === "string" ? r.result : JSON.stringify(r.result)}` : ""}</div>
                   </div>
                   <Button size="sm" disabled={busy} onClick={() => run(() => api.runRoutine(r.id), `${r.name} ran`)}><Play size={12} /> Run</Button>
                 </li>

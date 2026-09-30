@@ -99,7 +99,17 @@ function patchAgent(list: Agent[], id: string, p: Partial<Agent>) {
   return list.map((a) => (a.id === id ? { ...a, ...p } : a));
 }
 
+const eventListeners = new Set<(ev: NEvent) => void>();
+/** every live event, as it arrives (the office animates from these) */
+export function onEvents(fn: (ev: NEvent) => void) {
+  eventListeners.add(fn);
+  return () => { eventListeners.delete(fn); };
+}
+
 function onEvent(ev: NEvent) {
+  eventListeners.forEach((fn) => {
+    try { fn(ev); } catch { /* one bad listener never stops the stream */ }
+  });
   setState((s) => {
     const events = [...s.events.slice(-399), ev];
     const app = s.app;

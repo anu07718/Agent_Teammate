@@ -8,6 +8,8 @@ export interface Agent {
   description: string;
   vibe: string;
   status: "idle" | "working" | "waiting";
+  lead?: boolean;
+  systems?: string[];
   case_id: string | null;
   doing: string | null;
   since: number;
@@ -44,6 +46,7 @@ export interface CaseSummary {
   txn_id?: string | null;
   preview: string;
   specialist?: string | null;
+  owner?: string;
   pending: boolean;
   seal_broken: boolean;
   first_reply_s?: number | null;

@@ -2,11 +2,11 @@ import { Building2, CheckCheck, Cpu, FlaskConical, Gauge, LayoutGrid, Moon, Scro
 import { useEffect, useRef } from "react";
 import { cx } from "./components/ui";
 import { clock, pct } from "./lib/format";
-import { openCase, setState, setTheme, useUI, type View, EMPTY } from "./store";
+import { OfficePage } from "./office/OfficePage";
+import { getState, openCase, setState, setTheme, useUI, type View, EMPTY } from "./store";
 import { BenchmarkView } from "./views/Benchmark";
 import { BrainView } from "./views/Brain";
 import { LedgerView } from "./views/Ledger";
-import { OfficeView } from "./views/Office";
 import { SettingsView } from "./views/Settings";
 import { SupervisorView } from "./views/Supervisor";
 import { TrailView } from "./views/Trail";
@@ -104,6 +104,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (getState().view === "office") return; // the office has its own keys
       if (e.key === "`") setState((s) => ({ logOpen: !s.logOpen }));
       const n = Number(e.key);
       if (n >= 1 && n <= NAV.length && !e.metaKey && !e.ctrlKey) setState({ view: NAV[n - 1].id });
@@ -113,6 +114,7 @@ export default function App() {
   }, []);
 
   const pending = app?.stats.pending_approvals ?? 0;
+  if (view === "office") return <OfficePage />;
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-11 shrink-0 items-center gap-4 border-b border-line bg-panel px-3" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -145,7 +147,7 @@ export default function App() {
         <main className="flex min-w-0 flex-1 flex-col">
           {error && !app && <div className="m-4 rounded-lg border border-escalate/40 bg-escalate/10 p-3 text-[12.5px]">Cannot reach the Nirnaya server ({error}). Start it with <code className="font-mono">python -m nirnaya</code>, or set the server address under Settings.</div>}
           <div className="min-h-0 flex-1">
-            {!app ? null : view === "office" ? <OfficeView /> : view === "workspace" ? <WorkspaceView /> : view === "approvals" ? <ApprovalsView /> :
+            {!app ? null : view === "workspace" ? <WorkspaceView /> : view === "approvals" ? <ApprovalsView /> :
               view === "supervisor" ? <SupervisorView /> : view === "brain" ? <BrainView /> : view === "ledger" ? <LedgerView /> :
               view === "benchmark" ? <BenchmarkView /> : view === "trail" ? <TrailView /> : <SettingsView />}
           </div>

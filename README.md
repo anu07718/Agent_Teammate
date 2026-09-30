@@ -25,20 +25,48 @@ Development with hot reload: `make dev` (API on :8000, web on :5173).
 Optional: `ANTHROPIC_API_KEY` to let Claude refine understanding and draft replies (rules run without it),
 `SENTRY_DSN` / `VITE_SENTRY_DSN` for error monitoring. Everything else works offline on a simulated bank.
 
-Try the presets in the Office task bar:
+Try it from the office's Task Status bar: pick a customer, press **SAMPLES**, choose one, press **ADD**.
 - a failed UPI debit three days late gets reversed with ₹100/day compensation, on its own
 - a duplicate charge is refunded with an undo
-- an unauthorised ₹18,500 blocks the UPI ID at once and parks the credit for a human
+- an unauthorised ₹18,500 blocks the UPI ID at once and parks the credit for a human: the Risk desk
+  stands up and waves, and its chat holds the sealed evidence packet with APPROVE / REJECT
 - an injection attempt is refused
 
-Then in **Approvals**, press *Move the ground* and try to approve. The Seal no longer matches, so the old
-approval does not apply.
+Then say *move the ground* in that chat and try to approve. The Seal no longer matches the ledger, so the
+old approval does not apply and the case is checked again.
+
+Other departments take tasks in plain words: pick **OVERSIGHT** and type *verify the audit trail*, pick
+**DECISION** and type *run the benchmark*, or put one on the timetable: *every weekday at 9am, write
+today's digest*.
 
 ## The app
 
+**The office** is the home screen: a 3D office where the 19 agents sit at desks in six departments around
+the Brain, in the order a case meets them (Intake → Resolution → Verification → Decision → Commit &
+Reply → Oversight).
+
+- **Department cards** float over every pod with that department's real numbers and DOING / NEXT / DONE.
+- **The top bar** shows the systems Nirnaya is connected to (UPI switch, core banking, refund engine,
+  CRM, wallet, disputes, card and UPI controls, messaging). A tile pulses and a dot rides the wire into
+  the department whenever a tool is called; a tile goes grey during an outage or when its circuit opens.
+- **The Task Status panel** on the right takes a sentence for any department (a customer message for
+  Intake or Resolution, a task for the others, or a routine with its schedule in words) and reads back
+  who will take it before you press ADD. Below it, every case and task as a live card.
+- **Click a department or an agent** to fly in: the rail on the left shows the agent's deliverables,
+  anything waiting for your OK (the sealed packet), and a chat grounded in what it actually did.
+- Case tokens travel between departments as the case moves, desks show their last lines on screen,
+  and the Brain glints on the nodes the Evidence desk reads.
+- Keys: **1–6** departments · **B** the company board · **G** the Brain · **P** the calendar (click a day
+  to book a task or start a routine) · **C** chat with the lead · **D** dark mode · **W** the workspace.
+
+| ![Approval at the Risk desk](docs/screenshots/office-approval.png) | ![The office in dark mode](docs/screenshots/office-dark.png) |
+|---|---|
+
+**The workspace** (W, or the WORKSPACE button) is the operator's view:
+
 | View | What it is for |
 |---|---|
-| **Office** | Every agent at a desk in its department. Customers walk in, case tickets move desk to desk, server racks light up when a tool is called. Click an agent to ask what it is doing |
+| **Office** | Back to the 3D office |
 | **Cases** | An IDE-style workspace: cases grouped by state, tabs per case. Each case shows its superstep timeline, conversation, evidence, decision (score vs certified threshold), shadow diff, seal, audit trail and checkpoint chain |
 | **Approvals** | Sealed evidence packets: approve, edit or reject. Every decision becomes a training label |
 | **Supervisor** | Per-action error ceiling α and autonomy rung, certified thresholds per amount band, the reliability diagram, deflection vs precision, drift monitor, routines |
@@ -90,10 +118,12 @@ read status, search the graph and memory, or score an action.
 ## Tests
 
 ```bash
-make test-backend   # 33 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
-                    # restart durability, checkpoint chaining, tamper detection, drift fail-closed, MCP, HTTP
+make test-backend   # 42 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
+                    # restart durability, checkpoint chaining, tamper detection, drift fail-closed, MCP, HTTP,
+                    # office ops, plain-words schedules, routines, the Brain graph and agent chat
 make test-web       # typecheck + production build
-make run & make e2e # drives the real UI in Chromium: 13 end-to-end checks, including a phone layout
+make run & make e2e # drives the real UI in Chromium: 17 end-to-end checks through the office and the
+                    # workspace, including approvals in the office chat and a phone layout
 ```
 
 The benchmark (Benchmark view, or `POST /api/benchmark/run`) scores 12 scenarios × 3 phrasings.
@@ -107,7 +137,7 @@ rejection, undo and audit adds a real one.
 |---|---|
 | `backend/nirnaya/` | Engine, API, MCP server (Python, FastAPI) |
 | `backend/tests/` | pytest suite |
-| `web/` | Web app (React, Vite, Tailwind), Univer ledger, Playwright e2e in `web/e2e/` |
+| `web/` | Web app (React, Vite, Tailwind): the 3D office in `web/src/office/` (three.js), the workspace views, Univer ledger, Playwright e2e in `web/e2e/` |
 | `docs/REPO-SCAN.md` | What Nirnaya takes from each of the 18 reference projects, and their licences |
 | `ppt.md` | The submission deck |
 | `architecture/` | Architecture and tech-stack diagrams (draw.io source, PNG, SVG) |
