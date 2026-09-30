@@ -86,7 +86,19 @@ py -3.11 -m nirnaya --log nirnaya.log             # file log (desktop / no conso
 
 1. Open the office → Task Status (right).
 2. Pick a customer → **SAMPLES** → choose one → **ADD**.
-3. Keys: **1–6** departments · **B** board · **G** Brain · **P** calendar · **C** chat with lead · **D** dark · **W** workspace.
+3. Keys: **1–6** departments · **B** board · **G** Brain · **P** calendar · **C** chat with lead · **D** dark · **F** flows · **W** workspace.
+4. **FLOWS** (or **F**) → **Live** shows how the agents are working now; **Builder** → pick an example flow → **Run**.
+
+### Working as a team
+
+Everyone who opens the same server shares one office: avatars in the top bar show who is online and where,
+the agent chat is shared, and cards and the audit trail carry each person's name. Click your avatar to set
+your name, or open the portal with one already set:
+
+```
+http://127.0.0.1:8000/?as=Asha
+http://<LAN-IP>:8000/?as=Ravi      # a teammate on the same network (server started with --host 0.0.0.0)
+```
 
 ### Health check
 
@@ -254,12 +266,23 @@ curl -X POST http://127.0.0.1:8000/api/agents/upi/ask ^
 #   -d '{"question":"What did you last do?"}'
 ```
 
-Office chat (same idea):
+Office chat (the same chat the office shows, shared with the team; `by` is your name):
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/office/chat ^
   -H "Content-Type: application/json" ^
-  -d "{\"agent_id\": \"human\", \"message\": \"verify the audit trail\"}"
+  -d "{\"agent\": \"human\", \"text\": \"What is waiting on me?\", \"by\": \"Asha\"}"
+
+# the whole shared chat, every agent:
+curl http://127.0.0.1:8000/api/office/chats
+```
+
+Give a department a task (what the Task Status bar does):
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/office/tasks ^
+  -H "Content-Type: application/json" ^
+  -d "{\"dept\": \"oversight\", \"text\": \"verify the audit trail\", \"by\": \"Asha\"}"
 ```
 
 ### Submit a case (Intake path)
@@ -267,10 +290,22 @@ curl -X POST http://127.0.0.1:8000/api/office/chat ^
 ```bash
 curl -X POST http://127.0.0.1:8000/api/cases ^
   -H "Content-Type: application/json" ^
-  -d "{\"customer_id\": \"C001\", \"message\": \"UPI debit failed but money left my account\"}"
+  -d "{\"customer_id\": \"C-1001\", \"message\": \"UPI debit failed but money left my account\"}"
 ```
 
-Customer ids come from `/api/state` → `customers`.
+Customer ids come from `/api/state` → `customers` (`C-1001` to `C-1004`).
+
+### Flows (workflows the agents run)
+
+In the UI: **FLOWS** → **Builder**: drag nodes from the palette onto the canvas, drag from a node's right dot
+to the next node to wire them, set each node up on the right, **Save**, **Run**. Nodes: Start (by hand or
+“every weekday at 9am”), Customer message, Department task, Check, Ask a person, Post to team chat, Wait.
+
+```bash
+curl http://127.0.0.1:8000/api/flows                 # flows, runs, node types
+curl http://127.0.0.1:8000/api/flows/pipeline        # what the Live tab shows
+curl -X POST http://127.0.0.1:8000/api/flows/FL-1002/run -H "Content-Type: application/json" -d "{\"by\": \"Asha\"}"
+```
 
 ### MCP (other agents calling Nirnaya)
 
@@ -281,7 +316,7 @@ Endpoint: **`POST /mcp`**. Tools include `submit_case`, `case_status`, `graph_se
 ## 6. Tests (optional)
 
 ```bash
-# backend (~43 tests)
+# backend (53 tests)
 cd backend && py -3.11 -m pytest -q
 
 # web typecheck + build
@@ -290,8 +325,11 @@ cd web && npx tsc -b --noEmit && npm run build
 # e2e needs a server on :8000
 # terminal A: make run / py -3.11 -m nirnaya
 # terminal B:
-cd web && npm run e2e
-cd web && node e2e/phone-client.mjs   # phone-sized client flow
+cd web && npm run e2e                 # 17 checks through the office and the workspace
+cd web && node e2e/phone-client.mjs   # phone-sized client flow (5)
+cd web && node e2e/flows.mjs          # build a flow by drag and drop, run it (9)
+cd web && node e2e/team.mjs           # two people on one server (9)
+cd web && node e2e/audit.mjs          # every view and button, ~10 min
 ```
 
 ---
@@ -309,3 +347,5 @@ cd web && node e2e/phone-client.mjs   # phone-sized client flow
 | Database file | `backend/data/nirnaya.db` (or EXE path above) |
 | Agents list | `GET /api/state` or click desks in the office |
 | Agent chat | `POST /api/agents/{id}/ask` or click agent → chat |
+| Flows | **F** in the office → Live / Builder |
+| Arrive with a name | `http://127.0.0.1:8000/?as=Asha` |
