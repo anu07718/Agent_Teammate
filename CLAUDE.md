@@ -11,10 +11,15 @@
 make install                      # pip install -e backend[...] + npm ci in web/
 make run                          # build web, serve API + web on :8000
 make dev                          # API :8000 (reload) + Vite :5173 (proxies /api and /mcp)
-cd backend && python -m pytest -q # 42 tests, about 20 s
+cd backend && python -m pytest -q # 43 tests, about 20 s
 cd web && npx tsc -b --noEmit && npm run build
 cd web && npm run e2e             # needs a server on :8000; 17 browser checks (software WebGL flags are in the script)
+cd web && node e2e/phone-client.mjs  # the APK's flow at phone size, 5 checks (needs a server and web/dist)
+make exe                          # exe/build/Nirnaya + exe/dist/Nirnaya-Setup-<ver>-x64.exe
+make apk                          # apk/dist/Nirnaya-<ver>.apk
 ```
+Server flags for the desktop app: `--db`, `--web`, `--log FILE` (pythonw has no console), `--exit-with PID`
+(stop when the window process ends; Windows waits on the process handle, POSIX polls).
 Env: `NIRNAYA_DB` (SQLite path), `NIRNAYA_STEP_DELAY` (animation pacing, 0 in tests), `NIRNAYA_LLM=off|auto`,
 `ANTHROPIC_API_KEY`, `NIRNAYA_MODEL` (default `claude-opus-5-5`), `SENTRY_DSN`, `VITE_SENTRY_DSN`, `NIRNAYA_WEB`.
 
@@ -43,6 +48,9 @@ Env: `NIRNAYA_DB` (SQLite path), `NIRNAYA_STEP_DELAY` (animation pacing, 0 in te
   - shell and state: `App.tsx` (the office full screen when `view === "office"`, else the workspace shell), `store.ts` (external store + SSE, `onEvents` for listeners), `api.ts`
   - the office (`office/`, all original code): `scene.ts` (three.js scene, camera, people, emotes, tickets, the Brain board; positions bound HTML each frame via `scene.bind(key, el)`), `models.ts` (low-poly pieces), `layout.ts` (pods, seats, colours), `wires.ts` (SVG connector wires), `data.ts` (`/api/office` client, office store, cases and ops → cards), `OfficePage.tsx`, `Panel.tsx` (Task Status), `Rail.tsx` (department + agent chat, approvals), `Overlays.tsx` (board, Brain, calendar, big editor), `office.css`
   - workspace views: `views/*` (Workspace + Approvals, Supervisor, Brain, Ledger with Univer lazy-loaded, Benchmark, Trail, Settings)
+- `exe/`: the Windows app. `neutralino.config.json` (window), `resources/launcher.js` (probe ports 8765–8769, reuse a running Nirnaya, else spawn the bundled `python\pythonw.exe -m nirnaya ... --exit-with NL_PID`, then `location.replace` to the server), `build.sh` (embeddable Python 3.12 + win_amd64 wheels from `requirements-win.txt`, `backend/nirnaya`, `web/dist`, NSIS), `installer.nsi` (per-user, WebView2 bootstrapper). `exe/dist/` holds the built installer (committed).
+- `apk/`: the Android app. Capacitor 8 (`capacitor.config.json`: `androidScheme: http` so it can call LAN servers), `android/` (committed; manifest has `usesCleartextTraffic`), `build.sh` (web → `www/`, `cap sync`, `gradlew assembleDebug`). It is a client: the first launch shows `ServerConnect` in `OfficePage.tsx` (opens by itself when `window.Capacitor.isNativePlatform()`), which saves the address with `setApiBase`. `apk/dist/` holds the built APK (committed).
+- `tools/make_icons.py`: draws every icon (exe `.ico`, installer bitmaps, Android mipmaps and launch screens) from the favicon's N.
 - `docs/REPO-SCAN.md`: what was taken from each of the 18 reference repos, and why some were not merged (licences).
 
 ## Licence rules for the reference repos
@@ -64,6 +72,13 @@ Use the Sentry SDKs only. Do not use pixel-agents' image assets. The MIT and Apa
 - FastAPI runs sync endpoints in a thread pool: any office endpoint that starts an op or publishes events must be `async def` (ops use `asyncio.create_task`).
 - e2e: the recalibration step rejects on purpose (approving would teach the model from the test's own labels and change later routes). Checks select approval packets by `data-case` / `data-op`, never "the last one".
 - Fonts are bundled (`@fontsource/inter`, `@fontsource/instrument-serif`), so the office looks the same offline and in the phone build.
+- Every fetch and link must go through `apiBase()` (`api.ts`): the APK serves the app from `http://localhost`, so a bare `/api/...` would hit the phone, not the server.
+- EXE: numpy's Windows wheels call `ucrtbase.crealf`, which wine 9 lacks. Test with wine 10+ (WineHQ `wine-stable-amd64` + the `i386-windows` DLLs from `wine-stable-i386`, extracted with `dpkg -x`, are enough; the i386 apt deps do not resolve on noble). NSIS installers are 32-bit, hence the i386 DLLs.
+- EXE: Neutralino's `os.spawnProcess` runs `cmd.exe /c "<command>"` on Windows, so the command is `"<path>\pythonw.exe" -m nirnaya --db "<path>" ...` with each path quoted; cmd strips only the outer pair. `NL_PATH` can be relative (`.`): resolve it with `filesystem.getAbsolutePath`.
+- EXE: `neu build` uses and deletes `exe/.tmp`; never keep anything there. Neutralino ignores the window close unless it is a real WM_DELETE_WINDOW (xdotool `windowclose` destroys the window instead; use python-xlib to send the message).
+- EXE: pip `--platform win_amd64` still reads environment markers for the build machine, so Windows-only dependencies (colorama, tzdata) are listed in `requirements-win.txt` by hand.
+- APK: no KVM in the cloud box, so no emulator; `aapt2 dump badging` / `apksigner verify` plus `e2e/phone-client.mjs` are the checks. The server cannot run on the phone: pydantic-core has no Android wheels (Chaquopy or PyPI).
 
 ## Next
-Web app first (done), with the 3D office as home (done). Then the **APK**: wrap `web/` with Capacitor, pointing at a server URL (Settings → Server). Then the **EXE**: Electron shell that starts the backend (PyInstaller) and loads `web/dist`.
+Web app (done), 3D office as home (done), Windows installer in `exe/` (done), Android APK in `apk/` (done, client of a server).
+Still to do: open the EXE on real Windows and the APK on a real phone (neither could run here); code-sign the EXE; a release keystore for the APK; an optional "share on Wi-Fi" switch in the desktop app so a phone can use its server (it listens on 127.0.0.1 only today, and the server has no login).

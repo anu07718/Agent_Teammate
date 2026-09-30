@@ -1,0 +1,13 @@
+{
+  "name": "nirnaya-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nirnaya for Windows: a desktop window around the local Nirnaya server",
+  "scripts": {
+    "build": "bash build.sh"
+  },
+  "devDependencies": {
+    "@neutralinojs/lib": "6.9.0",
+    "@neutralinojs/neu": "11.7.2"
+  }
+}

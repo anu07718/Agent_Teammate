@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nirnaya</title>
+  <link rel="stylesheet" href="/launcher.css" />
+</head>
+<body>
+  <main class="card">
+    <img class="mark" src="/icons/appIcon.png" alt="" width="72" height="72" />
+    <h1>Nirnaya</h1>
+    <p class="tag">the support teammate that knows when to stop</p>
+    <div class="bar" aria-hidden="true"><i></i></div>
+    <p id="status" role="status">Starting…</p>
+    <section id="failed" hidden>
+      <p id="why"></p>
+      <pre id="log"></pre>
+      <div class="row">
+        <button id="retry">Try again</button>
+        <button id="openlog" class="ghost">Open the log</button>
+        <button id="quit" class="ghost">Quit</button>
+      </div>
+    </section>
+  </main>
+  <script src="/js/neutralino.js"></script>
+  <script src="/launcher.js"></script>
+</body>
+</html>

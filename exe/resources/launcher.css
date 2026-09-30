@@ -1,0 +1,26 @@
+:root { --ink: #16181d; --grey: #6b7280; --line: #e6e8ee; --blue: #5b7cfa; --bg: #f6f7fb; --card: #fff; --red: #c2413b; }
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #eceef3; --grey: #9aa1ad; --line: #2a2e37; --bg: #0f1115; --card: #171a20; }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { display: grid; place-items: center; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 "Segoe UI", system-ui, -apple-system, "Inter", sans-serif; }
+.card { width: min(560px, calc(100vw - 32px)); padding: 36px 32px 28px; border: 1px solid var(--line); border-radius: 20px;
+  background: var(--card); text-align: center; box-shadow: 0 20px 60px rgba(20, 24, 40, .08); }
+.mark { border-radius: 18px; }
+h1 { margin: 14px 0 0; font: 400 38px/1.1 Georgia, "Times New Roman", serif; letter-spacing: -.5px; }
+.tag { margin: 4px 0 22px; color: var(--grey); }
+.bar { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.bar i { display: block; width: 36%; height: 100%; border-radius: 4px; background: var(--blue); animation: slide 1.3s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(280%); } }
+#status { margin: 12px 0 0; color: var(--grey); font-size: 13px; }
+body.failed .bar { display: none; }
+#why { color: var(--red); font-weight: 600; margin: 4px 0 10px; }
+pre { max-height: 180px; overflow: auto; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: var(--bg);
+  border: 1px solid var(--line); text-align: left; font: 11px/1.45 Consolas, "Cascadia Mono", monospace; white-space: pre-wrap; }
+pre:empty { display: none; }
+.row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+button { height: 34px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--blue); background: var(--blue); color: #fff;
+  font: inherit; font-weight: 600; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }

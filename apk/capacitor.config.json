@@ -1,0 +1,13 @@
+{
+  "appId": "app.nirnaya.mobile",
+  "appName": "Nirnaya",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#ffffff"
+  }
+}

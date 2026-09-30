@@ -2,6 +2,7 @@
 // every department, the Task Status panel on the right, the rail on the left when a department is in
 // focus, and the board, the Brain and the calendar a key away. Everything moves on live events.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiBase, setApiBase } from "../api";
 import { onEvents, setState, useUI, EMPTY } from "../store";
 import type { NEvent } from "../types";
 import { CONN_ICON } from "./bits";
@@ -22,6 +23,30 @@ function Clock() {
   const [t, setT] = useState(() => new Date());
   useEffect(() => { const h = setInterval(() => setT(new Date()), 1000); return () => clearInterval(h); }, []);
   return <span className="o-clock">{t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }).toLowerCase()}</span>;
+}
+
+/** shown while the server is out of reach: the phone and desktop builds point at a server here */
+function ServerConnect() {
+  const [url, setUrl] = useState(() => apiBase() || "");
+  const [open, setOpen] = useState(() => !!(window as any).Capacitor?.isNativePlatform?.());
+  const save = () => {
+    const u = url.trim().replace(/\/$/, "");
+    setApiBase(u && !/^https?:\/\//.test(u) ? `http://${u}` : u);
+    location.reload();
+  };
+  return (
+    <div className="o-offline" data-testid="server-connect">
+      Can't reach the Nirnaya server{apiBase() ? ` at ${apiBase()}` : ""}.
+      {!open ? <button className="o-actbtn" style={{ marginLeft: 10 }} onClick={() => setOpen(true)}>SET SERVER</button> : (
+        <div className="o-conn-form">
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.20:8000" aria-label="Server address"
+            onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") save(); }} />
+          <button className="o-add" onClick={save}>CONNECT</button>
+          <div className="o-conn-note">On the same Wi-Fi, start the server on your computer with <b>python -m nirnaya --host 0.0.0.0</b> and enter its address.</div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function DeptCard({ pod, tasks, kpis, agents, busy, cardRef, onClick }: {
@@ -362,7 +387,7 @@ export function OfficePage() {
         <Clock />
       </div>
 
-      {!connected && <div className="o-offline">Can't reach the Nirnaya server. Start it with <b>python -m nirnaya</b>.</div>}
+      {!connected && <ServerConnect />}
       {focused && <button className="o-overview" style={{ left: pod && !narrow() ? RAIL_W + 24 : 24 }} onClick={overview}>◂ OVERVIEW</button>}
 
       <Rail pod={pod ?? "intake"} agentId={agentOpen ?? ""} setAgent={setAgentOpen} tasks={tasks} lead={pod ? leadOf(pod) : "triage"} open={!!pod && !!agentOpen}

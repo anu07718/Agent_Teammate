@@ -25,6 +25,15 @@ Development with hot reload: `make dev` (API on :8000, web on :5173).
 Optional: `ANTHROPIC_API_KEY` to let Claude refine understanding and draft replies (rules run without it),
 `SENTRY_DSN` / `VITE_SENTRY_DSN` for error monitoring. Everything else works offline on a simulated bank.
 
+### On Windows and Android
+
+| | Get it | What it is |
+|---|---|---|
+| **Windows** | [`exe/dist/Nirnaya-Setup-0.1.0-x64.exe`](exe/dist/) | The whole of Nirnaya in its own window: the server runs on the computer, nothing else to install. [exe/README.md](exe/README.md) |
+| **Android** | [`apk/dist/Nirnaya-0.1.0.apk`](apk/dist/) | The office and workspace on the phone, connected to a Nirnaya server on your Wi-Fi (`python -m nirnaya --host 0.0.0.0`) or one you host. [apk/README.md](apk/README.md) |
+
+Rebuild them with `make exe` and `make apk`.
+
 Try it from the office's Task Status bar: pick a customer, press **SAMPLES**, choose one, press **ADD**.
 - a failed UPI debit three days late gets reversed with ₹100/day compensation, on its own
 - a duplicate charge is refunded with an undo
@@ -118,13 +127,18 @@ read status, search the graph and memory, or score an action.
 ## Tests
 
 ```bash
-make test-backend   # 42 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
+make test-backend   # 43 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
                     # restart durability, checkpoint chaining, tamper detection, drift fail-closed, MCP, HTTP,
-                    # office ops, plain-words schedules, routines, the Brain graph and agent chat
+                    # office ops, plain-words schedules, routines, the Brain graph, agent chat, and the
+                    # desktop app's server flags (--db/--web/--log, stops with its window)
 make test-web       # typecheck + production build
 make run & make e2e # drives the real UI in Chromium: 17 end-to-end checks through the office and the
                     # workspace, including approvals in the office chat and a phone layout
+make e2e-phone      # the Android app's flow at phone size: asks for the server, connects, works (5 checks)
 ```
+
+How the Windows and Android builds were tested, and what could not be tested on this build machine, is
+written down in [exe/README.md](exe/README.md) and [apk/README.md](apk/README.md).
 
 The benchmark (Benchmark view, or `POST /api/benchmark/run`) scores 12 scenarios × 3 phrasings.
 Currently: pass^3 = 100%, 80% handled alone, 0 wrong autonomous actions. That is on the seeded
@@ -138,6 +152,9 @@ rejection, undo and audit adds a real one.
 | `backend/nirnaya/` | Engine, API, MCP server (Python, FastAPI) |
 | `backend/tests/` | pytest suite |
 | `web/` | Web app (React, Vite, Tailwind): the 3D office in `web/src/office/` (three.js), the workspace views, Univer ledger, Playwright e2e in `web/e2e/` |
+| `exe/` | The Windows app: Neutralino window, launcher, bundled-Python build, NSIS installer; `exe/dist/` has the installer |
+| `apk/` | The Android app: Capacitor project and build; `apk/dist/` has the APK |
+| `tools/make_icons.py` | Draws the app icons for both from the favicon's mark |
 | `docs/REPO-SCAN.md` | What Nirnaya takes from each of the 18 reference projects, and their licences |
 | `ppt.md` | The submission deck |
 | `architecture/` | Architecture and tech-stack diagrams (draw.io source, PNG, SVG) |

@@ -1,0 +1,16 @@
+{
+  "name": "nirnaya-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nirnaya for Android: the Nirnaya web app in a native shell, connected to your Nirnaya server",
+  "scripts": {
+    "build": "bash build.sh"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
+  }
+}
