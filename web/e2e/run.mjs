@@ -143,7 +143,7 @@ await step("a routine in plain words lands on the timetable and runs on RUN NOW"
   await typeTask("every weekday at 9am, write today's digest");
   await panel().getByText(/every weekday · 09:00/).waitFor();
   await panel().getByRole("button", { name: "ADD", exact: true }).click();
-  const r = await waitFor(async () => (await api("/api/office")).routines.find((x) => x.kind === "digest" && x.by === "you"));
+  const r = await waitFor(async () => (await api("/api/office")).routines.find((x) => x.kind === "digest" && x.by !== "system"));
   const row = panel().locator(".o-row", { hasText: r.title }).first();
   await row.getByRole("button", { name: "RUN NOW" }).click();
   await waitFor(async () => (await api("/api/office")).ops.some((o) => o.routine === r.id && o.state === "done"));

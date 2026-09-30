@@ -1,3 +1,4 @@
+import { by } from "./team";
 import type { AppState, CaseDetail } from "./types";
 
 const KEY = "nirnaya.server";
@@ -54,15 +55,15 @@ export const api = {
   health: () => req<{ ok: boolean; version: string; llm: boolean; policy_hash: string }>("/api/health"),
   caseDetail: (id: string) => req<CaseDetail>(`/api/cases/${id}`),
   createCase: (customer_id: string, message: string, channel: string) =>
-    post<{ id: string }>("/api/cases", { customer_id, message, channel }),
+    post<{ id: string }>("/api/cases", { customer_id, message, channel, by: by() }),
   approve: (id: string, edits?: Record<string, number>, note = "") =>
-    post<CaseDetail>(`/api/cases/${id}/approve`, { by: "support lead", note, edits: edits ?? null }),
-  reject: (id: string, note = "") => post<CaseDetail>(`/api/cases/${id}/reject`, { by: "support lead", note }),
-  undo: (id: string) => post<CaseDetail>(`/api/cases/${id}/undo`),
-  audit: (id: string, correct: boolean) => post<CaseDetail>(`/api/cases/${id}/audit?correct=${correct}`),
+    post<CaseDetail>(`/api/cases/${id}/approve`, { by: by(), note, edits: edits ?? null }),
+  reject: (id: string, note = "") => post<CaseDetail>(`/api/cases/${id}/reject`, { by: by(), note }),
+  undo: (id: string) => post<CaseDetail>(`/api/cases/${id}/undo`, { by: by() }),
+  audit: (id: string, correct: boolean) => post<CaseDetail>(`/api/cases/${id}/audit?correct=${correct}&by=${encodeURIComponent(by())}`),
   approvals: () => req<any[]>("/api/approvals"),
   supervisor: () => req<any>("/api/supervisor"),
-  setPolicy: (action: string, patch: { alpha?: number; rung?: number }) => post<any>("/api/supervisor/policy", { action, ...patch }),
+  setPolicy: (action: string, patch: { alpha?: number; rung?: number }) => post<any>("/api/supervisor/policy", { action, ...patch, by: by() }),
   recalibrate: () => post<any>("/api/supervisor/recalibrate"),
   injectDrift: () => post<any>("/api/supervisor/drift/inject"),
   clearDrift: () => post<any>("/api/supervisor/drift/clear"),

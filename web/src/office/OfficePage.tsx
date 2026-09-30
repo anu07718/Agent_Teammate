@@ -3,10 +3,12 @@
 // focus, and the board, the Brain and the calendar a key away. Everything moves on live events.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiBase, setApiBase } from "../api";
+import { Avatar, People } from "../components/People";
 import { onEvents, setState, useUI, EMPTY } from "../store";
+import { me, tellView, type Person } from "../team";
 import type { NEvent } from "../types";
 import { CONN_ICON } from "./bits";
-import { deriveTasks, feed, getOffice, refreshOffice, say, setOffice, softRefreshOffice, useOffice, type OTask } from "./data";
+import { deriveTasks, feed as addFeed, getOffice, heard, loadChats, oapi, refreshOffice, say, setOffice, softRefreshOffice, useOffice, type OTask } from "./data";
 import { POD_IDS, POD_STYLE, STEP_ICON, type PodId } from "./layout";
 import { BigEditor, Board, BrainOverlay, Calendar, useBrainData } from "./Overlays";
 import { Panel } from "./Panel";
@@ -49,9 +51,9 @@ function ServerConnect() {
   );
 }
 
-function DeptCard({ pod, tasks, kpis, agents, busy, cardRef, onClick }: {
+function DeptCard({ pod, tasks, kpis, agents, busy, cardRef, onClick, here = [] }: {
   pod: PodId; tasks: OTask[]; kpis: [string, string | number][]; agents: number; busy: boolean;
-  cardRef?: (el: HTMLDivElement | null) => void; onClick?: () => void;
+  cardRef?: (el: HTMLDivElement | null) => void; onClick?: () => void; here?: Person[];
 }) {
   const s = POD_STYLE[pod];
   const mine = tasks.filter((t) => t.dept === pod);
@@ -59,7 +61,10 @@ function DeptCard({ pod, tasks, kpis, agents, busy, cardRef, onClick }: {
   const waiting = n("waiting");
   return (
     <div className={`o-card${busy ? " sweep" : ""}`} style={{ ["--chip" as any]: s.chip }} ref={cardRef} onClick={onClick} data-pod={pod}>
-      <div className="h"><span className="o-dot" style={{ background: s.chip }} /><span className="o-caps">{s.name}</span><span className="live" /></div>
+      <div className="h"><span className="o-dot" style={{ background: s.chip }} /><span className="o-caps">{s.name}</span>
+        {here.length > 0 && <span className="o-here" title={`${here.map((p) => p.name).join(", ")} ${here.length > 1 ? "are" : "is"} looking at ${s.name.toLowerCase()}`}>
+          {here.slice(0, 3).map((p) => <Avatar key={p.client} p={p} size={18} />)}</span>}
+        <span className="live" /></div>
       <div className="count"><b>{agents}</b><span className="o-caps" style={{ color: "var(--o-grey)" }}>AGENTS</span></div>
       <div className="rows">
         {kpis.map(([l, v]) => <div className="row" key={l}><span className="o-caps">{l}</span><b key={String(v)} className="o-flash">{v}</b></div>)}
@@ -70,10 +75,51 @@ function DeptCard({ pod, tasks, kpis, agents, busy, cardRef, onClick }: {
   );
 }
 
+/** what an event adds to an agent's ACTIVITY feed (live, and replayed from the server when the office opens,
+ * so a teammate who arrives later sees the same history) */
+function feedFrom(ev: NEvent, ownerOf: (cid: string) => string) {
+  const feed = (agent: string, icon: string, text: string) => addFeed(agent, icon, text, ev.ts * 1000);
+  switch (ev.kind) {
+    case "superstep": {
+      const ids: string[] = ev.agents || [];
+      if (ev.phase === "start") for (const id of ids) feed(id, STEP_ICON[ev.step] ?? "▸", `${ev.case_id}: ${ev.step}`);
+      else if (ev.note) for (const id of ids) feed(id, "✓", `${ev.case_id} · ${ev.step}: ${ev.note}`);
+      break;
+    }
+    case "decision.routed": feed("router", "🔀", `${ev.case_id} → ${ev.route}`); break;
+    case "approval.requested":
+      feed(ownerOf(ev.case_id), "⏸", `Waiting for an OK: ${ev.case_id}`);
+      feed("seal", "🔏", `Sealed ${ev.case_id} · ${ev.seal}…`);
+      break;
+    case "approval.granted": feed(ownerOf(ev.case_id), "✅", `${ev.case_id} approved${ev.by ? ` by ${ev.by}` : ""}${ev.edited ? " with an edit" : ""}`); break;
+    case "approval.rejected": feed(ownerOf(ev.case_id), "❌", `${ev.case_id} rejected${ev.by ? ` by ${ev.by}` : ""}`); break;
+    case "seal.rejected_approval": feed("seal", "🔓", `${ev.case_id}: the ledger moved, so the old approval does not apply`); break;
+    case "op.updated": {
+      const op = ev.op;
+      if (op.state === "doing") feed(op.agent, "📋", op.title + (op.by && !["you", "routine"].includes(op.by) ? ` · for ${op.by}` : ""));
+      if (op.state === "waiting") feed(op.agent, "⏸", `Waiting for an OK: ${op.title}`);
+      if (op.state === "done") feed(op.agent, op.ok === false ? "⚠" : "✓", `${op.title}: ${(op.result || "").split("\n")[0]}`);
+      break;
+    }
+    case "drift.alarm": if (ev.status?.alarm) feed("drift", "⚠", ev.status.reason); break;
+    case "rail.event": feed("recheck", "🌊", `${ev.txn_id}: ${String(ev.event).replace("_", " ")} (version ${ev.version})`); break;
+    case "brain.read": if ((ev.nodes || []).length) feed(ev.agent, "🧠", `read ${(ev.nodes || []).length} node(s) in the Brain`); break;
+    case "chat.message": {
+      const m = ev.message;
+      if (m.who === "user" && m.by) feed(m.agent, "💬", `${m.by} asked: ${m.text.slice(0, 80)}`);
+      break;
+    }
+    case "flow.run":
+      if (ev.run.state === "done" || ev.run.state === "failed") feed("human", ev.run.state === "done" ? "✓" : "⚠", `Flow “${ev.run.name}” ${ev.run.state}`);
+      break;
+  }
+}
+
 export function OfficePage() {
   const app = useUI((s) => s.app);
   const agents = useUI((s) => s.app?.agents ?? EMPTY);
   const connected = useUI((s) => s.connected);
+  const people = useUI((s) => s.people ?? EMPTY) as Person[];
   const snap = useOffice((s) => s.snap);
   const [dept, setDept] = useState<PodId>("intake");
   const [text, setText] = useState("");
@@ -183,11 +229,12 @@ export function OfficePage() {
     sceneRef.current.setBrain(nodes, links);
   }, [brain]);
 
-  // live events → the office moves
+  // live events → the office moves (and the ACTIVITY feeds grow)
   useEffect(() => onEvents((ev: NEvent) => {
+    const ownerOf = (cid: string) => (appRef.current?.cases.find((c) => c.id === cid)?.owner) || "triage";
+    feedFrom(ev, ownerOf);
     const s = sceneRef.current;
     if (!s) return;
-    const ownerOf = (cid: string) => (appRef.current?.cases.find((c) => c.id === cid)?.owner) || "triage";
     const keyOf = (system: string) => getOffice().snap?.connectors.find((c) => c.name === system)?.key;
     switch (ev.kind) {
       case "superstep": {
@@ -197,7 +244,6 @@ export function OfficePage() {
             const icon = STEP_ICON[ev.step] ?? "▸";
             s.pushLine(id, `▸ ${ev.case_id} ${ev.step}`);
             s.emote(id, icon);
-            feed(id, icon, `${ev.case_id}: ${ev.step}`);
             const prev = lastStep.current[ev.case_id];
             if (prev && prev !== id) s.ticket(prev, id, POD_STYLE[podOf(id)].chip);
             lastStep.current[ev.case_id] = id;
@@ -205,7 +251,6 @@ export function OfficePage() {
         } else if (ev.note) {
           for (const id of ids) {
             s.pushLine(id, `✓ ${ev.note}`);
-            feed(id, "✓", `${ev.case_id} · ${ev.step}: ${ev.note}`);
             if (getOffice().chats[id]) say(id, { who: "work", icon: "✓", text: `${ev.case_id} · ${ev.step}: ${ev.note}` });
           }
         }
@@ -221,20 +266,14 @@ export function OfficePage() {
       }
       case "decision.routed":
         s.emote("router", ({ ACT: "✅", HEDGE: "↩️", ESCALATE: "⚠️", REFUSE: "⛔" } as Record<string, string>)[ev.route] ?? "🔀");
-        feed("router", "🔀", `${ev.case_id} → ${ev.route}`);
         break;
-      case "approval.requested": {
-        const o = ownerOf(ev.case_id);
+      case "approval.requested":
         s.emote("seal", "🔏");
-        feed(o, "⏸", `Waiting for your OK: ${ev.case_id}`);
-        feed("seal", "🔏", `Sealed ${ev.case_id} · ${ev.seal}…`);
         break;
-      }
       case "approval.granted": {
         const o = ownerOf(ev.case_id);
         s.cheer(o);
         s.emote(o, "✅");
-        feed(o, "✅", `${ev.case_id} approved${ev.edited ? " with an edit" : ""}`);
         softRefreshOffice(600);
         break;
       }
@@ -242,13 +281,11 @@ export function OfficePage() {
         const o = ownerOf(ev.case_id);
         s.slump(o);
         s.emote(o, "❌");
-        feed(o, "❌", `${ev.case_id} rejected`);
         softRefreshOffice(600);
         break;
       }
       case "seal.rejected_approval":
         s.emote("seal", "🔓");
-        feed("seal", "🔓", `${ev.case_id}: the ledger moved, so the old approval does not apply`);
         break;
       case "case.finished": {
         const c = ev.case;
@@ -268,32 +305,55 @@ export function OfficePage() {
       case "op.updated": {
         const op = ev.op;
         softRefreshOffice(200);
-        if (op.state === "doing") { s.emote(op.agent, "📋"); s.pushLine(op.agent, `▸ ${op.title}`); feed(op.agent, "📋", op.title); }
-        if (op.state === "waiting") { s.emote(op.agent, "⏸"); feed(op.agent, "⏸", `Waiting for your OK: ${op.title}`); }
+        if (op.state === "doing") { s.emote(op.agent, "📋"); s.pushLine(op.agent, `▸ ${op.title}`); }
+        if (op.state === "waiting") s.emote(op.agent, "⏸");
         if (op.state === "done") {
           s.emote(op.agent, op.ok === false ? "⚠️" : "✓");
           s.pushLine(op.agent, `✓ ${op.title}`);
-          feed(op.agent, op.ok === false ? "⚠" : "✓", `${op.title}: ${(op.result || "").split("\n")[0]}`);
           if (op.kind === "benchmark" || op.kind === "recalibrate") setBrainV((v) => v + 1);
         }
         break;
       }
+      case "chat.message": {
+        const m = ev.message;
+        heard(m);
+        if (m.who !== "user") { s.emote(m.agent, m.icon === "📣" ? "📣" : "💬"); s.pushLine(m.agent, `💬 ${m.text.slice(0, 60)}`); }
+        break;
+      }
+      case "flow.run":
+        softRefreshOffice(300);
+        break;
       case "op.removed": case "routine.ran": case "routine.changed":
         softRefreshOffice(200);
         break;
       case "drift.alarm":
-        if (ev.status?.alarm) { s.emote("drift", "⚠️"); feed("drift", "⚠", ev.status.reason); }
+        if (ev.status?.alarm) s.emote("drift", "⚠️");
         softRefreshOffice(400);
         break;
       case "rail.event":
         s.emote("recheck", "🌊");
-        feed("recheck", "🌊", `${ev.txn_id}: ${String(ev.event).replace("_", " ")} (version ${ev.version})`);
         break;
       case "rail.outage": case "rail.reset":
         softRefreshOffice(200);
         break;
     }
   }), [podOf, nameOf, labels]);
+
+  // the shared chat, and what happened before this page opened (so a teammate arriving later sees it too)
+  const replayed = useRef(false);
+  useEffect(() => {
+    if (!app || replayed.current) return;
+    replayed.current = true;
+    void loadChats();
+    void oapi.recent(1200).then((evs) => {
+      const ownerOf = (cid: string) => (appRef.current?.cases.find((c) => c.id === cid)?.owner) || "triage";
+      setOffice({ feeds: {} });
+      for (const ev of evs) feedFrom(ev, ownerOf);
+    }).catch(() => {});
+  }, [app, nameOf]);
+
+  // tell the team where you are
+  useEffect(() => { tellView("office", focused && focused !== "brain" ? POD_STYLE[focused].name : focused === "brain" ? "the Brain" : null); }, [focused]);
 
   // keys
   useEffect(() => {
@@ -314,6 +374,7 @@ export function OfficePage() {
       else if (k === "b") setBoard((b) => !b);
       else if (k === "d") setDark((d) => !d);
       else if (k === "w") setState({ view: "workspace" });
+      else if (k === "f") setState({ view: "flows" });
       else if (k === "c" && focused && focused !== "brain") setAgentOpen(leadOf(focused));
       else if (k >= "1" && k <= "6") focusPod(POD_IDS[Number(k) - 1]);
       else if (k === "+" || k === "=") sceneRef.current?.zoomBy(1.4);
@@ -331,6 +392,7 @@ export function OfficePage() {
   const count = (pod: PodId) => agents.filter((a) => a.department === pod).length;
   const busy = (pod: PodId) => agents.some((a) => a.department === pod && a.status === "working");
   const pod = focused && focused !== "brain" ? focused : null;
+  const watching = (p: PodId) => people.filter((x) => x.client !== me().client && x.view === "office" && x.focus === POD_STYLE[p].name);
   const nodeCount = snap?.kpis.brain?.[0]?.[1] ?? brain?.nodes.length ?? 0;
 
   return (
@@ -351,7 +413,7 @@ export function OfficePage() {
         </div>
         {POD_IDS.map((p) => (
           <DeptCard key={p} pod={p} tasks={tasks} kpis={snap?.kpis[p] ?? []} agents={count(p)} busy={busy(p)}
-            cardRef={bind(`pod:${p}`)} onClick={() => focusPod(p)} />
+            cardRef={bind(`pod:${p}`)} onClick={() => focusPod(p)} here={watching(p)} />
         ))}
       </div>
 
@@ -376,14 +438,16 @@ export function OfficePage() {
           <CONN_ICON.claude.icon color={CONN_ICON.claude.color} strokeWidth={2.2} />
         </span>
         <span className="o-gauge o-caps" title="today's cases, how many Nirnaya finished on its own, and the cost per case">
-          TODAY<b>{casesToday}</b>CASES<span className="sep">·</span><b>{stats ? Math.round(stats.autonomy * 100) : 0}%</b>ALONE
+          TODAY<b>{casesToday}</b>{casesToday === 1 ? "CASE" : "CASES"}<span className="sep">·</span><b>{stats ? Math.round(stats.autonomy * 100) : 0}%</b>ALONE
           {stats?.cost_per_case != null && <><span className="sep">·</span><b>₹{stats.cost_per_case.toFixed(1)}</b>PER CASE</>}
         </span>
         <button className="o-btn o-caps" onClick={() => setCal(true)} title="the calendar (P)" aria-label="Calendar">◷ <span className="lbl">CALENDAR</span></button>
+        <button className="o-btn o-caps" onClick={() => setState({ view: "flows" })} title="how the agents are working, and flows you draw (F)" aria-label="Flows">⌥ <span className="lbl">FLOWS</span></button>
         <button className="o-btn o-caps" onClick={() => setState({ view: "workspace" })} title="cases, approvals, supervisor, ledger (W)" aria-label="Workspace">▦ <span className="lbl">WORKSPACE</span></button>
         {waitingAll.length > 0 && (
           <button className="o-btn amber o-caps" onClick={() => zoomToTask(waitingAll[0])} title="go to the first thing waiting for you">⚠ {waitingAll.length}</button>
         )}
+        <People className="o-people" size={26} max={4} />
         <Clock />
       </div>
 
@@ -403,7 +467,7 @@ export function OfficePage() {
         <button onClick={overview} title="overview (0)" aria-label="Overview">⌂</button>
       </div>
       <div className="o-keys">
-        <b>1–6</b> departments · <b>B</b> board · <b>G</b> brain · <b>P</b> calendar · <b>C</b> chat · <b>D</b> dark · <b>W</b> workspace · <b>Esc</b> back
+        <b>1–6</b> departments · <b>B</b> board · <b>G</b> brain · <b>P</b> calendar · <b>C</b> chat · <b>D</b> dark · <b>F</b> flows · <b>W</b> workspace · <b>Esc</b> back
       </div>
 
       <Board open={board} tasks={tasks} snap={snap} agentsIn={count} nameOf={nameOf} onClose={() => setBoard(false)}

@@ -176,7 +176,7 @@ class Ops:
 
     def _remove(self, op_id: str) -> None:
         self.E().store.kv_set(KEY, [o for o in self.all() if o["id"] != op_id])
-        self.E().bus.publish("op.removed", id=op_id)
+        self.E().bus.publish("op.removed", op_id=op_id)
 
     def _next_id(self) -> str:
         n = self.E().store.kv_get("office_ops_seq", 1000) + 1
@@ -238,25 +238,27 @@ class Ops:
                        {"op": op["id"], "kind": op["kind"], "ok": ok, "by": op["by"]})
         return self._put(op)
 
-    def approve(self, op_id: str) -> dict:
+    def approve(self, op_id: str, by: str = "you") -> dict:
         op = self.get(op_id)
         if not op or op["state"] != "waiting":
             raise ValueError("this is not waiting for your OK")
-        op.update(approved=True, state="doing")
+        op.update(approved=True, approved_by=by, state="doing")
+        self.E().trail.append(op.get("case_id") or "-", "office.op.approved", by, {"op": op_id})
         self._put(op)
         self.start(op_id, approved=True)
         return op
 
-    def reject(self, op_id: str, note: str = "") -> dict:
+    def reject(self, op_id: str, note: str = "", by: str = "you") -> dict:
         op = self.get(op_id)
         if not op or op["state"] != "waiting":
             raise ValueError("this is not waiting for your OK")
         e = self.E()
-        op.update(state="done", done_at=time.time(), ok=False, rejected=True, note=note or None,
-                  result="Not run: you said no" + (f" — “{note}”" if note else "") + ".")
+        who = "you" if by == "you" else by
+        op.update(state="done", done_at=time.time(), ok=False, rejected=True, note=note or None, rejected_by=by,
+                  result=f"Not run: {who} said no" + (f" — “{note}”" if note else "") + ".")
         e.roster.idle(op["agent"])
         e.bus.publish("agent.status", agent=op["agent"], status="idle", case_id=None, doing=None, department=op["dept"])
-        e.trail.append("-", "office.op.rejected", "human", {"op": op_id, "note": note})
+        e.trail.append("-", "office.op.rejected", by, {"op": op_id, "note": note})
         return self._put(op)
 
     def cancel(self, op_id: str) -> None:
@@ -288,7 +290,8 @@ def ask_for(e, op: dict) -> str:
 async def run_kind(e, op: dict) -> tuple[bool, str, dict]:
     k, text = op["kind"], op.get("text") or ""
     if k == "case":
-        c = e.create_case(op.get("customer_id") or "C-1001", text, op.get("channel") or "chat")
+        c = e.create_case(op.get("customer_id") or "C-1001", text, op.get("channel") or "chat",
+                          by=None if op["by"] in ("you", "routine") else op["by"])
         e.start(c["id"])
         return True, f"Opened {c['id']} for {c['customer_name']}. It is on the board as its own card.", {"case_id": c["id"]}
     if k == "sample":
@@ -318,7 +321,7 @@ async def run_kind(e, op: dict) -> tuple[bool, str, dict]:
         ok = not any("error" in x for x in reads.values())
         return ok, "\n".join(lines), {"tools": tools}
     if k == "benchmark":
-        r = await benchmark.run(e, k=3, label="office" if op["by"] == "you" else "routine")
+        r = await benchmark.run(e, k=3, label="routine" if op["by"] == "routine" else "office")
         return True, (f"pass^{r['k']} {PCT(r['pass_k'])} over {r['scenarios']} scenarios × {r['k']} phrasings · "
                       f"{PCT(r['autonomy'])} handled alone · {r['wrong_autonomous']} wrong autonomous action(s) · "
                       f"run {r['id']} in {r['seconds']} s"), {}
@@ -355,7 +358,7 @@ async def run_kind(e, op: dict) -> tuple[bool, str, dict]:
         m = re.search(r"\bNR-\d+", text, re.I)
         case_id = m.group(0).upper()
         try:
-            await e.undo(case_id, by="support lead")
+            await e.undo(case_id, by="support lead" if op["by"] in ("you", "routine") else op["by"])
         except (KeyError, ValueError) as ex:
             return False, f"{case_id}: {ex}", {"case_id": case_id}
         return True, f"Undid the hedged action on {case_id} and told the customer.", {"case_id": case_id}

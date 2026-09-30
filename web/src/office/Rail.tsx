@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { ACTION_LABEL, inr } from "../lib/format";
-import { openCase, useUI } from "../store";
+import { openCase, setState, useUI } from "../store";
+import { me } from "../team";
 import type { Agent, CaseDetail } from "../types";
 import { ago } from "../lib/format";
 import { timeStr, span } from "./bits";
@@ -81,8 +82,7 @@ function CaseApproval({ t, onReject }: { t: OTask; onReject: () => void }) {
         <button className="yes" disabled={busy} onClick={async () => {
           setBusy(true);
           try {
-            const r = await api.approve(t.id);
-            say(t.agent, { who: "agent", text: r.seal_broken ? `The ledger moved after this was sealed, so your approval was not applied. I checked the case again: it is ${r.status}.` : "✓ Approved. The gateway verified the seal and committed it exactly once." });
+            await api.approve(t.id); // the team sees who approved it in this chat (the server writes the note)
           } catch (e) { say(t.agent, { who: "agent", text: `That didn't go through: ${(e as Error).message}` }); }
           setBusy(false);
         }}>APPROVE</button>
@@ -99,8 +99,29 @@ function OpApproval({ t, onReject }: { t: OTask; onReject: () => void }) {
       <div className="who o-caps">needs your approval</div>
       <div className="ask">{t.op?.ask ?? `“${t.title}” is ready. Run it?`}</div>
       <div className="btns">
-        <button className="yes" onClick={async () => { await oapi.approveOp(t.id); say(t.agent, { who: "agent", text: "✓ Approved — running it now. It lands here when it's done." }); void refreshOffice(); }}>APPROVE</button>
+        <button className="yes" onClick={async () => {
+          try { await oapi.approveOp(t.id); } catch (e) { say(t.agent, { who: "agent", text: `That didn't go through: ${(e as Error).message}` }); }
+          void refreshOffice();
+        }}>APPROVE</button>
         <button onClick={onReject}>REJECT</button>
+      </div>
+    </div>
+  );
+}
+
+function FlowApproval({ t, onReject }: { t: OTask; onReject: () => void }) {
+  const w = t.flow!;
+  return (
+    <div className="o-appr" data-flow={t.id}>
+      <div className="who o-caps">a flow asks you · {w.flow}</div>
+      <div className="ask">{w.question}</div>
+      <div className="btns">
+        <button className="yes" onClick={async () => {
+          try { await oapi.decideFlow(w.run_id, w.node, true); } catch (e) { say(t.agent, { who: "agent", text: `That didn't go through: ${(e as Error).message}` }); }
+          void refreshOffice();
+        }}>YES</button>
+        <button onClick={onReject}>NO</button>
+        <button onClick={() => setState({ view: "flows" })} title="open the flow">FLOW ↗</button>
       </div>
     </div>
   );
@@ -139,7 +160,7 @@ export function Rail({ pod, agentId, setAgent, tasks, card, lead, open }: Props)
         say(agentId, { who: "agent", text: "Understood. What should change? Tell me here: the note goes on the trail and teaches the calibrator." });
       };
       if (t.state === "waiting") {
-        out.push({ ts: t.changedAt, key: "a" + t.id, node: t.kind === "case" ? <CaseApproval t={t} onReject={reject} /> : <OpApproval t={t} onReject={reject} /> });
+        out.push({ ts: t.changedAt, key: "a" + t.id, node: t.kind === "case" ? <CaseApproval t={t} onReject={reject} /> : t.kind === "flow" ? <FlowApproval t={t} onReject={reject} /> : <OpApproval t={t} onReject={reject} /> });
       } else if (t.state === "done") {
         const meta = t.kind === "case"
           ? `${t.route === "REFUSE" ? "refused" : t.route === "ACT" || t.route === "HEDGE" ? "resolved alone" : "resolved after your OK"} · ${timeStr(t.doneAt ?? t.changedAt)} · click to view`
@@ -153,10 +174,13 @@ export function Rail({ pod, agentId, setAgent, tasks, card, lead, open }: Props)
         out.push({ ts: t.changedAt, key: "d" + t.id, node: <div className="o-m-work"><span className="i">▸</span>{t.id} · {t.title} · {t.kind === "case" ? t.c?.step : "working"}</div> });
       }
     }
+    const myName = me().name;
     for (const [i, m] of (chat ?? []).entries()) {
+      const theirs = m.who === "user" && m.by && m.by !== myName;
       out.push({
-        ts: m.ts, key: "c" + i,
-        node: m.who === "user" ? <div className="o-m-user">{m.text}</div> : m.who === "agent" ? <div className="o-m-agent">{m.text}</div>
+        ts: m.ts, key: "c" + (m.id ?? `l${i}`),
+        node: m.who === "user" ? <div className={`o-m-user${theirs ? " theirs" : ""}`}>{theirs && <span className="by o-caps">{m.by}</span>}{m.text}</div>
+          : m.who === "agent" ? <div className="o-m-agent">{m.by && <span className="by o-caps">{m.by}</span>}{m.text}</div>
           : <div className="o-m-work"><span className="i">{m.icon ?? "▸"}</span>{m.text}</div>,
       });
     }
@@ -169,22 +193,20 @@ export function Rail({ pod, agentId, setAgent, tasks, card, lead, open }: Props)
     text = text.trim();
     if (!text) return;
     setInput("");
-    say(agentId, { who: "user", text });
     const rej = getOffice().rejecting[agentId];
     if (rej) {
       setOffice((s) => { const r = { ...s.rejecting }; delete r[agentId]; return { rejecting: r }; });
-      try {
+      try { // the note, and who wrote it, reach the whole team through the server's chat note
         if (rej.kind === "case") await api.reject(rej.id, text);
+        else if (rej.kind === "flow") { const [run, node] = rej.id.split(":"); await oapi.decideFlow(run, node, false, text); }
         else await oapi.rejectOp(rej.id, text);
-        say(agentId, { who: "agent", text: `Rejected with your note. ${rej.kind === "case" ? "The customer is told a specialist will follow up, and the decision became a training label." : "It won't run."}` });
       } catch (e) { say(agentId, { who: "agent", text: `That didn't go through: ${(e as Error).message}` }); }
       void refreshOffice();
       return;
     }
     setThinking(true);
     try {
-      const r = await oapi.chat(agentId, text);
-      say(agentId, { who: "agent", text: r.reply });
+      const r = await oapi.chat(agentId, text); // the question and the answer come back to everyone as chat messages
       if (r.moved) feed("recheck", "🌊", `${r.moved.txn_id} moved to version ${r.moved.version}`);
       if (r.routine) void refreshOffice();
     } catch (e) {

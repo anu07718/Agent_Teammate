@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from "react";
 import { api } from "./api";
+import { me, streamParams, type Person } from "./team";
 import type { Agent, AppState, CaseSummary, NEvent } from "./types";
 
-export type View = "office" | "workspace" | "approvals" | "supervisor" | "brain" | "ledger" | "benchmark" | "trail" | "settings";
+export type View = "office" | "workspace" | "approvals" | "flows" | "supervisor" | "brain" | "ledger" | "benchmark" | "trail" | "settings";
 
 export interface Toast { id: number; text: string; tone: "info" | "good" | "warn" | "bad"; caseId?: string }
 
@@ -20,6 +21,7 @@ export interface UIState {
   theme: "dark" | "light";
   logOpen: boolean;
   version: number;
+  people: Person[];
 }
 
 const initialTheme = (() => {
@@ -32,7 +34,7 @@ const initialTheme = (() => {
 
 let state: UIState = {
   app: null, connected: false, error: null, events: [], view: "office", openCases: [], activeCase: null,
-  selectedAgent: null, pulses: {}, toasts: [], theme: initialTheme, logOpen: false, version: 0,
+  selectedAgent: null, pulses: {}, toasts: [], theme: initialTheme, logOpen: false, version: 0, people: [],
 };
 const listeners = new Set<() => void>();
 
@@ -107,6 +109,7 @@ export function onEvents(fn: (ev: NEvent) => void) {
 }
 
 function onEvent(ev: NEvent) {
+  if (ev.kind === "presence") { setState({ people: ev.people ?? [] }); return; }
   eventListeners.forEach((fn) => {
     try { fn(ev); } catch { /* one bad listener never stops the stream */ }
   });
@@ -140,10 +143,14 @@ function onEvent(ev: NEvent) {
     return next;
   });
   if (ev.kind === "approval.requested") toast(`${ev.case_id} needs your approval`, "warn", ev.case_id);
+  const other = ev.by && ev.by !== me().name ? ev.by : null; // a teammate did it: say who
+  if (other && ev.kind === "approval.granted") toast(`${other} approved ${ev.case_id}`, "good", ev.case_id);
+  if (other && ev.kind === "approval.rejected") toast(`${other} rejected ${ev.case_id}`, "info", ev.case_id);
   if (ev.kind === "seal.rejected_approval") toast(`${ev.case_id}: the ledger moved, so the old approval was not applied`, "bad", ev.case_id);
   if (ev.kind === "drift.alarm" && ev.status?.alarm) toast("Drift alarm: every α halved, autonomy capped at HEDGE", "bad");
   if (["case.finished", "approval.granted", "approval.rejected", "action.undone", "system.restarted", "rail.reset",
-       "model.recalibrated", "policy.changed"].includes(ev.kind)) softRefresh();
+       "model.recalibrated", "policy.changed", "flow.run"].includes(ev.kind)) softRefresh();
+  if (ev.kind === "op.updated" && (ev.op.state === "waiting" || ev.op.state === "done")) softRefresh();
 }
 
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -162,7 +169,7 @@ let retry: ReturnType<typeof setTimeout> | null = null;
 export function connect(url: string) {
   es?.close();
   if (retry) clearTimeout(retry);
-  es = new EventSource(url);
+  es = new EventSource(`${url}${url.includes("?") ? "&" : "?"}${streamParams(state.view)}`);
   es.onopen = () => {
     setState({ connected: true });
     void refresh();

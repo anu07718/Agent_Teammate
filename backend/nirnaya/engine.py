@@ -160,10 +160,11 @@ class Engine:
                 "owner": (case.get("plan") or {}).get("specialist")
                 or specialists.SPECIALIST.get(case.get("intent") or "", "triage"),
                 "pending": bool(case.get("pending")), "seal_broken": bool(case.get("seal_broken")),
-                "first_reply_s": case.get("first_reply_s")}
+                "first_reply_s": case.get("first_reply_s"), "opened_by": case.get("opened_by"),
+                "approved_by": next((c["by"] for c in reversed(case.get("commits") or []) if c.get("by") not in (None, "autonomous")), None)}
 
     # ── public API ───────────────────────────────────────────────────────────
-    def create_case(self, customer_id: str, message: str, channel: str = "chat") -> dict:
+    def create_case(self, customer_id: str, message: str, channel: str = "chat", by: str | None = None) -> dict:
         cust = self.rails.customer(customer_id)
         if not cust:
             raise ValueError(f"unknown customer {customer_id}")
@@ -171,7 +172,7 @@ class Engine:
         case = {"id": f"NR-{1000 + n}", "customer_id": customer_id, "customer_name": cust["name"].split()[0],
                 "channel": channel, "created_at": time.time(), "status": "running", "route": None, "intent": None,
                 "step": "intake", "raw": message, "conversation": [], "supersteps": [], "decisions": [],
-                "pending": None, "commits": [], "labels": []}
+                "pending": None, "commits": [], "labels": [], "opened_by": by}
         self.store.save_case(case)
         self.trail.append(case["id"], "case.opened", "sentry", {"channel": channel, "customer": customer_id})
         self.bus.publish("case.created", case=self.summary(case))
@@ -578,7 +579,7 @@ class Engine:
             d["action"]["amount"] = p.get("amount", d["action"]["amount"])
         case["commits"].append({"at": time.time(), "by": by, "note": note, "result": res, "edited": edited})
         self._label(case, esc, correct=not edited, source="approval")
-        self.trail.append(case_id, "approval.granted", "human", {"by": by, "edited": edited, "note": note,
+        self.trail.append(case_id, "approval.granted", by or "human", {"by": by, "edited": edited, "note": note,
                                                                  "ok": res["ok"], "seal": seal})
         case["pending"] = None
         case["route_final"] = "APPROVED"
@@ -595,7 +596,7 @@ class Engine:
         self._checkpoint(case, "learn", "done")
         self._remember(case, "accepted" if not edited else "rejected")
         self._save(case)
-        self.bus.publish("approval.granted", case_id=case_id, by=by, edited=edited)
+        self.bus.publish("approval.granted", case_id=case_id, by=by, edited=edited, note=note)
         return case
 
     async def _reseal(self, case: dict, why: str) -> dict:
@@ -626,7 +627,7 @@ class Engine:
         self._label(case, esc, correct=False, source="rejection")
         for d in esc:
             d["route"], d["rejected_by"] = "REJECTED", by
-        self.trail.append(case_id, "approval.rejected", "human", {"by": by, "note": note})
+        self.trail.append(case_id, "approval.rejected", by or "human", {"by": by, "note": note})
         case["pending"] = None
         text = ("After reviewing your case, we can't complete this step automatically. A specialist from our team "
                 "will contact you on this channel with the next steps.")
@@ -637,7 +638,7 @@ class Engine:
         self._checkpoint(case, "learn", "done")
         self._remember(case, "rejected")
         self._save(case)
-        self.bus.publish("approval.rejected", case_id=case_id, by=by)
+        self.bus.publish("approval.rejected", case_id=case_id, by=by, note=note)
         return case
 
     async def undo(self, case_id: str, by: str = "customer") -> dict:
@@ -666,7 +667,7 @@ class Engine:
         self.gateway.send(case_id, case["customer_id"], text)
         self.memory.set_state(case_id, "rejected")
         self._save(case)
-        self.bus.publish("action.undone", case_id=case_id)
+        self.bus.publish("action.undone", case_id=case_id, by=by)
         return case
 
     def audit(self, case_id: str, correct: bool, by: str = "supervisor") -> dict:

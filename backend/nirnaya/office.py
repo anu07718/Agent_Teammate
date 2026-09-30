@@ -6,7 +6,7 @@
 - POST /api/office/ops/{id}/approve|reject, DELETE /api/office/ops/{id}
 - POST /api/office/routines, /routines/{id}/run|pause|resume, DELETE; GET /api/office/occurrences
 - GET  /api/office/brain              the context graph and case memory, for the Brain
-- POST /api/office/chat               talk to one agent
+- POST /api/office/chat               talk to one agent; GET /api/office/chats the shared chat, every agent
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from . import ops as ops_mod
 from . import schedule
 from .agents import DEPARTMENTS
 from .ops import KINDS, Ops
+from .team import Team, clean_name
 
 # The connected systems, as the top bar shows them: which departments each one feeds.
 CONNECTORS = [
@@ -49,6 +50,7 @@ class OfficeTask(BaseModel):
     at: float | None = None          # when to run it: unix seconds or ms; omit for now
     when: dict | None = None         # the REPEAT picker's schedule, if used
     needs_ok: bool | None = None
+    by: str | None = None            # who typed it (the team sees it on the card)
 
 
 class RoutineIn(BaseModel):
@@ -56,15 +58,18 @@ class RoutineIn(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
     when: dict | None = None
     needs_ok: bool | None = None
+    by: str | None = None
 
 
 class NoteIn(BaseModel):
     note: str = ""
+    by: str | None = None
 
 
 class ChatIn(BaseModel):
     agent: str
     text: str = Field(min_length=1, max_length=1000)
+    by: str | None = None
 
 
 def _midnight(now: float | None = None) -> float:
@@ -179,8 +184,9 @@ async def answer(e, agent_id: str, question: str) -> dict:
     return {"agent": agent_id, "answer": reply, "grounded_in": len(lines), "llm": e.llm.enabled}
 
 
-def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops]) -> None:
-    """E: the engine, R: the routines, O: the ops (all behind getters: a restart swaps the engine)."""
+def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Callable[[], Team],
+             F: Callable | None = None) -> None:
+    """E: the engine, R: the routines, O: the ops, T: the team, F: the flows (behind getters: a restart swaps the engine)."""
 
     def dept_ok(d: str) -> None:
         if d not in {x["id"] for x in DEPARTMENTS}:
@@ -192,7 +198,7 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops]) -> No
         return {"pods": DEPARTMENTS, "connectors": connectors(e), "kpis": kpis(e), "ops": O().all()[-150:],
                 "routines": R().public(), "kinds": {k: {"dept": v["dept"], "agent": v["agent"], "title": v["title"],
                                                         "routine": v["routine"], "help": v["help"]} for k, v in KINDS.items()},
-                "llm": {"enabled": e.llm.enabled}, "now": time.time()}
+                "llm": {"enabled": e.llm.enabled}, "now": time.time(), "flow_waits": F().waiting() if F else []}
 
     @app.get("/api/office/interpret")
     def interpret(dept: str, text: str = ""):
@@ -203,6 +209,7 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops]) -> No
     async def add_task(body: OfficeTask):
         dept_ok(body.dept)
         e = E()
+        by = clean_name(body.by, "you")
         due = _seconds(body.at) if body.at else None
         if due and due < time.time() - 60:
             raise HTTPException(400, "that time has passed; pick one that is still ahead")
@@ -210,7 +217,7 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops]) -> No
         if it.get("problem") and it["kind"] == "routine":
             raise HTTPException(400, it["problem"])
         if it["kind"] == "routine":
-            r = R().add(it["op_kind"], it["when"], text=it["text"], title=it["title"], needs_ok=body.needs_ok)
+            r = R().add(it["op_kind"], it["when"], text=it["text"], title=it["title"], needs_ok=body.needs_ok, by=by)
             return {"kind": "routine", "routine": r, "guessed": it.get("guessed")}
         if it["kind"] == "case":
             cust = body.customer_id or e.rails.customers()[0]["id"]
@@ -218,28 +225,36 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops]) -> No
                 raise HTTPException(400, f"unknown customer {cust}")
             if due:
                 op = O().create("case", dept=it["dept"], agent=it["agent"], title=body.text[:90], text=body.text,
-                                due_at=due, customer_id=cust, channel=body.channel, needs_ok=False)
+                                due_at=due, customer_id=cust, channel=body.channel, needs_ok=False, by=by)
                 return {"kind": "op", "op": op}
-            c = e.create_case(cust, body.text, body.channel)
+            c = e.create_case(cust, body.text, body.channel, by=None if by == "you" else by)
             e.start(c["id"])
             return {"kind": "case", "case": e.summary(c)}
         op = O().create(it["op_kind"], dept=it["dept"], agent=it["agent"], title=it["title"], text=body.text,
-                        due_at=due, needs_ok=body.needs_ok)
+                        due_at=due, needs_ok=body.needs_ok, by=by)
         return {"kind": "op", "op": op}
 
     @app.post("/api/office/ops/{op_id}/approve")
-    async def approve_op(op_id: str):
+    async def approve_op(op_id: str, body: NoteIn | None = None):
+        by = clean_name(body.by if body else None, "you")
         try:
-            return O().approve(op_id)
+            op = O().approve(op_id, by=by)
         except ValueError as ex:
             raise HTTPException(409, str(ex))
+        T().post(op["agent"], "work", f"{'You' if by == 'you' else by} approved “{op['title']}”. Running it now; "
+                 "the result lands here.", icon="✅", ref=op_id, by=by)
+        return op
 
     @app.post("/api/office/ops/{op_id}/reject")
     async def reject_op(op_id: str, body: NoteIn):
+        by = clean_name(body.by, "you")
         try:
-            return O().reject(op_id, body.note)
+            op = O().reject(op_id, body.note, by=by)
         except ValueError as ex:
             raise HTTPException(409, str(ex))
+        T().post(op["agent"], "work", f"{'You' if by == 'you' else by} said no to “{op['title']}”"
+                 + (f": “{body.note}”" if body.note else "") + ". It won't run.", icon="❌", ref=op_id, by=by)
+        return op
 
     @app.delete("/api/office/ops/{op_id}")
     async def cancel_op(op_id: str):
@@ -259,7 +274,8 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops]) -> No
             raise HTTPException(400, it["problem"])
         try:
             return {"routine": R().add(it["op_kind"], it["when"], text=it["text"], title=it["title"],
-                                       needs_ok=body.needs_ok), "guessed": it.get("guessed")}
+                                       needs_ok=body.needs_ok, by=clean_name(body.by, "you")),
+                    "guessed": it.get("guessed")}
         except ValueError as ex:
             raise HTTPException(400, str(ex))
 
@@ -295,12 +311,24 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops]) -> No
     def office_brain():
         return brain(E())
 
+    @app.get("/api/office/chats")
+    def chats():
+        return T().chats()
+
     @app.post("/api/office/chat")
     async def chat(body: ChatIn):
         e = E()
-        a = e.roster.agents.get(body.agent)
-        if not a:
+        if body.agent not in e.roster.agents:
             raise HTTPException(404, "unknown agent")
+        by = clean_name(body.by, "you")
+        asked = T().post(body.agent, "user", body.text.strip(), by=by)
+        out = await _chat(body, by)
+        answered = T().post(body.agent, "agent", out["reply"])
+        return {**out, "asked": asked, "answered": answered}
+
+    async def _chat(body: ChatIn, by: str) -> dict:
+        e = E()
+        a = e.roster.agents[body.agent]
         text, low = body.text.strip(), body.text.strip().lower()
         ref = re.search(r"\bNR-\d+\b", text, re.I)
         if re.search(r"\bmove the ground\b", low):
@@ -337,7 +365,7 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops]) -> No
             if it["kind"] == "routine":
                 if it.get("problem"):
                     return {"reply": it["problem"]}
-                r = R().add(it["op_kind"], it["when"], text=it["text"], title=it["title"])
+                r = R().add(it["op_kind"], it["when"], text=it["text"], title=it["title"], by=by)
                 nxt = time.strftime("%a %H:%M", time.localtime(r["next_at"])) if r.get("next_at") else "—"
                 return {"reply": f"Done: {r['title']}, {r['desc']}. {_agent_name(e, r['agent'])} has it"
                                  f"{', and it waits for your OK before it runs' if r['needs_ok'] else ''}. Next run {nxt}.",

@@ -14,13 +14,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, benchmark, docparse, office, reports
+from . import __version__, benchmark, docparse, flows, office, reports
 from .agents import DEPARTMENTS
 from .engine import Engine
 from .policy import GRAPH_HASH, SUPERSTEPS
 from .ops import Ops
 from .presets import PRESETS
 from .routines import Routines
+from .team import Team, clean_name
 
 WEB_DIST = Path(os.environ.get("NIRNAYA_WEB", Path(__file__).resolve().parents[2] / "web" / "dist"))
 
@@ -29,6 +30,18 @@ class NewCase(BaseModel):
     customer_id: str
     message: str = Field(min_length=1, max_length=4000)
     channel: str = "chat"
+    by: str | None = None
+
+
+class By(BaseModel):
+    by: str | None = None
+
+
+class Me(BaseModel):
+    client: str = Field(min_length=1, max_length=64)
+    name: str | None = None
+    view: str | None = None
+    focus: str | None = None
 
 
 class Decision(BaseModel):
@@ -41,6 +54,7 @@ class PolicyChange(BaseModel):
     action: str
     alpha: float | None = None
     rung: int | None = None
+    by: str | None = None
 
 
 class RailEvent(BaseModel):
@@ -75,6 +89,10 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
         state["engine"] = eng
         state["ops"] = Ops(lambda: state["engine"])
         state["routines"] = Routines(eng, state["ops"])
+        state["team"].hook(eng.bus)
+        state["flows"] = flows.Flows(lambda: state["engine"], lambda: state["ops"], lambda: state["team"])
+        state["flows"].recover()
+        state["routines"].flows = state["flows"]
         if background:
             await eng.recover()
             state["routines"].start()
@@ -83,6 +101,7 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
         for t in list(eng.tasks.values()):
             t.cancel()
 
+    state["team"] = Team(lambda: state["engine"])
     app = FastAPI(title="Nirnaya", version=__version__, lifespan=lifespan)
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -109,7 +128,10 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
         return {"agents": e.roster.public(), "departments": DEPARTMENTS, "tools": e.gateway.describe(),
                 "cases": [e.summary(c) for c in e.store.list_cases(100)], "stats": e.stats(),
                 "customers": customers, "presets": PRESETS, "supersteps": SUPERSTEPS, "drift": e.drift_status,
-                "policy_hash": e.policy.policy_hash(), "integrations": integrations()}
+                "policy_hash": e.policy.policy_hash(), "integrations": integrations(),
+                "waiting": {"cases": sum(1 for c in e.store.list_cases(500) if c.get("pending")),
+                            "ops": sum(1 for o in state["ops"].all() if o["state"] == "waiting"),
+                            "flows": len(state["flows"].waiting())}}
 
     @app.get("/api/integrations")
     def integrations():
@@ -121,10 +143,14 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
                 "mcp": {"endpoint": "/mcp", "tools": len(MCP_TOOLS)}}
 
     @app.get("/api/events")
-    async def events(request: Request):
+    async def events(request: Request, who: str | None = None, client: str | None = None, view: str | None = None):
         q = E().bus.subscribe()
+        team: Team = state["team"]
+        client = (client or "")[:64] or None
 
         async def stream():
+            if client:
+                team.join(client, who or "Someone", view)
             try:
                 yield f"event: hello\ndata: {json.dumps({'ts': time.time()})}\n\n"
                 while True:
@@ -137,19 +163,31 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
                         yield ": keep-alive\n\n"
             finally:
                 E().bus.unsubscribe(q)
+                if client:
+                    team.leave(client)
 
         return StreamingResponse(stream(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @app.get("/api/events/recent")
     def recent_events(n: int = 200):
-        return E().bus.recent(n)
+        return E().bus.recent(max(1, min(n, 1500)))
+
+    # ── the team ─────────────────────────────────────────────────────────────
+    @app.get("/api/team")
+    def team_now():
+        return {"people": state["team"].online()}
+
+    @app.post("/api/team/me")
+    def team_me(body: Me):
+        p = state["team"].update(body.client, name=body.name, view=body.view, focus=body.focus)
+        return {"me": p, "people": state["team"].online()}
 
     # ── cases ────────────────────────────────────────────────────────────────
     @app.post("/api/cases", status_code=201)
     async def create(body: NewCase):
         try:
-            c = E().create_case(body.customer_id, body.message, body.channel)
+            c = E().create_case(body.customer_id, body.message, body.channel, by=clean_name(body.by) if body.by else None)
         except ValueError as ex:
             raise HTTPException(400, str(ex))
         E().start(c["id"])
@@ -169,28 +207,28 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
     @app.post("/api/cases/{case_id}/approve")
     async def approve(case_id: str, body: Decision):
         try:
-            return await E().approve(case_id, body.by, body.note, body.edits)
+            return await E().approve(case_id, clean_name(body.by, "support lead"), body.note, body.edits)
         except ValueError as ex:
             raise HTTPException(409, str(ex))
 
     @app.post("/api/cases/{case_id}/reject")
     async def reject(case_id: str, body: Decision):
         try:
-            return await E().reject(case_id, body.by, body.note)
+            return await E().reject(case_id, clean_name(body.by, "support lead"), body.note)
         except ValueError as ex:
             raise HTTPException(409, str(ex))
 
     @app.post("/api/cases/{case_id}/undo")
-    async def undo(case_id: str):
+    async def undo(case_id: str, body: By | None = None):
         try:
-            return await E().undo(case_id)
+            return await E().undo(case_id, by=clean_name(body.by, "support lead") if body and body.by else "support lead")
         except ValueError as ex:
             raise HTTPException(409, str(ex))
 
     @app.post("/api/cases/{case_id}/audit")
-    def audit(case_id: str, correct: bool = True):
+    def audit(case_id: str, correct: bool = True, by: str | None = None):
         get_case(case_id)
-        return E().audit(case_id, correct)
+        return E().audit(case_id, correct, by=clean_name(by, "supervisor"))
 
     @app.get("/api/cases/{case_id}/export.xlsx")
     def export_xlsx(case_id: str):
@@ -233,7 +271,7 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
     def change_policy(body: PolicyChange):
         if body.action not in E().policy.actions:
             raise HTTPException(404, "unknown action")
-        E().set_policy(body.action, body.alpha, body.rung)
+        E().set_policy(body.action, body.alpha, body.rung, by=clean_name(body.by, "supervisor"))
         return supervisor()
 
     @app.post("/api/supervisor/recalibrate")
@@ -475,7 +513,9 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
         return JSONResponse({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "method not found"}})
 
     # ── the office ───────────────────────────────────────────────────────────
-    office.register(app, E, lambda: state["routines"], lambda: state["ops"])
+    office.register(app, E, lambda: state["routines"], lambda: state["ops"], lambda: state["team"],
+                    lambda: state["flows"])
+    flows.register(app, E, lambda: state["flows"])
 
     # ── the web app ──────────────────────────────────────────────────────────
     if WEB_DIST.exists():

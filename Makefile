@@ -2,7 +2,7 @@
 PY ?= python3
 PORT ?= 8000
 
-.PHONY: install build run dev test test-backend test-web e2e e2e-phone exe apk icons clean
+.PHONY: install build run dev test test-backend test-web e2e e2e-phone e2e-flows e2e-team audit exe apk icons clean
 
 install:
 	$(PY) -m pip install -e "backend[dev,llm,docs,monitoring]"
@@ -34,6 +34,17 @@ e2e:
 # the Android app's flow at phone size (also needs a running server)
 e2e-phone: build
 	cd web && node e2e/phone-client.mjs
+
+# flows by drag and drop, and two people on one server (both need a running server)
+e2e-flows:
+	cd web && node e2e/flows.mjs
+
+e2e-team:
+	cd web && node e2e/team.mjs
+
+# a supervisor's walk through every view and button (slow: about ten minutes)
+audit:
+	cd web && node e2e/audit.mjs
 
 # Windows installer -> exe/dist/ (needs makensis; wine 10+ optional, see exe/README.md)
 exe:

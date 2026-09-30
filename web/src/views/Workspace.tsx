@@ -1,9 +1,10 @@
-import { Download, ExternalLink, FileSpreadsheet, Inbox, RotateCcw, ShieldAlert, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { Check, CheckCheck, ClipboardList, ExternalLink, FileSpreadsheet, Inbox, RotateCcw, ShieldAlert, ThumbsDown, ThumbsUp, Workflow, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { ApprovalCard, DiffTable } from "../components/ApprovalCard";
 import { Badge, Button, Card, Empty, KV, Mono, RouteBadge, StatusDot, Tabs, cx } from "../components/ui";
 import { ACTION_LABEL, INTENT_LABEL, ago, clock, inr, pct, short } from "../lib/format";
+import { oapi, type Op, type OfficeSnap } from "../office/data";
 import { closeCase, openCase, setState, toast, useUI, EMPTY } from "../store";
 import type { CaseDetail, Score } from "../types";
 
@@ -43,7 +44,7 @@ function CaseList() {
                       <span className="font-mono text-[11.5px]">{c.id}</span>
                       <span className="truncate text-[12px] text-muted">{c.customer_name}</span>
                     </div>
-                    <div className="truncate text-[11.5px] text-faint">{c.intent ? INTENT_LABEL[c.intent] : c.step}{c.amount ? ` · ${inr(c.amount)}` : ""}</div>
+                    <div className="truncate text-[11.5px] text-faint">{c.intent ? INTENT_LABEL[c.intent] ?? c.intent : c.route === "REFUSE" ? "Refused at intake" : c.step}{c.amount ? ` · ${inr(c.amount)}` : ""}{c.opened_by ? ` · ${c.opened_by}` : ""}</div>
                   </div>
                   <RouteBadge route={c.route} />
                 </button>
@@ -296,13 +297,66 @@ export function WorkspaceView() {
   );
 }
 
+function OpItem({ op, onDone }: { op: Op; onDone: () => void }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const agents = useUI((s) => s.app?.agents ?? EMPTY);
+  const who = agents.find((a) => a.id === op.agent)?.name ?? op.agent;
+  const go = async (yes: boolean) => {
+    setBusy(true);
+    try {
+      if (yes) await oapi.approveOp(op.id); else await oapi.rejectOp(op.id, note);
+      toast(yes ? `${op.id} approved: ${who} is running it` : `${op.id} won't run`, yes ? "good" : "info");
+      onDone();
+    } catch (e) { toast((e as Error).message, "bad"); } finally { setBusy(false); }
+  };
+  return (
+    <Card title={<span className="flex items-center gap-2"><ClipboardList size={14} className="text-accent" /><Mono>{op.id}</Mono> {op.title}</span>}
+      actions={<span className="text-[11.5px] text-muted">{who}{op.by && !["you", "routine"].includes(op.by) ? ` · asked by ${op.by}` : op.routine ? " · routine" : ""}</span>}>
+      <p className="text-[12.5px]">{op.ask ?? `“${op.title}” is ready. Run it?`}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button variant="good" disabled={busy} onClick={() => go(true)}><Check size={14} /> Approve</Button>
+        <input aria-label={`Note for ${op.id}`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why not? (optional)"
+          className="h-8 min-w-40 flex-1 rounded-md border border-line-strong bg-panel-2 px-2.5 text-[12.5px]" />
+        <Button variant="danger" disabled={busy} onClick={() => go(false)}><X size={14} /> Reject</Button>
+      </div>
+    </Card>
+  );
+}
+
+function FlowItem({ w, onDone }: { w: OfficeSnap["flow_waits"][number]; onDone: () => void }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const go = async (yes: boolean) => {
+    setBusy(true);
+    try { await oapi.decideFlow(w.run_id, w.node, yes, note); toast(`“${w.flow}” carries on: ${yes ? "yes" : "no"}`, "good"); onDone(); }
+    catch (e) { toast((e as Error).message, "bad"); } finally { setBusy(false); }
+  };
+  return (
+    <Card title={<span className="flex items-center gap-2"><Workflow size={14} className="text-accent" />{w.flow} <Mono className="text-faint">{w.run_id}</Mono></span>}
+      actions={<Button size="sm" variant="ghost" onClick={() => setState({ view: "flows" })}>Open flow</Button>}>
+      <p className="text-[12.5px]">{w.question}</p>
+      <p className="mt-1 text-[11.5px] text-faint">Started by {w.by} · waiting {ago(w.since)}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button variant="good" disabled={busy} onClick={() => go(true)}><Check size={14} /> Yes</Button>
+        <input aria-label={`Note for ${w.run_id}`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="A note (optional)"
+          className="h-8 min-w-40 flex-1 rounded-md border border-line-strong bg-panel-2 px-2.5 text-[12.5px]" />
+        <Button variant="danger" disabled={busy} onClick={() => go(false)}><X size={14} /> No</Button>
+      </div>
+    </Card>
+  );
+}
+
 export function ApprovalsView() {
   const [items, setItems] = useState<any[] | null>(null);
+  const [snap, setSnap] = useState<OfficeSnap | null>(null);
   const version = useUI((s) => s.app?.stats.pending_approvals);
-  const evs = useUI((s) => s.events.length);
-  const load = () => api.approvals().then(setItems).catch((e) => toast(e.message, "bad"));
-  useEffect(() => { void load(); }, [version, evs > 0 ? Math.floor(evs / 5) : 0]);
+  const evs = useUI((s) => s.events.filter((e) => e.kind === "op.updated" || e.kind === "flow.run" || e.kind.startsWith("approval")).length);
+  const load = () => Promise.all([api.approvals().then(setItems), oapi.snap().then(setSnap)]).catch((e) => toast(e.message, "bad"));
+  useEffect(() => { void load(); }, [version, evs]);
   if (!items) return <Empty title="Loading…" />;
+  const ops = (snap?.ops ?? []).filter((o) => o.state === "waiting");
+  const flows = snap?.flow_waits ?? [];
   return (
     <div className="h-full overflow-y-auto p-4">
       <div className="mx-auto max-w-4xl space-y-4">
@@ -310,13 +364,17 @@ export function ApprovalsView() {
           <h2 className="text-lg font-semibold">Approvals</h2>
           <p className="text-[12.5px] text-muted">Each item is sealed to the exact ledger state it was prepared on. If anything moves before you approve, the seal no longer matches and the case is re-checked; your approval never lands on a different state.</p>
         </div>
-        {!items.length && <Card><Empty icon={<Download size={24} />} title="Nothing is waiting">Cases Nirnaya is not certified to finish alone appear here with their evidence.</Empty></Card>}
+        {!items.length && !ops.length && !flows.length && <Card><Empty icon={<CheckCheck size={24} />} title="Nothing is waiting">Cases Nirnaya is not certified to finish alone appear here with their evidence, with department tasks and flows that need a person's OK.</Empty></Card>}
         {items.map((it) => (
           <Card key={it.case.id} title={<span className="flex items-center gap-2"><Mono>{it.case.id}</Mono> {it.case.customer_name} · {INTENT_LABEL[it.case.intent] ?? it.case.intent} {it.case.amount ? `· ${inr(it.case.amount)}` : ""}</span>}
             actions={<Button size="sm" variant="ghost" onClick={() => openCase(it.case.id)}>Open case</Button>}>
             <ApprovalCard item={it} onDone={load} />
           </Card>
         ))}
+        {ops.length > 0 && <h3 className="pt-2 text-[12px] font-medium uppercase tracking-wider text-faint">Department tasks waiting for an OK</h3>}
+        {ops.map((op) => <OpItem key={op.id} op={op} onDone={load} />)}
+        {flows.length > 0 && <h3 className="pt-2 text-[12px] font-medium uppercase tracking-wider text-faint">Flows asking a person</h3>}
+        {flows.map((w) => <FlowItem key={w.run_id + w.node} w={w} onDone={load} />)}
       </div>
     </div>
   );

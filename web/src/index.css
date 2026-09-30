@@ -98,3 +98,6 @@ body {
 @keyframes slide-in { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
 .slide-in { animation: slide-in 0.25s ease-out; }
 @media (prefers-reduced-motion: reduce) { .pulse, .blink, .slide-in { animation: none; } }
+
+/* the team's avatars and name popover follow the workspace theme */
+:root, .dark { --people-ring: var(--panel); --people-bg: var(--raised); --people-fg: var(--fg); --people-line: var(--line-strong); }

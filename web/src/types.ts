@@ -50,6 +50,8 @@ export interface CaseSummary {
   pending: boolean;
   seal_broken: boolean;
   first_reply_s?: number | null;
+  opened_by?: string | null;
+  approved_by?: string | null;
 }
 
 export interface Action {
@@ -174,6 +176,7 @@ export interface AppState {
   drift: Drift;
   policy_hash: string;
   integrations: Record<string, any>;
+  waiting?: { cases: number; ops: number; flows: number };
 }
 
 export interface NEvent {

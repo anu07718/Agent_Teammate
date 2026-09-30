@@ -56,6 +56,7 @@ class Routines:
                 r["next_at"] = schedule.next_run(r["when"], now)
         self._persist()
         self._task: asyncio.Task | None = None
+        self.flows = None  # set by the app: flows with a schedule fire on this clock too
 
     # ── the list ─────────────────────────────────────────────────────────────
     def _persist(self) -> None:
@@ -68,7 +69,7 @@ class Routines:
         return [{**r, "desc": schedule.describe(r["when"])} for r in self.jobs]
 
     def add(self, kind: str, when: dict, *, text: str = "", title: str | None = None,
-            needs_ok: bool | None = None) -> dict:
+            needs_ok: bool | None = None, by: str = "you") -> dict:
         if kind not in KINDS or not KINDS[kind]["routine"]:
             raise ValueError(f"{kind} cannot run as a routine")
         if not schedule.valid(when):
@@ -78,7 +79,7 @@ class Routines:
         while self.get(rid):
             rid, n = f"{base}-{n}", n + 1
         r = _fresh({"id": rid, "kind": kind, "title": title or KINDS[kind]["title"], "when": when, "text": text,
-                    **({"needs_ok": needs_ok} if needs_ok is not None else {})}, by="you")
+                    **({"needs_ok": needs_ok} if needs_ok is not None else {})}, by=by)
         r["desc"] = schedule.describe(when)
         r["next_at"] = schedule.next_run(when, time.time())
         self.jobs.append(r)
@@ -141,6 +142,8 @@ class Routines:
                 log.exception("routine %s failed", r["id"])
                 r["next_at"] = schedule.next_run(r["when"], now)
         self.ops.fire_due(now)
+        if getattr(self, "flows", None):
+            self.flows.fire_due(now)
 
     async def loop(self) -> None:
         while True:

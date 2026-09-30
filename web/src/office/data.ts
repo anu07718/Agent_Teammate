@@ -2,6 +2,7 @@
 // needs (chats, activity feeds), and how cases and ops become cards on the Task Status panel.
 import { useSyncExternalStore } from "react";
 import { apiBase, ApiError } from "../api";
+import { by } from "../team";
 import { INTENT_LABEL, inr } from "../lib/format";
 import type { AppState, CaseSummary } from "../types";
 import type { PodId } from "./layout";
@@ -12,6 +13,7 @@ export interface Op {
   state: "scheduled" | "next" | "doing" | "waiting" | "done"; created_at: number; started_at: number | null; done_at: number | null;
   due_at: number | null; waiting_at: number | null; result: string | null; ok: boolean | null; needs_ok: boolean; ask: string | null;
   approved: boolean; rejected: boolean; note: string | null; late: boolean; case_id: string | null; tools: string[];
+  approved_by?: string; rejected_by?: string;
 }
 export interface Routine {
   id: string; kind: string; title: string; text: string; dept: PodId; agent: string; when: any; desc: string;
@@ -23,6 +25,7 @@ export interface OfficeSnap {
   pods: Pod[]; connectors: Connector[]; kpis: Record<string, [string, string | number][]>; ops: Op[]; routines: Routine[];
   kinds: Record<string, { dept: PodId; agent: string; title: string; routine: boolean; help: string }>;
   llm: { enabled: boolean }; now: number;
+  flow_waits: { run_id: string; node: string; flow: string; question: string; since: number; by: string }[];
 }
 export interface Interpretation {
   kind: "case" | "op" | "routine" | "error"; dept?: PodId; agent?: string; title?: string; op_kind?: string;
@@ -48,27 +51,34 @@ export const oapi = {
   snap: () => req<OfficeSnap>("/api/office"),
   interpret: (dept: string, text: string) => req<Interpretation>(`/api/office/interpret?dept=${dept}&text=${encodeURIComponent(text)}`),
   addTask: (b: { dept: string; text: string; customer_id?: string; channel?: string; at?: number; when?: any; needs_ok?: boolean }) =>
-    post<{ kind: "case" | "op" | "routine"; case?: CaseSummary; op?: Op; routine?: Routine; guessed?: string }>("/api/office/tasks", b),
-  approveOp: (id: string) => post<Op>(`/api/office/ops/${id}/approve`),
-  rejectOp: (id: string, note: string) => post<Op>(`/api/office/ops/${id}/reject`, { note }),
+    post<{ kind: "case" | "op" | "routine"; case?: CaseSummary; op?: Op; routine?: Routine; guessed?: string }>("/api/office/tasks", { ...b, by: by() }),
+  approveOp: (id: string) => post<Op>(`/api/office/ops/${id}/approve`, { by: by() }),
+  rejectOp: (id: string, note: string) => post<Op>(`/api/office/ops/${id}/reject`, { note, by: by() }),
+  decideFlow: (run: string, node: string, approve: boolean, note = "") =>
+    post<any>(`/api/flows/runs/${run}/decide`, { node, approve, note, by: by() }),
   cancelOp: (id: string) => req<{ ok: boolean }>(`/api/office/ops/${id}`, { method: "DELETE" }),
-  addRoutine: (b: { dept: string; text: string; when?: any; needs_ok?: boolean }) => post<{ routine: Routine }>("/api/office/routines", b),
+  addRoutine: (b: { dept: string; text: string; when?: any; needs_ok?: boolean }) => post<{ routine: Routine }>("/api/office/routines", { ...b, by: by() }),
   routine: (id: string, action: "run" | "pause" | "resume") => post<{ routine: Routine; op?: Op }>(`/api/office/routines/${id}/${action}`),
   deleteRoutine: (id: string) => req<{ ok: boolean }>(`/api/office/routines/${id}`, { method: "DELETE" }),
   occurrences: (start: number, end: number) => req<Record<string, number[]>>(`/api/office/occurrences?start=${start}&end=${end}`),
   brain: () => req<{ nodes: { id: string; label: string; group: string; kind: string; props: any }[]; links: [number, number, string][]; groups: string[] }>("/api/office/brain"),
-  chat: (agent: string, text: string) => post<{ reply: string; moved?: any; routine?: Routine }>("/api/office/chat", { agent, text }),
+  chat: (agent: string, text: string) => post<{ reply: string; moved?: any; routine?: Routine }>("/api/office/chat", { agent, text, by: by() }),
+  chats: () => req<Record<string, ServerMsg[]>>("/api/office/chats"),
+  recent: (n = 800) => req<any[]>(`/api/events/recent?n=${n}`),
 };
 
+/** a message in the shared office chat, as the server keeps it */
+export interface ServerMsg { id: number; agent: string; who: "user" | "agent" | "work"; text: string; by: string | null; icon: string | null; ref: string | null; ts: number }
+
 // ── the office store ─────────────────────────────────────────────────────────
-export interface ChatMsg { who: "agent" | "user" | "work"; text: string; ts: number; icon?: string }
+export interface ChatMsg { who: "agent" | "user" | "work"; text: string; ts: number; icon?: string; id?: number; by?: string | null; local?: boolean }
 export interface FeedLine { icon: string; text: string; ts: number }
 interface OState {
   snap: OfficeSnap | null;
   chats: Record<string, ChatMsg[]>;
   feeds: Record<string, FeedLine[]>;
   reads: Record<string, { agent: string; ts: number }>;
-  rejecting: Record<string, { kind: "case" | "op"; id: string }>; // agent → the item whose REJECT note comes next
+  rejecting: Record<string, { kind: "case" | "op" | "flow"; id: string }>; // agent → the item whose REJECT note comes next
   version: number;
 }
 let os: OState = { snap: null, chats: {}, feeds: {}, reads: {}, rejecting: {}, version: 0 };
@@ -94,25 +104,54 @@ export function softRefreshOffice(ms = 300) {
   snapTimer = setTimeout(() => { snapTimer = null; void refreshOffice(); }, ms);
 }
 
+/** a note only this browser sees (a prompt, an error); the shared chat comes from the server */
 export function say(agent: string, msg: Omit<ChatMsg, "ts">) {
-  setOffice((s) => ({ chats: { ...s.chats, [agent]: [...(s.chats[agent] || []).slice(-80), { ...msg, ts: Date.now() }] } }));
+  setOffice((s) => ({ chats: { ...s.chats, [agent]: [...(s.chats[agent] || []).slice(-120), { ...msg, ts: Date.now(), local: true }] } }));
 }
-export function feed(agent: string, icon: string, text: string) {
-  setOffice((s) => ({ feeds: { ...s.feeds, [agent]: [{ icon, text, ts: Date.now() }, ...(s.feeds[agent] || [])].slice(0, 40) } }));
+
+const fromServer = (m: ServerMsg): ChatMsg => ({ id: m.id, who: m.who, text: m.text, ts: m.ts * 1000, by: m.by, icon: m.icon ?? undefined });
+
+/** the shared chat for every agent (on opening the office) */
+export async function loadChats() {
+  try {
+    const all = await oapi.chats();
+    setOffice((s) => {
+      const chats: Record<string, ChatMsg[]> = {};
+      for (const [agent, msgs] of Object.entries(all)) chats[agent] = [...msgs.map(fromServer), ...(s.chats[agent] || []).filter((m) => m.local)];
+      for (const [agent, msgs] of Object.entries(s.chats)) if (!chats[agent]) chats[agent] = msgs;
+      return { chats };
+    });
+  } catch { /* the server is away */ }
+}
+
+/** one new message from anyone on the team */
+export function heard(m: ServerMsg) {
+  setOffice((s) => {
+    const list = s.chats[m.agent] || [];
+    if (list.some((x) => x.id === m.id)) return {};
+    return { chats: { ...s.chats, [m.agent]: [...list.slice(-120), fromServer(m)] } };
+  });
+}
+export function feed(agent: string, icon: string, text: string, ts = Date.now()) {
+  setOffice((s) => ({ feeds: { ...s.feeds, [agent]: [{ icon, text, ts }, ...(s.feeds[agent] || [])].slice(0, 40) } }));
 }
 
 // ── cards ────────────────────────────────────────────────────────────────────
 export type TState = "scheduled" | "next" | "doing" | "waiting" | "done";
 export interface OTask {
-  id: string; kind: "case" | "op"; dept: PodId; agent: string; title: string; state: TState; progress: number;
+  id: string; kind: "case" | "op" | "flow"; dept: PodId; agent: string; title: string; state: TState; progress: number;
   changedAt: number; addedAt: number; doneAt?: number; dueAt?: number; routine?: string | null; late?: boolean;
   approved?: boolean; ok?: boolean | null; route?: string | null; c?: CaseSummary; op?: Op;
+  flow?: { run_id: string; node: string; flow: string; question: string; by: string };
 }
 const STEPS = ["intake", "understand", "evidence", "plan", "calibrate", "shadow", "route", "commit", "respond", "learn"];
 
 export function caseTitle(c: CaseSummary) {
   const who = c.customer_name ? ` · ${c.customer_name}` : "";
-  if (!c.intent) return (c.preview || c.id).slice(0, 70);
+  if (!c.intent) {
+    const t = c.preview || c.id;
+    return t.length > 70 ? t.slice(0, 68).replace(/\s+\S*$/, "") + "…" : t;
+  }
   const amt = c.amount ? ` ${inr(c.amount)}` : "";
   return `${INTENT_LABEL[c.intent] ?? c.intent}${amt}${who}`;
 }
@@ -141,5 +180,19 @@ export function deriveTasks(app: AppState | null, snap: OfficeSnap | null, podOf
       routine: o.routine, late: o.late, approved: o.approved, ok: o.ok, op: o,
     });
   }
+  for (const w of snap?.flow_waits ?? []) {
+    out.push({
+      id: `${w.run_id}:${w.node}`, kind: "flow", dept: "oversight", agent: "human", title: `${w.flow}: ${w.question}`,
+      state: "waiting", progress: 0.5, changedAt: w.since * 1000, addedAt: w.since * 1000, flow: w,
+    });
+  }
   return out.sort((a, b) => b.changedAt - a.changedAt);
 }
+
+/** who did it, when it was a person (routines, flows and the office itself are not) */
+export function byWhom(t: OTask): string | null {
+  const b = t.kind === "case" ? t.c?.opened_by : t.op?.by;
+  return b && !["you", "routine", "system", "Nirnaya"].includes(b) ? b : null;
+}
+
+export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);

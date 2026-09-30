@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppState } from "../types";
 import { dayTime, span, timeStr, until } from "./bits";
-import { oapi, refreshOffice, type Interpretation, type OfficeSnap, type OTask, type Routine, type TState } from "./data";
+import { byWhom, esc, oapi, refreshOffice, type Interpretation, type OfficeSnap, type OTask, type Routine, type TState } from "./data";
 import { POD_IDS, POD_STYLE, type PodId } from "./layout";
 
 const CASE_PODS: PodId[] = ["intake", "resolution"];
@@ -62,6 +62,18 @@ export function Panel(p: Props) {
   const inRef = useRef<HTMLTextAreaElement>(null);
   const seen = useRef(new Set<string>());
   const isCase = CASE_PODS.includes(dept);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // a menu that is open closes on Escape or on a click anywhere outside it
+  useEffect(() => {
+    if (!menu && !samples) return;
+    const close = () => { setMenu(false); setSamples(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    const onDown = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest?.(".o-menu, .o-dd, .o-mini")) close(); };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("mousedown", onDown);
+    return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("mousedown", onDown); };
+  }, [menu, samples]);
 
   // what the office will do with this sentence, read back as you type
   useEffect(() => {
@@ -101,7 +113,7 @@ export function Panel(p: Props) {
       void refreshOffice();
       setTimeout(() => setSaid(null), 7000);
     } catch (e) {
-      setSaid({ html: `Couldn't add it: ${(e as Error).message}`, tone: "err" });
+      setSaid({ html: `Couldn't add it: ${esc((e as Error).message)}`, tone: "err" });
     } finally {
       setBusy(false);
       inRef.current?.blur();
@@ -116,12 +128,12 @@ export function Panel(p: Props) {
       const pod = p.podOf(agent), c = POD_STYLE[pod]?.chip ?? "#ccc";
       return `<span class="av" style="border-color:${c};background:${c}55">${p.nameOf(agent)[0]}</span>`;
     };
-    if (hint.problem) return { html: hint.problem, tone: "err" as const };
-    if (hint.kind === "routine") return { html: `${av(hint.agent!)}⏱ Routine · <b>${hint.when_desc}</b> · <b>${p.nameOf(hint.agent!)}</b> in ${POD_STYLE[hint.dept!].name.toLowerCase()} · next ${until(hint.next_at)}${hint.needs_ok ? " · waits for your OK" : ""}${hint.guessed ? ` · “${hint.guessed}” taken as ${hint.when?.at}` : ""}` };
+    if (hint.problem) return { html: esc(hint.problem), tone: "err" as const };
+    if (hint.kind === "routine") return { html: `${av(hint.agent!)}⏱ Routine · <b>${hint.when_desc}</b> · <b>${p.nameOf(hint.agent!)}</b> in ${POD_STYLE[hint.dept!].name.toLowerCase()} · next ${until(hint.next_at)}${hint.needs_ok ? " · waits for your OK" : ""}${hint.guessed ? ` · “${esc(hint.guessed)}” taken as ${hint.when?.at}` : ""}` };
     if (repeat) return { html: `⏱ Repeats ${CADENCES.find((c) => c[0] === cad)?.[1].toLowerCase()}${cad === "hourly" || cad === "m5" ? "" : " at " + at} · the office names the desk when you press Add` };
     if (hint.kind === "case") return { html: `${av(hint.agent!)}Probably <b>${p.nameOf(hint.agent!)}</b> · triage confirms when you press Add · ${customer} over ${channel}` };
-    if (hint.op_kind === "help") return { html: `${POD_STYLE[dept].name[0] + POD_STYLE[dept].name.slice(1).toLowerCase()} can: ${(hint.can || []).join("; ")}.`, tone: "err" as const };
-    return { html: `${av(hint.agent!)}Goes to <b>${p.nameOf(hint.agent!)}</b>${hint.dept !== dept ? ` in ${POD_STYLE[hint.dept!].name.toLowerCase()}` : ""} · “${hint.title}”${hint.needs_ok ? " · waits for your OK" : ""}` };
+    if (hint.op_kind === "help") return { html: `${POD_STYLE[dept].name[0] + POD_STYLE[dept].name.slice(1).toLowerCase()} can: ${esc((hint.can || []).join("; "))}.`, tone: "err" as const };
+    return { html: `${av(hint.agent!)}Goes to <b>${p.nameOf(hint.agent!)}</b>${hint.dept !== dept ? ` in ${POD_STYLE[hint.dept!].name.toLowerCase()}` : ""} · “${esc(hint.title ?? "")}”${hint.needs_ok ? " · waits for your OK" : ""}` };
   }, [hint, said, p.text, repeat, cad, at, customer, channel, dept]);
 
   const scoped = p.focused && p.focused !== "brain" ? tasks.filter((t) => t.dept === p.focused) : tasks;
@@ -138,7 +150,7 @@ export function Panel(p: Props) {
   };
 
   return (
-    <div className={`o-panel${min ? " min" : ""}`} data-testid="task-panel" onClick={() => menu && setMenu(false)}>
+    <div ref={panelRef} className={`o-panel${min ? " min" : ""}`} data-testid="task-panel">
       <div className="o-cmd">
         <div className="r1">
           <button className="o-dd" aria-label="Department" onClick={(e) => { e.stopPropagation(); setMenu(!menu); setSamples(false); }}>
@@ -220,11 +232,11 @@ export function Panel(p: Props) {
             <span className="o-st scheduled">⏱</span>
             <div className="body">
               <div className="t">{r.title}</div>
-              <div className="m">{r.desc} · {p.nameOf(r.agent)} · {r.needs_ok ? "waits for your OK" : "read-only"}{r.last ? ` · last ${timeStr(r.last * 1000)}` : ""}</div>
+              <div className="m">{r.desc} · {p.nameOf(r.agent)} · {r.needs_ok ? "waits for your OK" : "read-only"}{r.last ? ` · last ${timeStr(r.last * 1000)}` : ""}{r.by && !["you", "system"].includes(r.by) ? ` · set by ${r.by}` : ""}</div>
               <div className="acts">
                 <button className="run" onClick={() => act(r, "run")}>RUN NOW</button>
                 <button onClick={() => act(r, r.paused ? "resume" : "pause")}>{r.paused ? "RESUME" : "PAUSE"}</button>
-                {r.by === "you" && <button onClick={() => act(r, "delete")}>DELETE</button>}
+                {r.by !== "system" && <button onClick={() => act(r, "delete")}>DELETE</button>}
               </div>
             </div>
             <span className="ago">{r.paused ? "PAUSED" : until(r.next_at)}</span>
@@ -244,7 +256,8 @@ export function Panel(p: Props) {
 }
 
 function Row({ t, isNew, scoped, nameOf, onRow, onCalendar }: { t: OTask; isNew: boolean; scoped: boolean; nameOf: (a: string) => string; onRow: (t: OTask) => void; onCalendar: () => void }) {
-  const who = scoped ? nameOf(t.agent) : `${nameOf(t.agent)} · ${POD_STYLE[t.dept]?.name ?? ""}`;
+  const person = byWhom(t);
+  const who = (scoped ? nameOf(t.agent) : `${nameOf(t.agent)} · ${POD_STYLE[t.dept]?.name ?? ""}`) + (person ? ` · for ${esc(person)}` : "");
   const pct = Math.round(t.progress * 100);
   const refused = t.route === "REFUSE";
   const failed = t.kind === "op" && t.state === "done" && t.ok === false;
@@ -253,12 +266,13 @@ function Row({ t, isNew, scoped, nameOf, onRow, onCalendar }: { t: OTask; isNew:
   if (failed) { chip = "fail"; label = t.op?.rejected ? "NOT RUN" : "FLAGGED"; }
   let meta = who;
   if (t.state === "doing") meta += t.kind === "case" ? ` · step ${Math.max(1, Math.round(t.progress * 10))} of 10 · ${t.c?.step ?? ""}` : " · working";
-  if (t.state === "waiting") meta = `<span class="o-amb">waiting ${span(Date.now() - t.changedAt)} for your OK</span> · ${who}${t.kind === "case" ? " · sealed" : ""}`;
+  if (t.state === "waiting") meta = `<span class="o-amb">waiting ${span(Date.now() - t.changedAt)} for an OK</span> · ${who}${t.kind === "case" ? " · sealed" : t.kind === "flow" ? " · a flow asks" : ""}`;
   if (t.state === "scheduled") meta += ` · runs ${t.dueAt ? dayTime(t.dueAt) : ""}`;
   if (t.state === "done") {
     const how = t.kind === "case"
-      ? (refused ? "refused" : t.c?.status === "resolved" && (t.route === "ACT" || t.route === "HEDGE") ? (t.route === "HEDGE" ? "done alone, with an undo" : "resolved alone") : "resolved after your OK")
-      : t.op?.rejected ? "you said no" : t.approved ? "ran after your OK" : t.op?.routine ? "routine" : "done";
+      ? (refused ? "refused" : t.c?.status === "resolved" && (t.route === "ACT" || t.route === "HEDGE") ? (t.route === "HEDGE" ? "done alone, with an undo" : "resolved alone") : t.c?.approved_by ? `resolved after ${esc(t.c.approved_by)}’s OK` : "resolved after a person’s OK")
+      : t.op?.rejected ? `${t.op.rejected_by && t.op.rejected_by !== "you" ? esc(t.op.rejected_by) : "you"} said no`
+      : t.approved ? `ran after ${t.op?.approved_by && t.op.approved_by !== "you" ? esc(t.op.approved_by) + "’s" : "your"} OK` : t.op?.routine ? "routine" : "done";
     meta += ` · ${how} · ${timeStr(t.doneAt ?? t.changedAt)}` + (failed || refused ? "" : ` · <span class="res">result →</span>`);
   }
   if (t.late) meta += " · ran late";

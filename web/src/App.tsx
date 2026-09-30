@@ -1,9 +1,12 @@
-import { Building2, CheckCheck, Cpu, FlaskConical, Gauge, LayoutGrid, Moon, ScrollText, Settings, Sheet, Sun, Terminal, Waypoints } from "lucide-react";
+import { Building2, CheckCheck, Cpu, FlaskConical, Gauge, LayoutGrid, Moon, ScrollText, Settings, Sheet, Sun, Terminal, Waypoints, Workflow } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { People } from "./components/People";
 import { cx } from "./components/ui";
+import { FlowsView } from "./flows/FlowsView";
 import { clock, pct } from "./lib/format";
 import { OfficePage } from "./office/OfficePage";
 import { getState, openCase, setState, setTheme, useUI, type View, EMPTY } from "./store";
+import { tellView } from "./team";
 import { BenchmarkView } from "./views/Benchmark";
 import { BrainView } from "./views/Brain";
 import { LedgerView } from "./views/Ledger";
@@ -16,6 +19,7 @@ const NAV: { id: View; label: string; icon: any; mobile?: boolean }[] = [
   { id: "office", label: "Office", icon: Building2, mobile: true },
   { id: "workspace", label: "Cases", icon: LayoutGrid, mobile: true },
   { id: "approvals", label: "Approvals", icon: CheckCheck, mobile: true },
+  { id: "flows", label: "Flows", icon: Workflow, mobile: true },
   { id: "supervisor", label: "Supervisor", icon: Gauge, mobile: true },
   { id: "brain", label: "Brain", icon: Waypoints },
   { id: "ledger", label: "Ledger", icon: Sheet },
@@ -55,7 +59,22 @@ function LogPanel() {
     k.startsWith("tool") ? "text-sky-400" : k.startsWith("approval") || k.startsWith("seal") ? "text-amber-400" : k.startsWith("drift") ? "text-red-400" :
     k.startsWith("decision") ? "text-violet-400" : k.startsWith("case") ? "text-emerald-400" : "text-neutral-400";
   const line = (e: any) => {
+    const who = (b?: string | null) => (b && !["you", "routine", "system"].includes(b) ? ` · by ${b}` : "");
     switch (e.kind) {
+      case "op.updated": return `${e.op.id} ${e.op.agent} ${e.op.state} · ${e.op.title}${e.op.state === "done" && e.op.result ? ` → ${String(e.op.result).split("\n")[0]}` : ""}${who(e.op.by)}`;
+      case "op.removed": return `${e.op_id} cancelled`;
+      case "routine.ran": return `${e.routine} ran · ${e.result ?? ""}`;
+      case "routine.changed": return `${e.routine?.title ?? e.routine?.id} · ${e.routine?.desc ?? ""}${e.routine?.paused ? " · paused" : ""}`;
+      case "chat.message": return `${e.message.agent} · ${e.message.by ?? e.message.who}: ${e.message.text.split("\n")[0].slice(0, 160)}`;
+      case "flow.run": return `${e.run.id} “${e.run.name}” ${e.run.state} · ${Math.round(e.run.progress * 100)}%${who(e.run.by)}`;
+      case "flow.saved": return `“${e.flow.name}” saved (v${e.flow.version})${who(e.by)}`;
+      case "flow.deleted": return `${e.flow_id} deleted${who(e.by)}`;
+      case "brain.read": return `${e.agent} read ${(e.nodes || []).length} node(s) for ${e.case_id}`;
+      case "approval.requested": return `${e.case_id} sealed ${e.seal}… · waiting for a person`;
+      case "approval.granted": return `${e.case_id} approved${who(e.by)}${e.edited ? " (edited)" : ""}`;
+      case "approval.rejected": return `${e.case_id} rejected${who(e.by)}${e.note ? ` · “${e.note}”` : ""}`;
+      case "rail.event": return `${e.txn_id} ${String(e.event).replace("_", " ")} → version ${e.version}`;
+      case "policy.changed": return `${e.action} α ${e.alpha} rung ${e.rung}`;
       case "superstep": return `${e.case_id} ${e.step} ${e.phase}${e.note ? ` · ${e.note}` : ""}`;
       case "tool.called": return `${e.agent} → ${e.tool} ${e.ok ? `ok ${e.ms ?? ""}ms` : `FAILED ${e.error}`}`;
       case "agent.status": return `${e.agent} ${e.status}${e.doing ? ` · ${e.doing}` : ""}`;
@@ -107,14 +126,17 @@ export default function App() {
       if (getState().view === "office") return; // the office has its own keys
       if (e.key === "`") setState((s) => ({ logOpen: !s.logOpen }));
       const n = Number(e.key);
-      if (n >= 1 && n <= NAV.length && !e.metaKey && !e.ctrlKey) setState({ view: NAV[n - 1].id });
+      const i = e.key === "0" ? 9 : n - 1; // 1–9, then 0 for the tenth
+      if (e.key.length === 1 && /[0-9]/.test(e.key) && i < NAV.length && !e.metaKey && !e.ctrlKey) setState({ view: NAV[i].id });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const pending = app?.stats.pending_approvals ?? 0;
-  if (view === "office") return <OfficePage />;
+  useEffect(() => { if (view !== "office") tellView(view); }, [view]);
+
+  const pending = app?.waiting ? app.waiting.cases + app.waiting.ops + app.waiting.flows : app?.stats.pending_approvals ?? 0;
+  if (view === "office") return <><OfficePage /><Toasts /></>;
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-11 shrink-0 items-center gap-4 border-b border-line bg-panel px-3" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -132,6 +154,7 @@ export default function App() {
           {app && <span className="hidden items-center gap-1 text-[11px] text-muted sm:flex" title="Language model"><Cpu size={12} />{app.integrations.llm.enabled ? "Claude" : "rules"}</span>}
           <button aria-label="Toggle the live log" onClick={() => setState((s) => ({ logOpen: !s.logOpen }))} className={cx("rounded p-1.5 cursor-pointer hover:bg-panel-2", logOpen ? "text-accent" : "text-muted")}><Terminal size={15} /></button>
           <button aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="rounded p-1.5 text-muted cursor-pointer hover:bg-panel-2">{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}</button>
+          <People size={24} max={4} />
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
@@ -148,7 +171,7 @@ export default function App() {
           {error && !app && <div className="m-4 rounded-lg border border-escalate/40 bg-escalate/10 p-3 text-[12.5px]">Cannot reach the Nirnaya server ({error}). Start it with <code className="font-mono">python -m nirnaya</code>, or set the server address under Settings.</div>}
           <div className="min-h-0 flex-1">
             {!app ? null : view === "workspace" ? <WorkspaceView /> : view === "approvals" ? <ApprovalsView /> :
-              view === "supervisor" ? <SupervisorView /> : view === "brain" ? <BrainView /> : view === "ledger" ? <LedgerView /> :
+              view === "flows" ? <FlowsView /> : view === "supervisor" ? <SupervisorView /> : view === "brain" ? <BrainView /> : view === "ledger" ? <LedgerView /> :
               view === "benchmark" ? <BenchmarkView /> : view === "trail" ? <TrailView /> : <SettingsView />}
           </div>
           {logOpen && <LogPanel />}
@@ -161,7 +184,7 @@ export default function App() {
           <button className={cx("cursor-pointer", pending ? "text-escalate" : "")} onClick={() => setState({ view: "approvals" })}>{pending} awaiting approval</button>
           <span className={app.drift.alarm ? "text-escalate" : ""}>drift PSI {app.drift.psi.toFixed(2)}{app.drift.alarm ? " · failing closed" : ""}</span>
           <span className="ml-auto">policy <span className="font-mono">{app.policy_hash}</span></span>
-          <span>press 1–9 to switch views · ` for the log</span>
+          <span>press 1–9, 0 to switch views · ` for the log</span>
         </>}
       </footer>
       <nav className="flex h-14 shrink-0 items-stretch border-t border-line bg-panel md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }} aria-label="Views">
