@@ -47,7 +47,7 @@ export function Live({ onOpenFlow }: { onOpenFlow: (flowId: string) => void }) {
 
   return (
     <div className="h-full overflow-y-auto p-4">
-      <div className="mx-auto max-w-[1400px] space-y-4">
+      <div className="mx-auto min-w-0 max-w-[1400px] space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">How the agents are working</h2>
@@ -86,7 +86,7 @@ export function Live({ onOpenFlow }: { onOpenFlow: (flowId: string) => void }) {
           </div>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
           <Card title="Cases, newest first" pad={false}>
             {p.cases.length ? (
               <ul className="divide-y divide-line">
@@ -113,7 +113,7 @@ export function Live({ onOpenFlow }: { onOpenFlow: (flowId: string) => void }) {
 
           <div className="space-y-4">
             <Card title="Department tasks">
-              <div className="grid grid-cols-5 gap-2 text-center">
+              <div className="grid grid-cols-3 gap-2 text-center sm:grid-cols-5">
                 {([["scheduled", "booked"], ["next", "next"], ["doing", "doing"], ["waiting", "waiting"], ["done", "done"]] as const).map(([k, l]) => (
                   <div key={k} className="rounded-md bg-panel-2 px-1 py-2"><div className={cx("text-lg font-semibold tabular", k === "waiting" && p.ops[k] ? "text-hedge" : "")}>{p.ops[k] ?? 0}</div><div className="text-[10.5px] uppercase tracking-wider text-faint">{l}</div></div>
                 ))}

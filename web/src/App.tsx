@@ -87,7 +87,7 @@ function LogPanel() {
     <div ref={ref} className="h-44 shrink-0 overflow-y-auto border-t border-line bg-[#0b0b0c] px-3 py-2 font-mono text-[11.5px] leading-5">
       {events.filter((e) => e.kind !== "case.updated").slice(-250).map((e) => (
         <div key={e.id} className="flex gap-2 whitespace-pre-wrap">
-          <span className="text-neutral-600">{clock(e.ts)}</span>
+          <span className="shrink-0 whitespace-nowrap text-neutral-600">{clock(e.ts)}</span>
           <span className={cx("w-32 shrink-0", color(e.kind))}>{e.kind}</span>
           <button className="text-left text-neutral-300 cursor-pointer" onClick={() => e.case_id && openCase(e.case_id)}>{line(e)}</button>
         </div>

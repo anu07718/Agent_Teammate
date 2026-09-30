@@ -94,8 +94,10 @@ await step("an unauthorised ₹18,500 is blocked now and the credit waits, seale
 });
 
 await step("moving the ground from the chat makes the old approval not apply", async () => {
+  // the chat is shared and kept on the server, so earlier runs' replies may be there: wait for a new one
+  const before = await rail().getByText(/ledger moved to version/).count();
   await rail().getByRole("button", { name: "move the ground" }).click();
-  await rail().getByText(/ledger moved to version/).waitFor();
+  await waitFor(async () => (await rail().getByText(/ledger moved to version/).count()) > before);
   await rail().locator(`.o-appr[data-case="${parked.case.id}"]`).getByRole("button", { name: "APPROVE" }).click();
   const c = await waitFor(async () => {
     const d = await api(`/api/cases/${parked.case.id}`);
