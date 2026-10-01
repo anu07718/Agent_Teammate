@@ -25,7 +25,7 @@ export interface OfficeSnap {
   pods: Pod[]; connectors: Connector[]; kpis: Record<string, [string, string | number][]>; ops: Op[]; routines: Routine[];
   kinds: Record<string, { dept: PodId; agent: string; title: string; routine: boolean; help: string }>;
   llm: { enabled: boolean }; now: number;
-  flow_waits: { run_id: string; node: string; flow: string; question: string; since: number; by: string }[];
+  flow_waits: { run_id: string; node: string; flow: string; flow_id?: string; question: string; since: number; by: string }[];
 }
 export interface Interpretation {
   kind: "case" | "op" | "routine" | "error"; dept?: PodId; agent?: string; title?: string; op_kind?: string;
@@ -142,7 +142,7 @@ export interface OTask {
   id: string; kind: "case" | "op" | "flow"; dept: PodId; agent: string; title: string; state: TState; progress: number;
   changedAt: number; addedAt: number; doneAt?: number; dueAt?: number; routine?: string | null; late?: boolean;
   approved?: boolean; ok?: boolean | null; route?: string | null; c?: CaseSummary; op?: Op;
-  flow?: { run_id: string; node: string; flow: string; question: string; by: string };
+  flow?: { run_id: string; node: string; flow: string; flow_id?: string; question: string; by: string };
 }
 const STEPS = ["intake", "understand", "evidence", "plan", "calibrate", "shadow", "route", "commit", "respond", "learn"];
 

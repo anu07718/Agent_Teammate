@@ -1,5 +1,5 @@
 import { Activity, Play, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { LineChart } from "../components/charts";
 import { Badge, Button, Card, Empty, Stat, cx } from "../components/ui";
@@ -58,7 +58,9 @@ export function SupervisorView() {
   const policyHash = useUI((s) => s.app?.policy_hash);
   const drift = useUI((s) => s.app?.drift);
   const done = useUI((s) => s.app?.stats.done);
-  const load = () => api.supervisor().then(setD).catch((e) => toast(e.message, "bad"));
+  // only the newest answer is shown: a reload that started before your last change must not undo it on screen
+  const seq = useRef(0);
+  const load = () => { const n = ++seq.current; return api.supervisor().then((x) => { if (n === seq.current) setD(x); }).catch((e) => toast(e.message, "bad")); };
   useEffect(() => { void load(); }, [policyHash, drift?.alarm, done]);
   if (!d) return <Empty title="Loading…" />;
   const cal = d.calibration;
@@ -71,8 +73,10 @@ export function SupervisorView() {
   const change = async (id: string, patch: { alpha?: number; rung?: number }) => {
     // show the new setting at once; the server's re-certified thresholds replace it when they arrive
     setD((prev: any) => ({ ...prev, actions: prev.actions.map((a: any) => (a.id === id ? { ...a, ...patch } : a)) }));
+    const n = ++seq.current;
     try {
-      setD(await api.setPolicy(id, patch));
+      const x = await api.setPolicy(id, patch);
+      if (n === seq.current) setD(x);
       toast(`${ACTION_LABEL[id] ?? id}: policy updated; sealed approvals under the old policy will be re-validated`, "info");
     } catch (e) {
       toast((e as Error).message, "bad");

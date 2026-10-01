@@ -339,7 +339,10 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
             if not pick:
                 return {"reply": "Nothing sealed is waiting for approval, so there is no ground to move.", "moved": None}
             tid = pick["plan"]["txn_id"]
-            event = "merchant_refund" if pick.get("intent") == "unauthorized" else "reversal_lands"
+            event = e.rails.natural_event(tid)
+            if not event:
+                return {"reply": f"{tid} has already been reversed or refunded, so nothing more can land on it from "
+                                 "outside.", "moved": None}
             snap = e.rails.outside_event(tid, event)
             e.trail.append("-", "rail.event", "outside", {"txn_id": tid, "event": event})
             e.bus.publish("rail.event", txn_id=tid, event=event, version=snap["version"])

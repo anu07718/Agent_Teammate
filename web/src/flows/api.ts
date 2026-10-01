@@ -1,5 +1,6 @@
 // The Flows API: flows the team draws, their runs, and the live pipeline of how the agents are working.
 import { apiBase, ApiError } from "../api";
+import { setState } from "../store";
 import { by } from "../team";
 import type { CaseSummary } from "../types";
 
@@ -19,9 +20,9 @@ export interface Run {
 }
 export interface TypeSpec { label: string; group: string; icon: string; ports: string[]; help: string; config: Record<string, any> }
 export interface FlowsData {
-  flows: Flow[]; runs: Run[]; types: Record<NodeType, TypeSpec>; fields: Record<string, string>; ops: string[];
+  flows: Flow[]; runs: Run[]; types: Record<NodeType, TypeSpec>; fields: Record<string, string>; ops: string[]; ops_for: Record<string, string[]>;
   task_depts: string[]; depts: { id: string; name: string }[]; customers: { id: string; name: string }[];
-  can: Record<string, string[]>; waiting: { run_id: string; node: string; flow: string; question: string; since: number; by: string }[];
+  can: Record<string, string[]>; waiting: { run_id: string; node: string; flow: string; flow_id?: string; question: string; since: number; by: string }[];
 }
 export interface Pipeline {
   steps: { name: string; i: number; agents: string[]; here: string[]; done: number; avg_ms: number | null }[];
@@ -51,3 +52,9 @@ export const fapi = {
   decide: (run: string, node: string, approve: boolean, note = "") => send<Run>("POST", `/api/flows/runs/${run}/decide`, { node, approve, note, by: by() }),
   stop: (run: string) => send<Run>("POST", `/api/flows/runs/${run}/stop`, { by: by() }),
 };
+
+/** open Flows on this flow in the Builder, where its runs are drawn (from Approvals or the office) */
+export function showFlow(id?: string | null) {
+  try { if (id) { sessionStorage.setItem("nirnaya.flows.open", id); sessionStorage.setItem("nirnaya.flows.tab", "builder"); } } catch { /* storage off */ }
+  setState({ view: "flows" });
+}

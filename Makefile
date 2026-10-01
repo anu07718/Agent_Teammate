@@ -2,7 +2,7 @@
 PY ?= python3
 PORT ?= 8000
 
-.PHONY: install build run dev test test-backend test-web e2e e2e-phone e2e-flows e2e-team audit exe apk icons clean
+.PHONY: install build run dev test test-backend test-web e2e e2e-phone e2e-flows e2e-team e2e-workflow e2e-fields audit exe apk icons clean
 
 install:
 	$(PY) -m pip install -e "backend[dev,llm,docs,monitoring]"
@@ -41,6 +41,14 @@ e2e-flows:
 
 e2e-team:
 	cd web && node e2e/team.mjs
+
+# workflow.md followed step by step, as a new user would (needs a running server)
+e2e-workflow:
+	cd web && node e2e/workflow.mjs
+
+# every field, menu option and condition: the office (~25 min under software WebGL), the workspace, Flows
+e2e-fields:
+	cd web && node e2e/fields-office.mjs && node e2e/fields-workspace.mjs && node e2e/fields-flows.mjs
 
 # a supervisor's walk through every view and button (slow: about ten minutes)
 audit:

@@ -14,7 +14,8 @@ interface AgentRT {
   station: THREE.Group;
   p: Person;
   screen: Screen;
-  world: THREE.Vector3;       // where the head is, for pills and bubbles
+  world: THREE.Vector3;       // where the head is, for bubbles and the ⚠
+  pin: THREE.Vector3;         // the same without the breathing bob, so name tags hold still
   seatPos: THREE.Vector3;
   mode: Mode;
   lines: string[];
@@ -194,7 +195,7 @@ export class OfficeScene {
         warn.renderOrder = 60;
         this.scene.add(warn);
         this.agents[a.id] = {
-          a, station: st, p, screen, world: new THREE.Vector3(x, 5.6, z), seatPos: new THREE.Vector3(x, 1.2, z),
+          a, station: st, p, screen, world: new THREE.Vector3(x, 5.6, z), pin: new THREE.Vector3(x, 5.6, z), seatPos: new THREE.Vector3(x, 1.2, z),
           mode: "idle", lines: [], phase: Math.random() * 10, standK: 0, cheerUntil: 0, slumpUntil: 0, warn,
           glance: 0, glanceUntil: 0,
         };
@@ -611,8 +612,9 @@ export class OfficeScene {
         }
         p.head.rotation.y += (r.glance - p.head.rotation.y) * (1 - Math.exp(-dt * 3));
       }
+      r.pin.copy(p.head.getWorldPosition(new THREE.Vector3())).add(new THREE.Vector3(0, 1.3, 0));
       p.body.position.y += Math.sin(t * 2.1) * 0.015;
-      // where the head is now, for bubbles, pills and the ⚠
+      // where the head is now, for bubbles and the ⚠
       r.world.copy(p.head.getWorldPosition(new THREE.Vector3())).add(new THREE.Vector3(0, 1.3, 0));
       if (waiting) {
         r.warn.position.copy(r.world).add(new THREE.Vector3(0, 0.8, 0));
@@ -676,6 +678,7 @@ export class OfficeScene {
     const z = this.view.zoom;
     const cardScale = 1 - 0.28 * smooth(1.1, 2.6, z);
     const pillScale = 0.66 + 0.34 * smooth(0.9, 2.2, z);
+    const pills: { el: HTMLElement; x: number; y: number; w: number; h: number }[] = [];
     for (const [key, el] of this.binds) {
       const [kind, id] = key.split(":");
       if (kind === "pod") {
@@ -702,8 +705,8 @@ export class OfficeScene {
       } else if (kind === "agent") {
         const r = this.agents[id];
         if (!r) continue;
-        const [x, y] = this.project(r.world.clone().add(new THREE.Vector3(0, r.a.lead ? 0.35 : 0, 0)));
-        el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%) scale(${pillScale})`;
+        const [x, y] = this.project(r.pin.clone().add(new THREE.Vector3(0, r.a.lead ? 0.35 : 0, 0)));
+        pills.push({ el, x, y, w: el.offsetWidth * pillScale, h: el.offsetHeight * pillScale });
         const dim = this.focused && this.focused !== "brain" && r.a.pod !== this.focused;
         el.style.opacity = dim ? String(1 - 0.85 * this.dimK) : "1";
       } else if (kind === "brain") {
@@ -711,6 +714,19 @@ export class OfficeScene {
         el.style.transform = `translate(${x}px,${y - 10}px) translate(-50%,-100%)`;
         el.style.opacity = this.focused && this.focused !== "brain" ? String(1 - 0.8 * this.dimK) : "1";
       }
+    }
+    // Desks sit close together when the whole office is in view, so name tags would cover each other.
+    // Lowest tag first; any tag that would overlap one already placed moves up above it.
+    pills.sort((a, b) => b.y - a.y);
+    const placed: typeof pills = [];
+    for (const p of pills) {
+      for (let tries = 0; tries < pills.length; tries++) {
+        const hit = placed.find((q) => Math.abs(p.x - q.x) < (p.w + q.w) / 2 + 3 && p.y > q.y - q.h - 2 && p.y - p.h < q.y + 2);
+        if (!hit) break;
+        p.y = hit.y - hit.h - 2;
+      }
+      placed.push(p);
+      p.el.style.transform = `translate(${Math.round(p.x)}px,${Math.round(p.y)}px) translate(-50%,-100%) scale(${pillScale})`;
     }
   }
 

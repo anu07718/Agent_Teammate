@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { ACTION_LABEL, inr } from "../lib/format";
-import { openCase, setState, useUI } from "../store";
+import { openCase, useUI } from "../store";
+import { showFlow } from "../flows/api";
 import { me } from "../team";
 import type { Agent, CaseDetail } from "../types";
 import { ago } from "../lib/format";
@@ -121,7 +122,7 @@ function FlowApproval({ t, onReject }: { t: OTask; onReject: () => void }) {
           void refreshOffice();
         }}>YES</button>
         <button onClick={onReject}>NO</button>
-        <button onClick={() => setState({ view: "flows" })} title="open the flow">FLOW ↗</button>
+        <button onClick={() => showFlow(w.flow_id)} title="open the flow">FLOW ↗</button>
       </div>
     </div>
   );

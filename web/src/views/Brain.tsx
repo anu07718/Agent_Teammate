@@ -126,7 +126,9 @@ export function BrainView() {
             {hits.map((h) => (
               <li key={h.case_id} className="rounded-md border border-line p-2 text-[12px]">
                 <div className="flex items-center gap-2">
-                  <button className="font-mono text-muted hover:underline cursor-pointer" onClick={() => !h.case_id.startsWith("H-") && openCase(h.case_id)}>{h.case_id}</button>
+                  {h.case_id.startsWith("H-")
+                    ? <span className="font-mono text-muted" title="a past case from the history the memory was seeded with; it has no page">{h.case_id}</span>
+                    : <button className="font-mono text-muted hover:underline cursor-pointer" onClick={() => openCase(h.case_id)} title="open this case">{h.case_id}</button>}
                   <Badge tone={h.state === "rejected" ? "bad" : h.state === "accepted" ? "good" : "accent"}>{h.state}</Badge>
                   {h.ground_moved && <Badge tone="warn">ground moved</Badge>}
                   <span className="ml-auto tabular text-faint">{h.score}</span>

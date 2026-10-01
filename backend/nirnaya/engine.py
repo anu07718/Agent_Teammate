@@ -12,6 +12,7 @@ import asyncio
 import copy
 import logging
 import os
+import threading
 import time
 import uuid
 
@@ -66,9 +67,10 @@ class Engine:
             labels = self.store.labels()
             if labels:
                 self.calibrator.fit(extra_labels=labels)
-        self.drift = DriftMonitor(self.calibrator.cal_scores)
+        self.drift = DriftMonitor(self.calibrator.cal_scores, by_action=self.calibrator.cal_by_action)
         self.drift_status = self.drift.check()
         self.risk = RiskControl()
+        self._fit_lock = threading.Lock()  # refits come from request threads; one at a time, newest policy last
         self.refit_thresholds()
         self.step_delay = float(os.environ.get("NIRNAYA_STEP_DELAY", "0.45")) if step_delay is None else step_delay
         self.tasks: dict[str, asyncio.Task] = {}
@@ -84,9 +86,10 @@ class Engine:
                 a.rung = int(ov.get("rung", a.rung))
 
     def refit_thresholds(self) -> None:
-        c = self.calibrator
-        self.risk.fit(c.cal_rows, c.cal_scores, c.cal_y, self.policy.actions,
-                      alpha_scale=self.drift_status["alpha_scale"])
+        with self._fit_lock:
+            c = self.calibrator
+            self.risk.fit(c.cal_rows, c.cal_scores, c.cal_y, self.policy.actions,
+                          alpha_scale=self.drift_status["alpha_scale"])
 
     def set_policy(self, action: str, alpha: float | None = None, rung: int | None = None, by: str = "supervisor"):
         a = self.policy.actions[action]
@@ -110,6 +113,7 @@ class Engine:
         labels = self.store.labels()
         self.calibrator.fit(extra_labels=labels or None)
         self.drift.reference = self.calibrator.cal_scores
+        self.drift.by_action = self.calibrator.cal_by_action
         self.refit_thresholds()
         self.trail.append("-", "model.recalibrated", "calibrator", {"real_labels": len(labels),
                                                                      "ece": self.calibrator.metrics["ece_calibrated"]})
@@ -375,7 +379,7 @@ class Engine:
             f = self._features(case, a)
             s = self.calibrator.score(f, a["type"])
             th = self.risk.thresholds(a["type"], a["amount"])
-            self.drift.observe(s["calibrated"])
+            self.drift.observe(s["calibrated"], a["type"])
             route, why = self._route_one(case, a, s["calibrated"], th)
             scores.append({"action": a["type"], "features": f, **s, "threshold": th, "route": route, "why": why})
         case["scores"] = scores

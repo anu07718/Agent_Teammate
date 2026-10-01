@@ -12,6 +12,9 @@ refuses what should never run.
 
 ![The Nirnaya office](docs/screenshots/office.png)
 
+**New here?** [workflow.md](workflow.md) walks you from the first start to knowing your agents are
+working: your first case, approvals, department tasks, routines, flows, and a five-minute checklist.
+
 ## Run it
 
 ```bash
@@ -100,9 +103,9 @@ then **Save** and **Run**.
 | **Start** | Where a run begins: by hand, or on a schedule in plain words (“every weekday at 9am”) |
 | **Customer message** | Opens a case from a customer. The whole pipeline handles it (Sentry, triage, the specialist, the calibrator, the Seal); the node waits until it is resolved, or approved if it needs a person |
 | **Department task** | Hands a department a task in plain words, like the office bar: “Verify the audit trail”, “Run the benchmark”, “Check T-5001” |
-| **Check** | Branches (yes / no) on the step before it: did it succeed, the case's route or status, its amount, or words in the result |
+| **Check** | Branches (yes / no) on the step before it: did it succeed, the case's route or status (is / is not), words in the result (is / is not / contains), or its amount (is / is not / > / <) |
 | **Ask a person** | Waits until someone on the team says yes or no, on the node, in Approvals, or at the Support lead's desk in the office |
-| **Post to team chat** | Posts in a department lead's chat for everyone; `{result}`, `{case}`, `{route}` fill in from the run |
+| **Post to team chat** | Posts in a department lead's chat for everyone; `{result}`, `{case}`, `{route}`, `{status}`, `{by}` and `{flow}` fill in from the run |
 | **Wait** | Pauses the run |
 
 Each node lights up as it runs, with its result, and the run's progress shows as a percentage. The work
@@ -167,17 +170,29 @@ read status, search the graph and memory, or score an action.
 ## Tests
 
 ```bash
-make test-backend   # 53 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
+make test-backend   # 58 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
                     # restart durability, checkpoint chaining, tamper detection, drift fail-closed, MCP, HTTP,
                     # office ops, plain-words schedules, routines, the Brain graph, agent chat, the desktop
                     # app's server flags, flows (validation, branches, waiting on cases and people, stale
-                    # saves, stop) and the team (presence, the shared chat, names on actions)
+                    # saves, stop, which ways each Check allows), the team (presence, the shared chat, names
+                    # on actions), the ledger's outside events landing once, drift staying quiet on ordinary
+                    # traffic, and policy changes made at the same moment
 make test-web       # typecheck + production build
 make run & make e2e # drives the real UI in Chromium: 17 end-to-end checks through the office and the
                     # workspace, including approvals in the office chat and a phone layout
 make e2e-phone      # the Android app's flow at phone size: asks for the server, connects, works (5 checks)
 make e2e-flows      # builds a flow by drag and drop, wires it, runs it, answers its approval (9 checks)
 make e2e-team       # two people on one server: presence, shared chat, names, a flow one saves and the other runs (9 checks)
+make e2e-workflow   # workflow.md followed step by step by a new user in a real browser (14 checks)
+make e2e-fields     # every field, menu option and condition, checked on the server too:
+                    #   office (19): all 6 departments, the 11 samples and their outcomes, 4 customers × 5 channels,
+                    #     every department's example tasks, approve/reject in the rail, 11 repeat cadences,
+                    #     routine controls, filters, calendar booking and controls, board, Brain, 19 agents' chats
+                    #   workspace (23): every view by button and key, cases, approvals of every kind, every α
+                    #     and autonomy rung, the Ledger's outages and outside events, k = 1–3, trail, settings
+                    #   flows (26): every palette node, every inspector field and option, every reason a save
+                    #     is refused, 23 Check conditions on a real case, approvals, Stop, Copy, Delete, the
+                    #     three examples, every {placeholder}, the canvas controls, a scheduled run
 make audit          # a supervisor's walk: every view and button, dark/light, desktop/phone; errors, failed
                     # requests, clipped text, fonts (writes web/e2e/shots/audit/audit.json)
 ```

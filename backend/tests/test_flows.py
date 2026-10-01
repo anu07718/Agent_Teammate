@@ -143,6 +143,26 @@ def test_checks_and_fill():
     assert check({"field": "amount", "op": ">", "value": "₹1,000"}, {"amount": 18500})
     assert not check({"field": "result", "op": "contains", "value": "broken"}, {"result": "Chain intact"})
     assert fill("{case} went {route}", {"case_id": "NR-1", "route": "ACT"}, {}) == "NR-1 went ACT"
+    # an amount compares as a number whichever way it is written, and stored as a float
+    assert check({"field": "amount", "op": "is", "value": "₹349"}, {"amount": 349.0})
+    assert check({"field": "amount", "op": "is not", "value": "350"}, {"amount": 349.0})
+    assert check({"field": "amount", "op": "<", "value": "1,000"}, {"amount": 349.0})
+    assert not check({"field": "amount", "op": "is", "value": "lots"}, {"amount": 349.0})
+    assert check({"field": "ok", "op": "is not", "value": "true"}, {"ok": False})
+    assert check({"field": "status", "op": "is", "value": "Resolved"}, {"status": "resolved"})
+    assert check({"field": "result", "op": "contains", "value": "intact"}, {"result": "Chain intact"})
+
+
+def test_a_check_only_offers_what_makes_sense_for_its_field(client):
+    d = client.get("/api/flows").json()
+    assert d["ops_for"]["route"] == ["is", "is not"] and "contains" in d["ops_for"]["result"] and ">" in d["ops_for"]["amount"]
+    for field, op, value in [("route", ">", "ACT"), ("ok", "contains", "true"), ("status", "<", "x"), ("amount", "contains", "3")]:
+        r = client.post("/api/flows", json={"name": "Odd", "nodes": [node("s", "start"), node("c", "if", field=field, op=op, value=value)],
+                                            "edges": [wire("s", "c")]})
+        assert r.status_code == 400 and "pick what to check and how" in r.json()["detail"], (field, op)
+    r = client.post("/api/flows", json={"name": "Empty", "nodes": [node("s", "start"), node("c", "if", field="result", op="contains", value=" ")],
+                                        "edges": [wire("s", "c")]})
+    assert r.status_code == 400 and "compare with" in r.json()["detail"]
 
 
 def test_the_team_sees_names_and_one_chat(client, engine):

@@ -41,6 +41,9 @@ def test_schedule_parse_and_next_run():
     assert schedule.parse("mon and thu at 17:30 check drift")["when"] == {"kind": "weekly", "days": [0, 3], "at": "17:30"}
     assert schedule.parse("every day verify the trail")["needs_time"]
     assert schedule.parse("pull the evidence for T-5001") is None
+    assert schedule.parse("every minute")["when"] == {"kind": "minutes", "every": 1}
+    assert schedule.parse("each minute, check for drift")["text"] == "Check for drift"
+    assert schedule.parse("every 15 min")["when"] == {"kind": "minutes", "every": 15}
     # a Saturday noon: the next weekday run is Monday 08:00
     sat = time.mktime((2026, 10, 3, 12, 0, 0, 0, 0, -1))
     nxt = time.localtime(schedule.next_run({"kind": "weekdays", "at": "08:00"}, sat))

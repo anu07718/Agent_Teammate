@@ -6,6 +6,7 @@ import { Badge, Button, Card, Empty, KV, Mono, RouteBadge, StatusDot, Tabs, cx }
 import { ACTION_LABEL, INTENT_LABEL, ago, clock, inr, pct, short } from "../lib/format";
 import { oapi, type Op, type OfficeSnap } from "../office/data";
 import { closeCase, openCase, setState, toast, useUI, EMPTY } from "../store";
+import { showFlow } from "../flows/api";
 import type { CaseDetail, Score } from "../types";
 
 const GROUPS: { id: string; label: string; test: (c: any) => boolean }[] = [
@@ -334,7 +335,7 @@ function FlowItem({ w, onDone }: { w: OfficeSnap["flow_waits"][number]; onDone: 
   };
   return (
     <Card title={<span className="flex items-center gap-2"><Workflow size={14} className="text-accent" />{w.flow} <Mono className="text-faint">{w.run_id}</Mono></span>}
-      actions={<Button size="sm" variant="ghost" onClick={() => setState({ view: "flows" })}>Open flow</Button>}>
+      actions={<Button size="sm" variant="ghost" onClick={() => showFlow(w.flow_id)}>Open flow</Button>}>
       <p className="text-[12.5px]">{w.question}</p>
       <p className="mt-1 text-[11.5px] text-faint">Started by {w.by} · waiting {ago(w.since)}</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">

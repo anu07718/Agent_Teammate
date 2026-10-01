@@ -59,8 +59,10 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
   const [busy, setBusy] = useState(false);
   const [sure, setSure] = useState(false);
   const [runSel, setRunSel] = useState<string | null>(null);
+  const deleting = useRef<string | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const draftRef = useRef(draft); draftRef.current = draft;
+  const dataRef = useRef(data); dataRef.current = data;
   const dirtyRef = useRef(dirty); dirtyRef.current = dirty;
   const presets = useUI((s) => s.app?.presets ?? EMPTY);
   const people = useUI((s) => s.people ?? EMPTY) as Person[];
@@ -101,7 +103,20 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
     }
     if (ev.kind === "flow.deleted") {
       setData((d) => (d ? { ...d, flows: d.flows.filter((f) => f.id !== ev.flow_id) } : d));
-      if (draftRef.current?.id === ev.flow_id && ev.by !== me().name) setNotice(`${ev.by} deleted this flow. Save it to keep your copy.`);
+      const cur = draftRef.current;
+      if (cur && cur.id === ev.flow_id && deleting.current !== ev.flow_id) {
+        // deleted by a teammate, or by you in another window: never leave a flow on screen that no longer exists
+        const who = ev.by === me().name ? "" : ` by ${ev.by}`;
+        if (dirtyRef.current) {
+          setDraft({ ...cur, id: null, version: 0 });
+          setNotice(`“${cur.name}” was deleted${who}. Save to keep your copy as a new flow.`);
+        } else {
+          // from what is on screen now, not a fresh load: a flow saved meanwhile must not vanish from the picker
+          const d = dataRef.current;
+          if (d) pick({ ...d, flows: d.flows.filter((f) => f.id !== ev.flow_id) }, null);
+          toast(`“${cur.name}” was deleted${who}`, "info");
+        }
+      }
     }
   }), []);
 
@@ -154,14 +169,15 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Ctrl/⌘+S saves from anywhere, a text field included (and never opens the browser's "save page")
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (dirty || !draft?.id) void save(); return; }
       const t = e.target as HTMLElement;
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return;
       if ((e.key === "Delete" || e.key === "Backspace") && sel) { e.preventDefault(); remove(); }
       if (e.key === "Escape") { setSel(null); setConn(null); }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   });
 
   // ── the canvas: pan, zoom, drag nodes, draw wires ─────────────────────────
@@ -169,7 +185,8 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
   const move = useRef<{ id: string; x: number; y: number; nx: number; ny: number; moved: boolean } | null>(null);
 
   const onBgDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest("[data-node]")) return;
+    // nodes handle their own; the zoom buttons must get their click (capturing the pointer here would eat it)
+    if ((e.target as HTMLElement).closest("[data-node], .fl-zoom")) return;
     setSel(null);
     pan.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -259,8 +276,10 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
     if (!draft?.id) { if (data) pick(data, null); return; }
     if (!sure) { setSure(true); setTimeout(() => setSure(false), 3000); return; }
     setSure(false);
+    deleting.current = draft.id;
     try { await fapi.remove(draft.id); const d = await load(); if (d) pick(d, null); toast("Flow deleted", "info"); }
     catch (e) { setErr((e as Error).message); }
+    finally { deleting.current = null; }
   };
 
   // the run shown on the canvas: the one picked below, else the latest of this flow
@@ -280,6 +299,7 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
         <select aria-label="Flow" value={draft?.id ?? ""} onChange={(e) => { if (!dirty || window.confirm("Drop your unsaved changes?")) pick(data, e.target.value); }}
           className="h-8 max-w-52 rounded-md border border-line-strong bg-panel-2 px-2 text-[12.5px]">
           {!draft?.id && <option value="">{draft?.name ?? "New flow"} (not saved)</option>}
+          {draft?.id && !data.flows.some((f) => f.id === draft.id) && <option value={draft.id}>{draft.name}</option>}
           {[...data.flows].sort((a, b) => a.name.localeCompare(b.name)).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
         <input aria-label="Flow name" value={draft?.name ?? ""} onChange={(e) => edit((d) => ({ ...d, name: e.target.value }))}
@@ -527,14 +547,15 @@ function Inspector({ n, data, presets, run, set, onDelete }: {
       </>}
       {n.type === "if" && <>
         <Field label="Check">
-          <select className={inputCls} value={c.field} onChange={(e) => set({ field: e.target.value, value: VALUES[e.target.value]?.[0] ?? "" })} aria-label="Check">
+          <select className={inputCls} value={c.field} aria-label="Check"
+            onChange={(e) => set({ field: e.target.value, value: VALUES[e.target.value]?.[0] ?? "", op: (data.ops_for[e.target.value] ?? data.ops).includes(c.op) ? c.op : "is" })}>
             {Object.entries(data.fields).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field label="How">
             <select className={inputCls} value={c.op} onChange={(e) => set({ op: e.target.value })} aria-label="How">
-              {data.ops.map((o) => <option key={o}>{o}</option>)}
+              {(data.ops_for[c.field] ?? data.ops).map((o) => <option key={o}>{o}</option>)}
             </select>
           </Field>
           <Field label="Value">
@@ -542,7 +563,8 @@ function Inspector({ n, data, presets, run, set, onDelete }: {
               <select className={inputCls} value={c.value} onChange={(e) => set({ value: e.target.value })} aria-label="Value">
                 {VALUES[c.field].map((v) => <option key={v}>{v}</option>)}
               </select>
-            ) : <input className={inputCls} value={c.value} onChange={(e) => set({ value: e.target.value })} aria-label="Value" />}
+            ) : <input className={inputCls} value={c.value} onChange={(e) => set({ value: e.target.value })} aria-label="Value"
+              placeholder={c.field === "amount" ? "₹ e.g. 1000" : "e.g. intact"} inputMode={c.field === "amount" ? "decimal" : undefined} />}
           </Field>
         </div>
         <p className="text-[11px] text-faint">It looks at the step wired into it. “yes” goes out the top dot, “no” the bottom one.</p>

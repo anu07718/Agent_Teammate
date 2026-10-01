@@ -1,7 +1,8 @@
 // The Android app's flow, in Chromium at phone size: the built web app served from its own origin
 // (as the APK serves it from http://localhost), marked as a native shell, with no server set. It must
 // ask for the server, connect, and then work against it.
-// Usage: node e2e/phone-client.mjs   (NIRNAYA_URL = a running server, default http://127.0.0.1:8000)
+// Usage: node e2e/phone-client.mjs   (NIRNAYA_URL = a running server, default http://127.0.0.1:8000;
+//        APP_DIST = the web files to serve, default web/dist)
 import { chromium } from "playwright";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -10,7 +11,8 @@ import { fileURLToPath } from "node:url";
 
 const SERVER = process.env.NIRNAYA_URL ?? "http://127.0.0.1:8000";
 const SHOTS = process.env.SHOTS;
-const DIST = fileURLToPath(new URL("../dist/", import.meta.url));
+// APP_DIST=folder serves another build, such as the assets/public folder unpacked from the APK itself
+const DIST = process.env.APP_DIST ? join(process.env.APP_DIST, "/") : fileURLToPath(new URL("../dist/", import.meta.url));
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".png": "image/png" };
 
 // a stand-in for the APK's local web server: files from web/dist, index.html for anything else

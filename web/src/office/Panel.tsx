@@ -131,10 +131,10 @@ export function Panel(p: Props) {
     if (hint.problem) return { html: esc(hint.problem), tone: "err" as const };
     if (hint.kind === "routine") return { html: `${av(hint.agent!)}⏱ Routine · <b>${hint.when_desc}</b> · <b>${p.nameOf(hint.agent!)}</b> in ${POD_STYLE[hint.dept!].name.toLowerCase()} · next ${until(hint.next_at)}${hint.needs_ok ? " · waits for your OK" : ""}${hint.guessed ? ` · “${esc(hint.guessed)}” taken as ${hint.when?.at}` : ""}` };
     if (repeat) return { html: `⏱ Repeats ${CADENCES.find((c) => c[0] === cad)?.[1].toLowerCase()}${cad === "hourly" || cad === "m5" ? "" : " at " + at} · the office names the desk when you press Add` };
-    if (hint.kind === "case") return { html: `${av(hint.agent!)}Probably <b>${p.nameOf(hint.agent!)}</b> · triage confirms when you press Add · ${customer} over ${channel}` };
+    if (hint.kind === "case") return { html: `${av(hint.agent!)}Probably <b>${p.nameOf(hint.agent!)}</b> · triage confirms when you press Add · ${esc(app?.customers.find((c) => c.id === customer)?.name.split(" ")[0] ?? "")} (${customer}) over ${channel}` };
     if (hint.op_kind === "help") return { html: `${POD_STYLE[dept].name[0] + POD_STYLE[dept].name.slice(1).toLowerCase()} can: ${esc((hint.can || []).join("; "))}.`, tone: "err" as const };
     return { html: `${av(hint.agent!)}Goes to <b>${p.nameOf(hint.agent!)}</b>${hint.dept !== dept ? ` in ${POD_STYLE[hint.dept!].name.toLowerCase()}` : ""} · “${esc(hint.title ?? "")}”${hint.needs_ok ? " · waits for your OK" : ""}` };
-  }, [hint, said, p.text, repeat, cad, at, customer, channel, dept]);
+  }, [hint, said, p.text, repeat, cad, at, customer, channel, dept, app]);
 
   const scoped = p.focused && p.focused !== "brain" ? tasks.filter((t) => t.dept === p.focused) : tasks;
   const routines = (snap?.routines ?? []).filter((r) => !p.focused || p.focused === "brain" || r.dept === p.focused);

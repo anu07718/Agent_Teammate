@@ -87,7 +87,15 @@ export function LedgerView() {
                 <li key={t.id} className="flex items-center gap-2 text-[12px]">
                   <span className="w-14 font-mono">{t.id}</span>
                   <span className="flex-1 truncate text-muted">{inr(t.amount)} · {t.merchant}</span>
-                  <Button size="sm" variant="ghost" title="Bank auto-reversal lands" onClick={async () => { await api.railEvent(t.id, "reversal_lands"); toast(`${t.id}: auto-reversal landed`, "warn"); }}><Waves size={12} /></Button>
+                  <Button size="sm" variant="ghost" disabled={!t.can} aria-label={`Move the ground on ${t.id}`}
+                    title={t.can === "reversal_lands" ? "The bank's auto-reversal lands" : t.can === "merchant_refund" ? "The merchant's refund lands" : "Already reversed or refunded"}
+                    onClick={async () => {
+                      try {
+                        const r = await api.railEvent(t.id, "auto");
+                        toast(`${t.id}: ${r.event === "merchant_refund" ? "the merchant's refund" : "the bank's auto-reversal"} landed (version ${r.version})`, "warn");
+                        await load();
+                      } catch (e) { toast((e as Error).message, "bad"); }
+                    }}><Waves size={12} /></Button>
                 </li>
               ))}
             </ul>

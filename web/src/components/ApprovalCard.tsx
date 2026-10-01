@@ -47,8 +47,8 @@ export function ApprovalCard({ item, onDone }: { item: { case: any; pending: any
         await api.reject(item.case.id);
         toast(`${item.case.id} rejected; the decision became a label`, "info", item.case.id);
       } else if (txn) {
-        await api.railEvent(txn, item.case.intent === "unauthorized" ? "merchant_refund" : "reversal_lands");
-        toast(`The live ledger moved under ${item.case.id}. Try approving now.`, "warn", item.case.id);
+        const r = await api.railEvent(txn, "auto");
+        toast(`${r.event === "merchant_refund" ? "A merchant refund" : "The bank's auto-reversal"} landed: the live ledger moved under ${item.case.id}. Try approving now.`, "warn", item.case.id);
       }
       await refresh();
       onDone?.();

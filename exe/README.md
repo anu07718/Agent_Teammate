@@ -59,15 +59,24 @@ bundled Python once as a check.
 ## What has been tested, and how
 
 The build machine is Linux, so the Windows parts were tested with wine 11:
-- The bundled Windows Python ran the server. The full browser suite (`web/e2e/run.mjs`, 17 checks) passed
-  against it.
+- The installer from `dist/` was installed silently into a fresh wine profile, and the server was started
+  from the installed folder with the installed Python, through `cmd.exe /c` as the window does. Every
+  browser suite then passed against it:
+  - `run.mjs` (17 checks)
+  - `workflow.mjs` (14): `workflow.md` followed step by step
+  - `fields-office.mjs` (19)
+  - `fields-workspace.mjs` (23): on a fresh database. On a server the other suites had already used, one
+    check differed, and it should: approved recalibrations had taught it to refund a duplicate charge
+    outright, so there was no undo to press.
+  - `fields-flows.mjs` (26)
+  - `phone-client.mjs` (5)
 - The installer ran silently: files, shortcuts and the uninstall entry were created. The uninstaller
   removed them and kept the user's data.
 - The exact command the window uses (`cmd.exe /c "…"`) worked from a folder with a space in its name. The
   server stopped when its parent process ended.
 - The launcher page (the same `resources.neu`) ran in the Linux build of the window under a virtual
   display. It showed the splash, started the server, opened the office and stopped the server when the
-  window was closed. It reused a server that was already running, and it showed the error screen when the
+  window was closed (4 seconds after the close, in the last run). It reused a server that was already running, and it showed the error screen when the
   server failed.
 
 Wine has no WebView2, so the Windows window itself (Neutralino on WebView2) has not been opened on real

@@ -52,9 +52,11 @@ a store release, set `NIRNAYA_KEYSTORE`, `NIRNAYA_KEYSTORE_PASS`, `NIRNAYA_KEY_A
 
 - The APK was built with Gradle and checked with `aapt2` and `apksigner`: package, version, target SDK
   36, INTERNET permission, cleartext allowed, the web app inside `assets/public`, a valid signature.
-- The phone flow (`web/e2e/phone-client.mjs`, 5 checks) ran in Chromium at phone size. It served the
-  app from its own origin, the way the APK serves it from `http://localhost`, and marked it as the native
-  shell. First launch asked for the server; entering the address connected the office live; a message
+- The web files inside the APK (`assets/public`) are byte for byte the `web/dist` build that every browser
+  suite tested, apart from Capacitor's own `cordova.js` and `cordova_plugins.js`.
+- The phone flow (`web/e2e/phone-client.mjs`, 5 checks) ran in Chromium at phone size on the files
+  unpacked from the APK itself (`APP_DIST=…/assets/public`). It served them from their own origin, the way
+  the APK serves them from `http://localhost`, and marked the page as the native shell. First launch asked for the server; entering the address connected the office live; a message
   typed on the phone became a resolved case on the server; the address survived a restart.
 
 This build machine has no hardware virtualisation, so the Android emulator cannot run here. The APK has

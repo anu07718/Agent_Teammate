@@ -11,13 +11,17 @@
 make install                      # pip install -e backend[...] + npm ci in web/
 make run                          # build web, serve API + web on :8000
 make dev                          # API :8000 (reload) + Vite :5173 (proxies /api and /mcp)
-cd backend && python -m pytest -q # 53 tests, about 35 s
+cd backend && python -m pytest -q # 58 tests, about 35 s
 cd web && npx tsc -b --noEmit && npm run build
 cd web && npm run e2e             # needs a server on :8000; 17 browser checks (software WebGL flags are in the script)
 cd web && node e2e/phone-client.mjs  # the APK's flow at phone size, 5 checks (needs a server and web/dist)
 cd web && node e2e/flows.mjs      # Flows: drag and drop, wire, save, run, approve on the node; 9 checks
 cd web && node e2e/team.mjs       # two people (?as=Asha, ?as=Ravi): presence, shared chat, names, shared flows; 9 checks
 cd web && node e2e/audit.mjs      # every view and button in dark/light, desktop/phone: errors, failed requests, clipped text, fonts (~10 min; OFFICE=0 skips the office click pass, which run.mjs and team.mjs cover)
+cd web && node e2e/workflow.mjs   # workflow.md followed by a new user, step by step; 14 checks (make e2e-workflow)
+cd web && node e2e/fields-office.mjs     # every office control and option, each result checked on the server; 19 checks, ~25 min
+cd web && node e2e/fields-workspace.mjs  # every workspace view, input, select and button; 23 checks
+cd web && node e2e/fields-flows.mjs      # every Flows node, field, option, save refusal and Check condition on real runs; 26 checks
 make exe                          # exe/build/Nirnaya + exe/dist/Nirnaya-Setup-<ver>-x64.exe
 make apk                          # apk/dist/Nirnaya-<ver>.apk
 ```
@@ -55,10 +59,11 @@ Env: `NIRNAYA_DB` (SQLite path), `NIRNAYA_STEP_DELAY` (animation pacing, 0 in te
   - shell and state: `App.tsx` (the office full screen when `view === "office"`, else the workspace shell), `store.ts` (external store + SSE, `onEvents` for listeners), `api.ts`
   - the office (`office/`, all original code): `scene.ts` (three.js scene, camera, people, emotes, tickets, the Brain board; positions bound HTML each frame via `scene.bind(key, el)`), `models.ts` (low-poly pieces), `layout.ts` (pods, seats, colours), `wires.ts` (SVG connector wires), `data.ts` (`/api/office` client, office store, cases and ops → cards), `OfficePage.tsx`, `Panel.tsx` (Task Status), `Rail.tsx` (department + agent chat, approvals), `Overlays.tsx` (board, Brain, calendar, big editor), `office.css`
   - workspace views: `views/*` (Workspace + Approvals, Supervisor, Brain, Ledger with Univer lazy-loaded, Benchmark, Trail, Settings)
-  - flows (`flows/`): `FlowsView.tsx` (Live | Builder), `Live.tsx` (the pipeline from `/api/flows/pipeline`), `Builder.tsx` (canvas: HTML5 drag from the palette, pointer events for moving nodes and drawing wires, pan/zoom by transform), `api.ts`, `flows.css`
+  - flows (`flows/`): `FlowsView.tsx` (Live | Builder), `Live.tsx` (the pipeline from `/api/flows/pipeline`), `Builder.tsx` (canvas: HTML5 drag from the palette, pointer events for moving nodes and drawing wires, pan/zoom by transform), `api.ts` (`showFlow(id)` opens a flow in the Builder from anywhere), `flows.css`
   - the team: `team.ts` (your name and browser id in localStorage `nirnaya.me`, `?as=Name`, `tellView`), `components/People.tsx` (avatars, rename popover)
 - `exe/`: the Windows app. `neutralino.config.json` (window), `resources/launcher.js` (probe ports 8765–8769, reuse a running Nirnaya, else spawn the bundled `python\pythonw.exe -m nirnaya ... --exit-with NL_PID`, then `location.replace` to the server), `build.sh` (embeddable Python 3.12 + win_amd64 wheels from `requirements-win.txt`, `backend/nirnaya`, `web/dist`, NSIS), `installer.nsi` (per-user, WebView2 bootstrapper). `exe/dist/` holds the built installer (committed).
 - `apk/`: the Android app. Capacitor 8 (`capacitor.config.json`: `androidScheme: http` so it can call LAN servers), `android/` (committed; manifest has `usesCleartextTraffic`), `build.sh` (web → `www/`, `cap sync`, `gradlew assembleDebug`). It is a client: the first launch shows `ServerConnect` in `OfficePage.tsx` (opens by itself when `window.Capacitor.isNativePlatform()`), which saves the address with `setApiBase`. `apk/dist/` holds the built APK (committed).
+- `workflow.md`: the guide for a new user, from first start to the "are my agents working" checklist. `web/e2e/workflow.mjs` follows it step by step: when a label, a sample or a result text changes, change both. `run.md` is the install/run guide (the owner edits it too).
 - `tools/make_icons.py`: draws every icon (exe `.ico`, installer bitmaps, Android mipmaps and launch screens) from the favicon's N.
 - `docs/REPO-SCAN.md`: what was taken from each of the 18 reference repos, and why some were not merged (licences).
 
@@ -69,6 +74,14 @@ Do **not** copy code from these:
 - **Sentry server:** FSL
 
 Use the Sentry SDKs only. Do not use pixel-agents' image assets. The MIT and Apache ones are fine to learn from or depend on (three.js, Univer, the fonts are packages). If code is ever copied, keep its licence notice.
+
+## Behaviour worth knowing
+- Drift (`drift.py`) is per action and one-sided: each action's live scores are compared with that action's own calibration scores, only once 20 have arrived, and only a shift towards *less* certain counts. Pooling every action made ordinary traffic look like drift (the mix of actions changes with whatever people send). `Inject drift` on the Supervisor still trips it.
+- The ledger's outside events (`rails.natural_event`): a failed debit can get its auto-reversal, a payment that went through can get a merchant refund, each once. `POST /api/sim/rail-event` takes `event: "auto"`; ledger rows carry `can` (the event that can still land, or null). "move the ground" in the office chat uses the same rule.
+- A Check node only offers ways that fit its field (`flows.OPS_FOR`): ok/route/status `is`/`is not`, result also `contains`, amount `is`/`is not`/`>`/`<` compared as numbers (₹ and commas allowed). An empty value is refused on save.
+- Schedules read "every minute" / "each minute" as `{"kind": "minutes", "every": 1}`.
+- Flow waits carry `flow_id`, so "Open flow" (Approvals) and "FLOW ↗" (office rail) open that flow in the Builder (via sessionStorage keys `nirnaya.flows.open` / `nirnaya.flows.tab`).
+- When the open flow is deleted elsewhere, the Builder switches to another flow (or, with unsaved changes, keeps them as a new unsaved flow and says so). It picks from the data on screen, never a fresh load, so a flow saved at the same moment does not drop out of the picker.
 
 ## Gotchas
 - React: a `useUI` selector must never return a fresh array or object (`?? []` loops forever; use `EMPTY` from `store.ts`).
@@ -88,6 +101,10 @@ Use the Sentry SDKs only. Do not use pixel-agents' image assets. The MIT and Apa
 - The office chat is server-side now: never add user or agent messages with `say()` (that is for this-browser-only prompts and errors). Approval notes come from `team._on_event`, not from the button handlers.
 - `Panel.tsx` renders its hint and row meta with `dangerouslySetInnerHTML`: anything a person typed or named (task text, names, server error text) goes through `esc()` from `office/data.ts`.
 - Under swiftshader every click in the 3D office takes about 2 s (Playwright waits for stable frames). Give office clicks 6 s or more in scripts.
+- Office name tags are anchored on the head *without* the breathing bob (`r.pin`), rounded to whole pixels, and pushed apart when they would overlap (`placeBinds`). A tag that moves every frame never counts as stable, and Playwright's click waits for it forever.
+- Office status chips and their meta line both contain words like DONE/WAITING/REFUSED: in tests select `.o-row[data-id=…] .o-st`, not `getByText("DONE")`. Filter tabs are named "All 12" (with a space): match `/^All\s*\d+$/`.
+- Flows canvas: `overflow: clip`, not just hidden. Focus and Playwright's scroll-into-view can scroll an `overflow: hidden` box, which shifts the world under the pointer maths. Pointer capture on the canvas swallows clicks on the zoom buttons, so `onBgDown` ignores `.fl-zoom`. SVG `<text>` (wire labels) has no `innerText`: read `textContent`.
+- `newOp` in tests: quiet routines (drift check, TAT watch) create ops too; match on `by` or the routine id.
 - Office menus (department, samples) close on Escape and on a click outside; the window key handler would otherwise send Escape to `overview()` and leave the menu covering the panel.
 - EXE: numpy's Windows wheels call `ucrtbase.crealf`, which wine 9 lacks. Test with wine 10+ (WineHQ `wine-stable-amd64` + the `i386-windows` DLLs from `wine-stable-i386`, extracted with `dpkg -x`, are enough; the i386 apt deps do not resolve on noble). NSIS installers are 32-bit, hence the i386 DLLs.
 - EXE: Neutralino's `os.spawnProcess` runs `cmd.exe /c "<command>"` on Windows, so the command is `"<path>\pythonw.exe" -m nirnaya --db "<path>" ...` with each path quoted; cmd strips only the outer pair. `NL_PATH` can be relative (`.`): resolve it with `filesystem.getAbsolutePath`.

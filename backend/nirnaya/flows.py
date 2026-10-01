@@ -60,6 +60,9 @@ FIELDS = {"ok": "the step succeeded", "route": "the case's route (ACT, HEDGE, ES
           "status": "the case's status (resolved, refused, parked)", "result": "the step's result text",
           "amount": "the case's amount (₹)"}
 OPS = ["is", "is not", "contains", ">", "<"]
+# what makes sense for each: a route is never "greater than" anything, and only text can "contain"
+OPS_FOR = {"ok": ["is", "is not"], "route": ["is", "is not"], "status": ["is", "is not"],
+           "result": ["is", "is not", "contains"], "amount": ["is", "is not", ">", "<"]}
 FIELDS_SHORT = {"ok": "succeeded", "route": "route", "status": "status", "result": "result", "amount": "amount"}
 
 
@@ -116,12 +119,12 @@ def check(cfg: dict, out: dict) -> bool:
     if field == "ok":
         got, want = bool(got), want.lower() in ("true", "yes", "1", "ok")
         return got == want if op == "is" else got != want
-    if op in (">", "<"):
+    if field == "amount" or op in (">", "<"):
         try:
-            a, b = float(got or 0), float(want.replace(",", "").replace("₹", ""))
+            a, b = float(got or 0), float(want.replace(",", "").replace("₹", "").strip())
         except ValueError:
-            return False
-        return a > b if op == ">" else a < b
+            return op == "is not"
+        return {"is": a == b, "is not": a != b, ">": a > b, "<": a < b}.get(op, False)
     g, w = str(got or "").lower(), want.lower()
     if op == "contains":
         return w in g
@@ -262,8 +265,13 @@ class Flows:
                 if it.get("op_kind") == "help":
                     raise ValueError(f"{label}: {DEPT_NAME[cfg['dept']]} doesn't know “{cfg['text']}”. It can "
                                      + "; ".join(ops_mod.can_do(cfg["dept"])) + ".")
-            if t == "if" and (cfg.get("field") not in FIELDS or cfg.get("op") not in OPS):
-                raise ValueError(f"{label}: pick what to check and how.")
+            if t == "if":
+                if cfg.get("field") not in FIELDS or cfg.get("op") not in OPS_FOR[cfg["field"]]:
+                    raise ValueError(f"{label}: pick what to check and how"
+                                     + (f" ({FIELDS_SHORT[cfg['field']]} can be: {', '.join(OPS_FOR[cfg['field']])})."
+                                        if cfg.get("field") in FIELDS else "."))
+                if not str(cfg.get("value") or "").strip():
+                    raise ValueError(f"{label}: say what to compare with.")
             if t == "wait":
                 try:
                     cfg["seconds"] = max(0.0, min(3600.0, float(cfg.get("seconds") or 0)))
@@ -487,7 +495,7 @@ class Flows:
             for nid, x in r["nodes"].items():
                 node = next((n for n in r["flow"]["nodes"] if n["id"] == nid), None)
                 if x["state"] == "waiting" and node and node["type"] == "approval":
-                    out.append({"run_id": r["id"], "node": nid, "flow": r["name"], "question": x["text"],
+                    out.append({"run_id": r["id"], "node": nid, "flow": r["name"], "flow_id": r["flow_id"], "question": x["text"],
                                 "since": x["started_at"], "by": r["by"]})
         return out
 
@@ -552,7 +560,7 @@ def register(app: FastAPI, E: Callable, F: Callable[[], Flows]) -> None:
     def flows_list():
         e = E()
         return {"flows": F().all(), "runs": F().runs(40), "waiting": F().waiting(), "types": NODE_TYPES, "fields": FIELDS,
-                "ops": OPS, "task_depts": TASK_DEPTS, "depts": [{"id": d["id"], "name": d["name"]} for d in DEPARTMENTS],
+                "ops": OPS, "ops_for": OPS_FOR, "task_depts": TASK_DEPTS, "depts": [{"id": d["id"], "name": d["name"]} for d in DEPARTMENTS],
                 "customers": [{"id": c["id"], "name": c["name"]} for c in e.rails.customers()],
                 "can": {d: ops_mod.can_do(d) for d in TASK_DEPTS}}
 

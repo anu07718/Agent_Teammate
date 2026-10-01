@@ -345,7 +345,7 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
                          "utr": t["utr"], "npci_status": t["npci_status"], "debit_status": t["debit_status"],
                          "reversal": t["reversal"]["status"], "refund": t["refund"]["status"],
                          "dispute": (t.get("dispute") or {}).get("status"), "version": t["version"],
-                         "created_at": t["created_at"]})
+                         "created_at": t["created_at"], "can": e.rails.natural_event(t["id"])})
         accts = [{"account": tok(a["id"]), "customer_id": a["customer_id"], "balance": a["balance"],
                   "version": a["version"]} for a in e.rails.state["accounts"].values()]
         return {"transactions": txns, "accounts": accts, "wallet_credits": e.rails.state["wallet_credits"],
@@ -354,13 +354,20 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
 
     @app.post("/api/sim/rail-event")
     def rail_event(body: RailEvent):
+        """An outside event lands on a payment. event "auto" picks the one that can really happen to it."""
+        e = E()
+        if body.txn_id not in e.rails.state["txns"]:
+            raise HTTPException(400, f"no transaction {body.txn_id}")
+        event = e.rails.natural_event(body.txn_id) if body.event == "auto" else body.event
+        if not event:
+            raise HTTPException(400, f"{body.txn_id} is already reversed or refunded; nothing more can land on it")
         try:
-            snap = E().rails.outside_event(body.txn_id, body.event)
+            snap = e.rails.outside_event(body.txn_id, event)
         except (KeyError, ValueError) as ex:
             raise HTTPException(400, str(ex))
-        E().trail.append("-", "rail.event", "outside", {"txn_id": body.txn_id, "event": body.event})
-        E().bus.publish("rail.event", txn_id=body.txn_id, event=body.event, version=snap["version"])
-        return {"version": snap["version"]}
+        e.trail.append("-", "rail.event", "outside", {"txn_id": body.txn_id, "event": event})
+        e.bus.publish("rail.event", txn_id=body.txn_id, event=event, version=snap["version"])
+        return {"version": snap["version"], "event": event}
 
     @app.post("/api/sim/outage")
     def outage(system: str, down: bool = True):

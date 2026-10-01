@@ -194,11 +194,29 @@ class Rails:
         self._save()
 
     # ── simulated outside events (the ground moving under a parked case) ─────
+    def natural_event(self, tid: str) -> str | None:
+        """What can still happen to this payment from outside: a failed debit gets the bank's auto-reversal,
+        a payment that went through can be refunded by the merchant. Each happens once."""
+        t = self.state["txns"][tid]
+        if t["npci_status"] == "FAILED" and t["debit_status"] == "DEBITED" and t["reversal"]["status"] != "REVERSED":
+            return "reversal_lands"
+        if t["npci_status"] == "SUCCESS" and t["refund"]["status"] != "PROCESSED":
+            return "merchant_refund"
+        return None
+
     def outside_event(self, tid: str, event: str) -> dict:
         t = self.state["txns"][tid]
         if event == "reversal_lands":
+            if t["reversal"]["status"] == "REVERSED":
+                raise ValueError(f"{tid} is already reversed")
+            if t["npci_status"] != "FAILED":
+                raise ValueError(f"{tid} went through, so the bank has nothing to reverse; a merchant refund can land instead")
             self.reverse(tid, t["amount"], by="bank-auto-reversal")
         elif event == "merchant_refund":
+            if t["refund"]["status"] == "PROCESSED":
+                raise ValueError(f"{tid} is already refunded")
+            if t["npci_status"] != "SUCCESS":
+                raise ValueError(f"{tid} failed, so the merchant never got the money; the bank's reversal can land instead")
             self.refund(tid, t["amount"])
         elif event == "npci_success":
             t["npci_status"], t["beneficiary_credited"] = "SUCCESS", True

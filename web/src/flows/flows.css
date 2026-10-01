@@ -36,7 +36,7 @@
 .fl-pal:hover { border-color: var(--accent); }
 .fl-pal:active { cursor: grabbing; }
 .fl-ic { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 7px; color: #fff; font-size: 14px; line-height: 1; }
-.fl-canvas { position: relative; overflow: hidden; min-height: 320px; outline: none; touch-action: none; cursor: grab;
+.fl-canvas { position: relative; overflow: hidden; overflow: clip; /* clip: focus or find-in-page must never scroll the world out from under the pointer maths */ min-height: 320px; outline: none; touch-action: none; cursor: grab;
   background-color: var(--bg); background-image: radial-gradient(circle, color-mix(in srgb, var(--faint) 45%, transparent) 1px, transparent 1.2px); }
 .fl-canvas:active { cursor: grabbing; }
 .fl-canvas.wiring { cursor: crosshair; }

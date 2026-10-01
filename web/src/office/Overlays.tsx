@@ -340,7 +340,7 @@ export function Calendar({ open, onClose, tasks, snap, nameOf, onOpen }: {
             {pop.ev.r && <>
               <button className="o-actbtn dark" onClick={async () => { await oapi.routine(pop.ev.r!.id, "run"); void refreshOffice(); setPop(null); }}>RUN NOW</button>
               <button className="o-actbtn" onClick={async () => { await oapi.routine(pop.ev.r!.id, pop.ev.r!.paused ? "resume" : "pause"); void refreshOffice(); setPop(null); }}>{pop.ev.r.paused ? "RESUME" : "PAUSE"}</button>
-              {pop.ev.r.by === "you" && <button className="o-actbtn" onClick={async () => { await oapi.deleteRoutine(pop.ev.r!.id); void refreshOffice(); setPop(null); }}>DELETE</button>}
+              {pop.ev.r.by !== "system" && <button className="o-actbtn" onClick={async () => { await oapi.deleteRoutine(pop.ev.r!.id); void refreshOffice(); setPop(null); }}>DELETE</button>}
             </>}
             {pop.ev.t?.state === "scheduled" && <button className="o-actbtn" onClick={async () => { await oapi.cancelOp(pop.ev.t!.id); void refreshOffice(); setPop(null); }}>CANCEL</button>}
           </div>

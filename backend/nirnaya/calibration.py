@@ -135,6 +135,8 @@ class Calibrator:
         self.knots = isotonic(raw_cal, y[cal])
         self.cal_rows = [rows[i] for i in cal]
         self.cal_scores = self.calibrated(X[cal])
+        acts = np.array([r["action"] for r in self.cal_rows])
+        self.cal_by_action = {a: self.cal_scores[acts == a] for a in set(acts.tolist())}
         self.cal_y = y[cal]
         p_raw_te, p_cal_te = self.stated(X[te]), self.calibrated(X[te])
         self.metrics = {"n_train": int(len(tr)), "n_calibration": int(len(cal)), "n_test": int(len(te)),

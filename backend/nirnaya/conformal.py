@@ -71,21 +71,24 @@ class RiskControl:
         wrong = 1.0 - y
         acts = np.array([r["action"] for r in rows])
         bands = np.array([band_of(r["amount"])[0] for r in rows])
-        self.table, self.curves = {}, {}
+        # built aside and swapped in whole: routing reads the table from other threads while a policy
+        # change or a recalibration refits it, and two refits can overlap
+        table: dict[str, dict[str, dict]] = {}
+        curves: dict[str, list[dict]] = {}
         for aid, a in actions.items():
-            self.table[aid] = {}
+            table[aid] = {}
             ma = acts == aid
             for bname, _lo, _hi, factor in BANDS:
                 m = ma & (bands == bname)
                 if not a.moves_money and bname != "small":
-                    self.table[aid][bname] = self.table[aid]["small"]
+                    table[aid][bname] = table[aid]["small"]
                     continue
                 alpha = max(1e-4, a.alpha * factor * alpha_scale)
                 act = ltt_threshold(scores[m], wrong[m], alpha, self.delta)
                 hedge = {"lambda": math.inf, "certified": False}
                 if a.reversible:
                     hedge = ltt_threshold(scores[m], wrong[m], min(0.25, 5 * alpha), self.delta)
-                self.table[aid][bname] = {"alpha": round(alpha, 5), "act": act, "hedge": hedge}
+                table[aid][bname] = {"alpha": round(alpha, 5), "act": act, "hedge": hedge}
             m = ma
             if m.sum():
                 s, w = scores[m], wrong[m]
@@ -96,7 +99,8 @@ class RiskControl:
                         continue
                     pts.append({"lambda": round(float(lam), 3), "deflection": round(float(sel.mean()), 4),
                                 "precision": round(float(1 - w[sel].mean()), 4)})
-                self.curves[aid] = pts
+                curves[aid] = pts
+        self.table, self.curves = table, curves
 
     def thresholds(self, action: str, amount: float) -> dict:
         """The thresholds for one action and amount; an uncertifiable threshold comes back as None."""

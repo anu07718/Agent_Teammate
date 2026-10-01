@@ -74,9 +74,9 @@ def parse(text: str) -> dict | None:
     needs_time = needs_day = False
     guessed = None
 
-    m = re.search(r"\bevery\s+(\d+)\s*(?:min|mins|minutes?)\b", s, re.I)
+    m = re.search(r"\b(?:every|each)\s+(?:(\d+)\s*)?(?:min|mins|minutes?)\b", s, re.I)
     if m:
-        return {"when": {"kind": "minutes", "every": max(1, int(m.group(1)))}, "text": _cut(s, [m.span()]),
+        return {"when": {"kind": "minutes", "every": max(1, int(m.group(1) or 1))}, "text": _cut(s, [m.span()]),
                 "needs_time": False, "needs_day": False, "guessed": None}
 
     m = re.search(r"\b(?:hourly|every\s+(\d+)\s+hours?|every\s+hour|each\s+hour|har\s+ghante)\b", s, re.I)
