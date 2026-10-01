@@ -39,7 +39,7 @@ def test_examples_are_there_and_valid(client):
     assert {"Morning audit check", "Duplicate-charge drill", "Model health"} <= set(names)
     morning = next(f for f in d["flows"] if f["name"] == "Morning audit check")
     assert morning["when"] == {"kind": "weekdays", "at": "09:00"} and morning["next_at"]
-    assert set(d["types"]) == {"start", "case", "task", "if", "approval", "notify", "wait"}
+    assert set(d["types"]) == {"start", "case", "task", "if", "approval", "notify", "wait", "email", "whatsapp", "call", "webhook"}
 
 
 def test_a_bad_flow_is_refused_with_a_reason(client):

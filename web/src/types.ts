@@ -177,6 +177,7 @@ export interface AppState {
   policy_hash: string;
   integrations: Record<string, any>;
   waiting?: { cases: number; ops: number; flows: number };
+  channels?: Record<"email" | "whatsapp" | "voice" | "hook", { enabled: boolean; ok: boolean | null; error: string | null; provider: string }>;
 }
 
 export interface NEvent {

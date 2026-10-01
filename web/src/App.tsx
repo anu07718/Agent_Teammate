@@ -1,11 +1,13 @@
-import { Building2, CheckCheck, Cpu, FlaskConical, Gauge, LayoutGrid, Moon, ScrollText, Settings, Sheet, Sun, Terminal, Waypoints, Workflow } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Building2, CheckCheck, Cpu, FlaskConical, Gauge, KeyRound, LayoutGrid, MessagesSquare, Moon, ScrollText, Settings, Sheet, Sun, Terminal, Waypoints, Workflow } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { api, setAccessKey } from "./api";
+import { ChannelsView } from "./channels/ChannelsView";
 import { People } from "./components/People";
 import { cx } from "./components/ui";
 import { FlowsView } from "./flows/FlowsView";
 import { clock, pct } from "./lib/format";
 import { OfficePage } from "./office/OfficePage";
-import { getState, openCase, setState, setTheme, useUI, type View, EMPTY } from "./store";
+import { connect, getState, openCase, refresh, setState, setTheme, useUI, type View, EMPTY } from "./store";
 import { tellView } from "./team";
 import { BenchmarkView } from "./views/Benchmark";
 import { BrainView } from "./views/Brain";
@@ -19,6 +21,7 @@ const NAV: { id: View; label: string; icon: any; mobile?: boolean }[] = [
   { id: "office", label: "Office", icon: Building2, mobile: true },
   { id: "workspace", label: "Cases", icon: LayoutGrid, mobile: true },
   { id: "approvals", label: "Approvals", icon: CheckCheck, mobile: true },
+  { id: "channels", label: "Channels", icon: MessagesSquare, mobile: true },
   { id: "flows", label: "Flows", icon: Workflow, mobile: true },
   { id: "supervisor", label: "Supervisor", icon: Gauge, mobile: true },
   { id: "brain", label: "Brain", icon: Waypoints },
@@ -61,6 +64,10 @@ function LogPanel() {
   const line = (e: any) => {
     const who = (b?: string | null) => (b && !["you", "routine", "system"].includes(b) ? ` · by ${b}` : "");
     switch (e.kind) {
+      case "channel.message": return `${e.conv?.channel} ${e.message?.dir === "in" ? "←" : "→"} ${e.conv?.name}: ${String(e.message?.text ?? "").split("\n")[0].slice(0, 160)}${e.message?.status ? ` · ${e.message.status}` : ""}${e.message?.error ? ` (${e.message.error})` : ""}`;
+      case "channel.error": return `${e.channel} could not send: ${e.error}`;
+      case "channels.changed": return "channel settings saved";
+      case "reply.sent": return `${e.case_id} reply ready for the customer (${String(e.text ?? "").length} chars)`;
       case "op.updated": return `${e.op.id} ${e.op.agent} ${e.op.state} · ${e.op.title}${e.op.state === "done" && e.op.result ? ` → ${String(e.op.result).split("\n")[0]}` : ""}${who(e.op.by)}`;
       case "op.removed": return `${e.op_id} cancelled`;
       case "routine.ran": return `${e.routine} ran · ${e.result ?? ""}`;
@@ -111,7 +118,31 @@ function Toasts() {
   );
 }
 
+function KeyPrompt() {
+  const [k, setK] = useState("");
+  const [bad, setBad] = useState(false);
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-bg/95 p-4" role="dialog" aria-label="Access key">
+      <form className="w-full max-w-sm space-y-3 rounded-xl border border-line bg-panel p-5" onSubmit={async (e) => {
+        e.preventDefault();
+        setAccessKey(k.trim());
+        await refresh();
+        if (getState().needKey) { setBad(true); return; }
+        connect(api.eventsUrl());
+      }}>
+        <div className="flex items-center gap-2 text-[15px] font-semibold"><KeyRound size={16} /> This Nirnaya server is locked</div>
+        <p className="text-[12.5px] text-muted">It was started with an access key (NIRNAYA_ACCESS_KEY). Enter it to continue; this browser remembers it.</p>
+        <input autoFocus type="password" aria-label="Access key" value={k} onChange={(e) => { setK(e.target.value); setBad(false); }}
+          className="h-9 w-full rounded-md border border-line-strong bg-panel-2 px-2.5 text-[13px]" />
+        {bad && <p className="text-[12px] text-escalate">That key is not right.</p>}
+        <button type="submit" className="h-9 w-full cursor-pointer rounded-md bg-accent text-[13px] font-medium text-white">Unlock</button>
+      </form>
+    </div>
+  );
+}
+
 export default function App() {
+  const needKey = useUI((s) => s.needKey);
   const view = useUI((s) => s.view);
   const app = useUI((s) => s.app);
   const connected = useUI((s) => s.connected);
@@ -136,6 +167,7 @@ export default function App() {
   useEffect(() => { if (view !== "office") tellView(view); }, [view]);
 
   const pending = app?.waiting ? app.waiting.cases + app.waiting.ops + app.waiting.flows : app?.stats.pending_approvals ?? 0;
+  if (needKey) return <KeyPrompt />;
   if (view === "office") return <><OfficePage /><Toasts /></>;
   return (
     <div className="flex h-full flex-col">
@@ -160,7 +192,7 @@ export default function App() {
       <div className="flex min-h-0 flex-1">
         <nav className="hidden w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-panel py-2 md:flex" aria-label="Views">
           {NAV.map((n, i) => (
-            <button key={n.id} onClick={() => setState({ view: n.id })} title={`${n.label} (${i + 1})`} aria-label={n.label} aria-current={view === n.id}
+            <button key={n.id} onClick={() => setState({ view: n.id })} title={i < 10 ? `${n.label} (${(i + 1) % 10})` : n.label} aria-label={n.label} aria-current={view === n.id}
               className={cx("relative grid h-9 w-9 cursor-pointer place-items-center rounded-md", view === n.id ? "bg-accent/15 text-accent" : "text-muted hover:bg-panel-2 hover:text-fg")}>
               <n.icon size={17} />
               {n.id === "approvals" && pending > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-escalate px-1 text-[9.5px] font-bold text-white">{pending}</span>}
@@ -170,7 +202,7 @@ export default function App() {
         <main className="flex min-w-0 flex-1 flex-col">
           {error && !app && <div className="m-4 rounded-lg border border-escalate/40 bg-escalate/10 p-3 text-[12.5px]">Cannot reach the Nirnaya server ({error}). Start it with <code className="font-mono">python -m nirnaya</code>, or set the server address under Settings.</div>}
           <div className="min-h-0 flex-1">
-            {!app ? null : view === "workspace" ? <WorkspaceView /> : view === "approvals" ? <ApprovalsView /> :
+            {!app ? null : view === "workspace" ? <WorkspaceView /> : view === "approvals" ? <ApprovalsView /> : view === "channels" ? <ChannelsView /> :
               view === "flows" ? <FlowsView /> : view === "supervisor" ? <SupervisorView /> : view === "brain" ? <BrainView /> : view === "ledger" ? <LedgerView /> :
               view === "benchmark" ? <BenchmarkView /> : view === "trail" ? <TrailView /> : <SettingsView />}
           </div>
@@ -190,8 +222,8 @@ export default function App() {
       <nav className="flex h-14 shrink-0 items-stretch border-t border-line bg-panel md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }} aria-label="Views">
         {NAV.filter((n) => n.mobile).map((n) => (
           <button key={n.id} onClick={() => setState({ view: n.id })} aria-current={view === n.id}
-            className={cx("relative flex flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 text-[10.5px]", view === n.id ? "text-accent" : "text-muted")}>
-            <n.icon size={18} />{n.label}
+            className={cx("relative flex min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 text-[10px] tracking-tight max-[359px]:text-[9px]", view === n.id ? "text-accent" : "text-muted")}>
+            <n.icon size={18} /><span className="max-w-full truncate">{n.label}</span>
             {n.id === "approvals" && pending > 0 && <span className="absolute right-[28%] top-1.5 h-2 w-2 rounded-full bg-escalate" />}
           </button>
         ))}

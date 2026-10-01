@@ -239,4 +239,6 @@ class Gateway:
         out = self._guarded("notify.send", lambda: {"delivered": True, "chars": len(text)}, agent=agent,
                             case_id=case_id)
         self.store.idem_put(idem, "notify.send", out)
+        # the channels deliver it by email, WhatsApp or on the call the case came from (once: replays stop above)
+        self.bus.publish("reply.sent", case_id=case_id, customer_id=customer_id, text=text)
         return out

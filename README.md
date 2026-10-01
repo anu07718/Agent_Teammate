@@ -15,6 +15,11 @@ refuses what should never run.
 **New here?** [workflow.md](workflow.md) walks you from the first start to knowing your agents are
 working: your first case, approvals, department tasks, routines, flows, and a five-minute checklist.
 
+**Real customers.** The agents answer real email (in the same thread), WhatsApp and phone calls, talk on
+a call page in the browser, and take messages from n8n. Escalations are forwarded by email and approved
+by replying APPROVE. [channels.md](channels.md) sets each one up on free tiers: Gmail, Meta's WhatsApp
+test number or WAHA, a Twilio trial, a Cloudflare tunnel.
+
 ## Run it
 
 ```bash
@@ -69,7 +74,8 @@ Reply → Oversight).
 - Case tokens travel between departments as the case moves, desks show their last lines on screen,
   and the Brain glints on the nodes the Evidence desk reads.
 - Keys: **1–6** departments · **B** the company board · **G** the Brain · **P** the calendar (click a day
-  to book a task or start a routine) · **C** chat with the lead · **D** dark mode · **F** flows · **W** the workspace.
+  to book a task or start a routine) · **C** chat with the lead · **D** dark mode · **F** flows ·
+  **M** channels · **W** the workspace.
 
 | ![Approval at the Risk desk](docs/screenshots/office-approval.png) | ![The office in dark mode](docs/screenshots/office-dark.png) |
 |---|---|
@@ -81,6 +87,7 @@ Reply → Oversight).
 | **Office** | Back to the 3D office |
 | **Cases** | An IDE-style workspace: cases grouped by state, tabs per case. Each case shows its superstep timeline, conversation, evidence, decision (score vs certified threshold), shadow diff, seal, audit trail and checkpoint chain |
 | **Approvals** | Sealed evidence packets: approve, edit or reject. Every decision becomes a training label. Department tasks and flow steps that need a person's OK are here too |
+| **Channels** | Real email, WhatsApp, phone calls and webhooks: a live inbox of every conversation (write back yourself), each channel's settings with the address to paste into the provider and a test, contacts. The call page is at `/call`. See [channels.md](channels.md) |
 | **Flows** | **Live**: the ten-step case pipeline with the desks on each step, how many cases are at each step now, and every case's progress; department tasks and flow runs beside it. **Builder**: drag nodes onto a canvas, wire them, save, run (below) |
 | **Supervisor** | Per-action error ceiling α and autonomy rung, certified thresholds per amount band, the reliability diagram, deflection vs precision, drift monitor, routines |
 | **Brain** | Context graph (customers, accounts, UPI IDs, transactions, merchants, cases, policies) and case memory with what held |
@@ -100,13 +107,15 @@ then **Save** and **Run**.
 
 | Node | What the agents do |
 |---|---|
-| **Start** | Where a run begins: by hand, or on a schedule in plain words (“every weekday at 9am”) |
+| **Start** | Where a run begins: by hand, on a schedule in plain words (“every weekday at 9am”), or when a message arrives (any channel or one, optionally only with certain words) |
 | **Customer message** | Opens a case from a customer. The whole pipeline handles it (Sentry, triage, the specialist, the calibrator, the Seal); the node waits until it is resolved, or approved if it needs a person |
 | **Department task** | Hands a department a task in plain words, like the office bar: “Verify the audit trail”, “Run the benchmark”, “Check T-5001” |
 | **Check** | Branches (yes / no) on the step before it: did it succeed, the case's route or status (is / is not), words in the result (is / is not / contains), or its amount (is / is not / > / <) |
 | **Ask a person** | Waits until someone on the team says yes or no, on the node, in Approvals, or at the Support lead's desk in the office |
 | **Post to team chat** | Posts in a department lead's chat for everyone; `{result}`, `{case}`, `{route}`, `{status}`, `{by}` and `{flow}` fill in from the run |
 | **Wait** | Pauses the run |
+| **Send email** · **Send WhatsApp** · **Phone call** | Through Channels; `{from}` answers whoever wrote in, and `{name}`, `{text}`, `{case}`, `{result}` fill in. The call: the agent says the text, then talks with them |
+| **Call a webhook** | POSTs the run so far as JSON to n8n, Make, Zapier or your own code |
 
 Each node lights up as it runs, with its result, and the run's progress shows as a percentage. The work
 is real: tasks are cards on the office board, cases appear in Cases, and the desks animate in the office.
@@ -170,20 +179,24 @@ read status, search the graph and memory, or score an action.
 ## Tests
 
 ```bash
-make test-backend   # 58 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
+make test-backend   # 77 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
                     # restart durability, checkpoint chaining, tamper detection, drift fail-closed, MCP, HTTP,
                     # office ops, plain-words schedules, routines, the Brain graph, agent chat, the desktop
                     # app's server flags, flows (validation, branches, waiting on cases and people, stale
                     # saves, stop, which ways each Check allows), the team (presence, the shared chat, names
                     # on actions), the ledger's outside events landing once, drift staying quiet on ordinary
-                    # traffic, and policy changes made at the same moment
+                    # traffic, policy changes made at the same moment, and the channels (signed webhooks
+                    # from Meta, WAHA and Twilio, email threads, a phone call turn by turn, the call page,
+                    # n8n, flows on a message, the access key) against stand-in providers
+make mail-server    # a real SMTP and IMAP server (GreenMail) on :3025 / :3143; then, in another terminal,
+make test-mail      # email through it: threaded replies, robots ignored, forward, APPROVE by email
 make test-web       # typecheck + production build
 make run & make e2e # drives the real UI in Chromium: 17 end-to-end checks through the office and the
                     # workspace, including approvals in the office chat and a phone layout
 make e2e-phone      # the Android app's flow at phone size: asks for the server, connects, works (5 checks)
 make e2e-flows      # builds a flow by drag and drop, wires it, runs it, answers its approval (9 checks)
 make e2e-team       # two people on one server: presence, shared chat, names, a flow one saves and the other runs (9 checks)
-make e2e-workflow   # workflow.md followed step by step by a new user in a real browser (14 checks)
+make e2e-workflow   # workflow.md followed step by step by a new user in a real browser (15 checks)
 make e2e-fields     # every field, menu option and condition, checked on the server too:
                     #   office (19): all 6 departments, the 11 samples and their outcomes, 4 customers × 5 channels,
                     #     every department's example tasks, approve/reject in the rail, 11 repeat cadences,
@@ -193,6 +206,9 @@ make e2e-fields     # every field, menu option and condition, checked on the ser
                     #   flows (26): every palette node, every inspector field and option, every reason a save
                     #     is refused, 23 Check conditions on a real case, approvals, Stop, Copy, Delete, the
                     #     three examples, every {placeholder}, the canvas controls, a scheduled run
+make e2e-channels   # Channels in a real browser (22 checks): every field, real email through GreenMail,
+                    #   WhatsApp and Twilio stand-ins, n8n, a flow on a WhatsApp message, forward and call
+                    #   from a case, APPROVE by email, the call page by voice (mocked) and by typing, the lock
 make audit          # a supervisor's walk: every view and button, dark/light, desktop/phone; errors, failed
                     # requests, clipped text, fonts (writes web/e2e/shots/audit/audit.json)
 ```
@@ -209,9 +225,10 @@ rejection, undo and audit adds a real one.
 
 | Path | Contents |
 |---|---|
-| `backend/nirnaya/` | Engine, API, MCP server (Python, FastAPI); `flows.py` (flows and their runs), `team.py` (presence and the shared chat) |
+| `backend/nirnaya/` | Engine, API, MCP server (Python, FastAPI); `flows.py` (flows and their runs), `team.py` (presence and the shared chat), `channels/` (email, WhatsApp, calls, the call page, webhooks) |
 | `backend/tests/` | pytest suite |
-| `web/` | Web app (React, Vite, Tailwind): the 3D office in `web/src/office/` (three.js), the Flows tab in `web/src/flows/`, the workspace views, Univer ledger, Playwright e2e in `web/e2e/` |
+| `web/` | Web app (React, Vite, Tailwind): the 3D office in `web/src/office/` (three.js), the Flows tab in `web/src/flows/`, Channels and the call page in `web/src/channels/`, the workspace views, Univer ledger, Playwright e2e in `web/e2e/` |
+| `channels.md` | Setting up real email, WhatsApp, phone calls and n8n on free tiers |
 | `exe/` | The Windows app: Neutralino window, launcher, bundled-Python build, NSIS installer; `exe/dist/` has the installer |
 | `apk/` | The Android app: Capacitor project and build; `apk/dist/` has the APK |
 | `tools/make_icons.py` | Draws the app icons for both from the favicon's mark |

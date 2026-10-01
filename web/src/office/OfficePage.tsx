@@ -375,6 +375,7 @@ export function OfficePage() {
       else if (k === "d") setDark((d) => !d);
       else if (k === "w") setState({ view: "workspace" });
       else if (k === "f") setState({ view: "flows" });
+      else if (k === "m") setState({ view: "channels" });
       else if (k === "c" && focused && focused !== "brain") setAgentOpen(leadOf(focused));
       else if (k >= "1" && k <= "6") focusPod(POD_IDS[Number(k) - 1]);
       else if (k === "+" || k === "=") sceneRef.current?.zoomBy(1.4);
@@ -467,7 +468,7 @@ export function OfficePage() {
         <button onClick={overview} title="overview (0)" aria-label="Overview">⌂</button>
       </div>
       <div className="o-keys">
-        <b>1–6</b> departments · <b>B</b> board · <b>G</b> brain · <b>P</b> calendar · <b>C</b> chat · <b>D</b> dark · <b>F</b> flows · <b>W</b> workspace · <b>Esc</b> back
+        <b>1–6</b> departments · <b>B</b> board · <b>G</b> brain · <b>P</b> calendar · <b>C</b> chat · <b>D</b> dark · <b>F</b> flows · <b>M</b> channels · <b>W</b> workspace · <b>Esc</b> back
       </div>
 
       <Board open={board} tasks={tasks} snap={snap} agentsIn={count} nameOf={nameOf} onClose={() => setBoard(false)}

@@ -24,10 +24,40 @@ export function setApiBase(url: string) {
   }
 }
 
+// ── the access key (a server on the internet started with NIRNAYA_ACCESS_KEY asks for it) ──
+const AKEY = "nirnaya.key";
+export function accessKey(): string {
+  try { return localStorage.getItem(AKEY) || ""; } catch { return ""; }
+}
+export function setAccessKey(k: string) {
+  try { if (k) localStorage.setItem(AKEY, k); else localStorage.removeItem(AKEY); } catch { /* storage unavailable */ }
+  // a cookie too, so links (the packet, the .xlsx) and the live stream carry it on the same origin
+  document.cookie = `nirnaya_key=${encodeURIComponent(k)}; path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}${k ? "" : "; max-age=0"}`;
+}
+/** ?key=… for URLs the browser opens itself (links, EventSource), when a key is set */
+export function withKey(url: string): string {
+  const k = accessKey();
+  return k ? `${url}${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(k)}` : url;
+}
+// every fetch to the API carries the key: one wrapper instead of a header at every call site
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const k = accessKey();
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!k || !/\/api\/|\/mcp$/.test(url)) return nativeFetch(input, init);
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  headers.set("X-Nirnaya-Key", k);
+  return nativeFetch(input, { ...init, headers });
+};
+
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public keyRequired = false) {
     super(message);
   }
+}
+
+export async function apiReq<T>(path: string, init?: RequestInit): Promise<T> {
+  return req<T>(path, init);
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -37,13 +67,15 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!r.ok) {
     let msg = r.statusText;
+    let keyRequired = false;
     try {
       const j = await r.json();
       msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail ?? j);
+      keyRequired = !!j.key_required;
     } catch {
       /* not json */
     }
-    throw new ApiError(r.status, msg);
+    throw new ApiError(r.status, msg, keyRequired);
   }
   return r.json() as Promise<T>;
 }
@@ -88,7 +120,7 @@ export const api = {
     if (!r.ok) throw new ApiError(r.status, r.statusText);
     return r.json();
   },
-  exportUrl: (id: string) => `${apiBase()}/api/cases/${id}/export.xlsx`,
-  previewUrl: (id: string) => `${apiBase()}/api/cases/${id}/export.html`,
-  eventsUrl: () => `${apiBase()}/api/events`,
+  exportUrl: (id: string) => withKey(`${apiBase()}/api/cases/${id}/export.xlsx`),
+  previewUrl: (id: string) => withKey(`${apiBase()}/api/cases/${id}/export.html`),
+  eventsUrl: () => withKey(`${apiBase()}/api/events`),
 };

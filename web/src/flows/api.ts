@@ -4,7 +4,7 @@ import { setState } from "../store";
 import { by } from "../team";
 import type { CaseSummary } from "../types";
 
-export type NodeType = "start" | "case" | "task" | "if" | "approval" | "notify" | "wait";
+export type NodeType = "start" | "case" | "task" | "if" | "approval" | "notify" | "wait" | "email" | "whatsapp" | "call" | "webhook";
 export interface FNode { id: string; type: NodeType; x: number; y: number; config: Record<string, any> }
 export interface FEdge { from: string; to: string; port: string }
 export interface Flow {
@@ -21,6 +21,7 @@ export interface Run {
 export interface TypeSpec { label: string; group: string; icon: string; ports: string[]; help: string; config: Record<string, any> }
 export interface FlowsData {
   flows: Flow[]; runs: Run[]; types: Record<NodeType, TypeSpec>; fields: Record<string, string>; ops: string[]; ops_for: Record<string, string[]>;
+  start_on: Record<string, string>; start_channels: string[];
   task_depts: string[]; depts: { id: string; name: string }[]; customers: { id: string; name: string }[];
   can: Record<string, string[]>; waiting: { run_id: string; node: string; flow: string; flow_id?: string; question: string; since: number; by: string }[];
 }

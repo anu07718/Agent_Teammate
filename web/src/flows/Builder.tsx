@@ -11,8 +11,9 @@ import { me, tellView, type Person } from "../team";
 import { fapi, type FEdge, type FlowsData, type FNode, type NodeType, type Run } from "./api";
 
 const W = 216, H = 88, GRID = 10;
-const GROUP_COLOR: Record<string, string> = { Trigger: "#2fa98c", Agents: "#5b7cfa", Logic: "#d98a1c", People: "#e0719a" };
-const ORDER: NodeType[] = ["start", "case", "task", "if", "approval", "notify", "wait"];
+const GROUP_COLOR: Record<string, string> = { Trigger: "#2fa98c", Agents: "#5b7cfa", Logic: "#d98a1c", People: "#e0719a", Channels: "#3c9bd6" };
+const ORDER: NodeType[] = ["start", "case", "task", "if", "approval", "notify", "wait", "email", "whatsapp", "call", "webhook"];
+const CHANNEL_NAME: Record<string, string> = { any: "any channel", email: "email", whatsapp: "WhatsApp", voice: "a phone call", web: "the call page", hook: "a webhook (n8n…)" };
 const TASK_EXAMPLES: Record<string, string[]> = {
   verification: ["Check T-5001", "Pull the evidence for T-5006"],
   decision: ["Run the benchmark", "List the certified thresholds", "Score refund_duplicate 349", "Recalibrate"],
@@ -31,13 +32,17 @@ function summary(n: FNode, d: FlowsData | null): string {
   const c = n.config;
   const dept = (id: string) => d?.depts.find((x) => x.id === id)?.name ?? id;
   switch (n.type) {
-    case "start": return c.when ? `⏱ ${c.when}` : "run by hand";
+    case "start": return c.on === "message" ? `on a message from ${CHANNEL_NAME[c.channel ?? "any"] ?? c.channel}${c.contains ? ` with “${c.contains}”` : ""}` : c.when ? `⏱ ${c.when}` : "run by hand";
     case "case": return `${d?.customers.find((x) => x.id === c.customer_id)?.name.split(" ")[0] ?? c.customer_id}: “${c.message}”`;
     case "task": return `${dept(c.dept)} · ${c.text}`;
     case "if": return `${d?.fields[c.field] ? c.field === "ok" ? "succeeded" : c.field : c.field} ${c.op} ${c.value}`;
     case "approval": return `“${c.question}”`;
     case "notify": return `→ ${dept(c.dept)}: ${c.text}`;
     case "wait": return `${c.seconds} s`;
+    case "email": return `✉ ${c.to}: ${c.subject || c.text}`;
+    case "whatsapp": return `→ ${c.to}: ${c.text}`;
+    case "call": return `☎ ${c.to}: “${c.text}”`;
+    case "webhook": { let host = c.url || "(no URL yet)"; try { host = new URL(c.url).host; } catch { /* not a URL yet */ } return `POST ${host}`; }
   }
 }
 
@@ -258,7 +263,8 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
     if (!id) return;
     try {
       const r = await fapi.run(id);
-      setRuns((rs) => [...rs.filter((x) => x.id !== r.id), r]);
+      // the answer is the run as it started: if its first steps already arrived live, keep those
+      setRuns((rs) => (rs.some((x) => x.id === r.id) ? rs : [...rs, r]));
       setRunSel(null);
       toast(`“${r.name}” is running (${r.id})`, "good");
     } catch (e) { setErr((e as Error).message); }
@@ -511,11 +517,28 @@ function Inspector({ n, data, presets, run, set, onDelete }: {
         <div><h3 className="text-[13px] font-semibold">{s.label}</h3><div className="font-mono text-[10.5px] text-faint">{n.id}</div></div>
       </div>
       <p className="text-[12px] text-muted">{s.help}</p>
-      {n.type === "start" && (
-        <Field label="When" hint="Leave empty to run it by hand. Or say when: “every weekday at 9am”, “Mondays at 10:30”, “every hour”.">
-          <input className={inputCls} value={c.when ?? ""} placeholder="by hand" onChange={(e) => set({ when: e.target.value })} aria-label="When" />
+      {n.type === "start" && <>
+        <Field label="Starts">
+          <select className={inputCls} value={c.on ?? ""} aria-label="Starts"
+            onChange={(e) => set(e.target.value === "message" ? { on: "message", when: "" } : { on: e.target.value })}>
+            {Object.entries(data.start_on ?? { "": "by hand or on a schedule" }).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
         </Field>
-      )}
+        {c.on === "message" ? <>
+          <Field label="Messages from" hint="It runs after the agents have handled the message, so later steps can use {from}, {name}, {text}, {case} and {result}.">
+            <select className={inputCls} value={c.channel ?? "any"} onChange={(e) => set({ channel: e.target.value })} aria-label="Messages from">
+              {(data.start_channels ?? ["any"]).map((x) => <option key={x} value={x}>{CHANNEL_NAME[x] ?? x}</option>)}
+            </select>
+          </Field>
+          <Field label="Only if the message mentions" hint="Leave empty for every message.">
+            <input className={inputCls} value={c.contains ?? ""} placeholder="any words" onChange={(e) => set({ contains: e.target.value })} aria-label="Only if the message mentions" />
+          </Field>
+        </> : (
+          <Field label="When" hint="Leave empty to run it by hand. Or say when: “every weekday at 9am”, “Mondays at 10:30”, “every hour”.">
+            <input className={inputCls} value={c.when ?? ""} placeholder="by hand" onChange={(e) => set({ when: e.target.value })} aria-label="When" />
+          </Field>
+        )}
+      </>}
       {n.type === "case" && <>
         <Field label="Customer">
           <select className={inputCls} value={c.customer_id} onChange={(e) => set({ customer_id: e.target.value })} aria-label="Customer">
@@ -582,6 +605,29 @@ function Inspector({ n, data, presets, run, set, onDelete }: {
         </Field>
         <Field label="Message" hint="{result}, {case}, {route}, {status}, {by} and {flow} fill in from the run.">
           <textarea className={cx(inputCls, "h-20 resize-none")} value={c.text} onChange={(e) => set({ text: e.target.value })} aria-label="Message" />
+        </Field>
+      </>}
+      {(n.type === "email" || n.type === "whatsapp" || n.type === "call") && <>
+        <Field label="To" hint={n.type === "email" ? "An email address, or “{from}” to answer whoever wrote in." : "A number with its country code (91…), or “{from}” for whoever wrote in."}>
+          <input className={inputCls} value={c.to ?? ""} onChange={(e) => set({ to: e.target.value })} aria-label="To"
+            placeholder={n.type === "email" ? "name@example.com or {from}" : "9198xxxxxxxx or {from}"} />
+        </Field>
+        {n.type === "email" && (
+          <Field label="Subject">
+            <input className={inputCls} value={c.subject ?? ""} onChange={(e) => set({ subject: e.target.value })} aria-label="Subject" />
+          </Field>
+        )}
+        <Field label={n.type === "call" ? "The agent says" : "Message"} hint="{name}, {from}, {text}, {case}, {result}, {route} and {status} fill in from the run.">
+          <textarea className={cx(inputCls, "h-20 resize-none")} value={c.text ?? ""} onChange={(e) => set({ text: e.target.value })} aria-label="Message" />
+        </Field>
+        <p className="text-[11px] text-faint">It sends through the {n.type === "email" ? "Email" : n.type === "whatsapp" ? "WhatsApp" : "Calls"} settings in Channels; if that channel is off, this step fails and says why.</p>
+      </>}
+      {n.type === "webhook" && <>
+        <Field label="URL" hint="An n8n Webhook node’s production URL, Make, Zapier, or your own server. It gets the run so far as JSON.">
+          <input className={inputCls} value={c.url ?? ""} placeholder="https://…" onChange={(e) => set({ url: e.target.value })} aria-label="URL" inputMode="url" />
+        </Field>
+        <Field label="Text">
+          <input className={inputCls} value={c.text ?? ""} onChange={(e) => set({ text: e.target.value })} aria-label="Text" />
         </Field>
       </>}
       {n.type === "wait" && (

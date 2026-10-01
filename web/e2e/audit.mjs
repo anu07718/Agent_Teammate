@@ -163,7 +163,7 @@ await p.page.locator(".o-root").waitFor();
 await p.page.waitForTimeout(2500);
 await p.page.screenshot({ path: `${SHOTS}/phone-office.png`, fullPage: true });
 report.views.push({ view: "phone office", ...(await inspect(p.page, "phone office")) });
-const pviews = ["Cases", "Approvals", "Supervisor", "Settings"];
+const pviews = ["Cases", "Approvals", "Channels", "Flows", "Supervisor", "Settings"];
 await p.page.getByRole("button", { name: /workspace/i }).first().click().catch(() => {});
 await p.page.waitForTimeout(800);
 for (const v of pviews) {

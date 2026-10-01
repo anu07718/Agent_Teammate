@@ -34,8 +34,9 @@ FINISHED = {"done", "failed", "skipped"}
 
 NODE_TYPES: dict[str, dict] = {
     "start": {"label": "Start", "group": "Trigger", "icon": "▶", "ports": ["next"],
-              "help": "Where a run begins. Run it by hand, or give it a schedule in plain words.",
-              "config": {"when": ""}},
+              "help": "Where a run begins: by hand, on a schedule in plain words, or when a customer's message "
+                      "(email, WhatsApp, a call…) has been handled.",
+              "config": {"when": "", "on": "", "channel": "any", "contains": ""}},
     "case": {"label": "Customer message", "group": "Agents", "icon": "💬", "ports": ["next"],
              "help": "Opens a case from a customer. The agents take it end to end; the node waits until it "
                      "is resolved (or approved, if it needs a person).",
@@ -55,7 +56,22 @@ NODE_TYPES: dict[str, dict] = {
                "config": {"dept": "oversight", "text": "Done: {result}"}},
     "wait": {"label": "Wait", "group": "Logic", "icon": "⏱", "ports": ["next"],
              "help": "Pauses the run for a few seconds.", "config": {"seconds": 5}},
+    "email": {"label": "Send email", "group": "Channels", "icon": "✉", "ports": ["next"],
+              "help": "Sends an email through Channels → Email. “{from}” is whoever wrote in, so it replies to them.",
+              "config": {"to": "{from}", "subject": "About your case {case}", "text": "Hello {name}, {result}"}},
+    "whatsapp": {"label": "Send WhatsApp", "group": "Channels", "icon": "🟢", "ports": ["next"],
+                 "help": "Sends a WhatsApp message through Channels → WhatsApp (a number with its country code, "
+                         "or “{from}”).", "config": {"to": "{from}", "text": "Update on {case}: {result}"}},
+    "call": {"label": "Phone call", "group": "Channels", "icon": "📞", "ports": ["next"],
+             "help": "Phones someone through Channels → Calls: the agent says the message, then talks with them.",
+             "config": {"to": "{from}", "text": "Hello {name}, this is Nirnaya calling about your case {case}."}},
+    "webhook": {"label": "Call a webhook", "group": "Channels", "icon": "🔗", "ports": ["next"],
+                "help": "POSTs the run so far as JSON to a URL: an n8n Webhook node, Make, Zapier or your own code.",
+                "config": {"url": "", "text": "{result}"}},
 }
+START_ON = {"": "by hand or on a schedule", "message": "when a message arrives"}
+CHANNEL_WORD = {"email": "email", "whatsapp": "WhatsApp", "voice": "phone", "web": "call-page", "hook": "webhook"}
+START_CHANNELS = ["any", "email", "whatsapp", "voice", "web", "hook"]
 FIELDS = {"ok": "the step succeeded", "route": "the case's route (ACT, HEDGE, ESCALATE, REFUSE)",
           "status": "the case's status (resolved, refused, parked)", "result": "the step's result text",
           "amount": "the case's amount (₹)"}
@@ -105,9 +121,12 @@ def _examples() -> list[dict]:
 
 
 def fill(text: str, out: dict, run: dict) -> str:
+    ctx = run.get("ctx") or {}
     vals = {"result": (out.get("result") or "").split("\n")[0], "case": out.get("case_id") or "",
             "route": out.get("route") or "", "status": out.get("status") or "", "by": run.get("by") or "",
-            "flow": run.get("name") or ""}
+            "flow": run.get("name") or "", "from": out.get("from") or ctx.get("from") or "",
+            "name": out.get("name") or ctx.get("name") or "", "channel": out.get("channel") or ctx.get("channel") or "",
+            "text": out.get("text") or ctx.get("text") or ""}
     for k, v in vals.items():
         text = text.replace("{" + k + "}", str(v))
     return text
@@ -151,8 +170,8 @@ class DecideIn(BaseModel):
 
 
 class Flows:
-    def __init__(self, get_engine: Callable, get_ops: Callable, get_team: Callable):
-        self.E, self.O, self.T = get_engine, get_ops, get_team
+    def __init__(self, get_engine: Callable, get_ops: Callable, get_team: Callable, get_channels: Callable = lambda: None):
+        self.E, self.O, self.T, self.C = get_engine, get_ops, get_team, get_channels
         self._tasks: dict[str, asyncio.Task] = {}  # run id → the task walking it
         self._gates: dict[tuple[str, str], asyncio.Future] = {}
 
@@ -179,9 +198,15 @@ class Flows:
         f["updated_at"] = time.time()
         f.setdefault("created_at", f["updated_at"])
         start = next((x for x in f["nodes"] if x["type"] == "start"), None)
-        parsed = schedule.parse(((start or {}).get("config") or {}).get("when") or "") if start else None
+        scfg = (start or {}).get("config") or {}
+        parsed = schedule.parse(scfg.get("when") or "") if start else None
         f["when"] = parsed["when"] if parsed and schedule.valid(parsed["when"]) else None
+        f["on"] = scfg.get("on") or ""
         f["when_desc"] = schedule.describe(f["when"]) if f["when"] else "by hand"
+        if f["on"] == "message":
+            ch = scfg.get("channel") or "any"
+            f["when_desc"] = ("on any message" if ch == "any" else f"on a {CHANNEL_WORD.get(ch, ch)} message") + \
+                (f" with “{scfg['contains']}”" if scfg.get("contains") else "")
         f["next_at"] = schedule.next_run(f["when"], time.time()) if f["when"] and not f.get("paused") else None
         return f
 
@@ -247,6 +272,26 @@ class Flows:
                 if not p or not schedule.valid(p["when"]):
                     raise ValueError(f"Start: I can't read “{cfg['when']}” as a schedule. Try “every weekday at 9am” "
                                      "or “Mondays at 10:30”, or leave it empty to run it by hand.")
+            if t == "start":
+                if (cfg.get("on") or "") not in START_ON:
+                    raise ValueError("Start: pick how the flow starts.")
+                if cfg.get("on") == "message" and str(cfg.get("when") or "").strip():
+                    raise ValueError("Start: a flow starts either on a schedule or on a message, not both.")
+                if (cfg.get("channel") or "any") not in START_CHANNELS:
+                    raise ValueError("Start: pick which channel's messages start it.")
+            if t in ("email", "whatsapp", "call"):
+                to = str(cfg.get("to") or "").strip()
+                if not to:
+                    raise ValueError(f"{label}: say who to send it to (or “{{from}}” for whoever wrote in).")
+                if "{" not in to:
+                    if t == "email" and "@" not in to:
+                        raise ValueError(f"{label}: “{to}” is not an email address.")
+                    if t != "email" and len(re.sub(r"\D", "", to)) < 10:
+                        raise ValueError(f"{label}: “{to}” is not a phone number (with its country code).")
+                if not str(cfg.get("text") or "").strip():
+                    raise ValueError(f"{label}: write the message.")
+            if t == "webhook" and not re.match(r"^https?://\S+$", str(cfg.get("url") or "").strip()):
+                raise ValueError(f"{label}: give the URL to POST to (https://…).")
             if t == "case":
                 if not e.rails.customer(str(cfg.get("customer_id"))):
                     raise ValueError(f"{label}: unknown customer {cfg.get('customer_id')}.")
@@ -315,7 +360,7 @@ class Flows:
         return clean, wires
 
     # ── running ──────────────────────────────────────────────────────────────
-    def start(self, fid: str, by: str) -> dict:
+    def start(self, fid: str, by: str, ctx: dict | None = None) -> dict:
         f = self.get(fid)
         if not f:
             raise KeyError(fid)
@@ -323,7 +368,8 @@ class Flows:
                "started_at": time.time(), "done_at": None, "progress": 0.0, "total": len(f["nodes"]),
                "nodes": {n["id"]: {"state": "pending", "text": "", "started_at": None, "done_at": None, "out": None}
                          for n in f["nodes"]},
-               "flow": {"nodes": f["nodes"], "edges": f["edges"], "version": f["version"]}, "result": None}
+               "flow": {"nodes": f["nodes"], "edges": f["edges"], "version": f["version"]}, "result": None,
+               "ctx": ctx}
         self._put_run(run)
         self.E().trail.append("-", "flow.started", by, {"flow": f["id"], "run": run["id"], "name": f["name"]})
         rid = run["id"]
@@ -348,7 +394,7 @@ class Flows:
         for w in spec["edges"]:
             out_edges.setdefault(w["from"], []).append(w)
         queue = [next(n["id"] for n in spec["nodes"] if n["type"] == "start")]
-        last: dict = {"ok": True, "result": ""}
+        last: dict = dict(run.get("ctx") or {"ok": True, "result": ""})
         failed = False
         try:
             while queue:
@@ -396,7 +442,13 @@ class Flows:
         e, t, cfg = self.E(), node["type"], node["config"]
         tick = 0.25 if e.step_delay else 0.02
         if t == "start":
+            ctx = run.get("ctx")
+            if ctx:
+                return {**_carry(ctx), "note": f"{CHANNEL_WORD.get(ctx.get('channel'), ctx.get('channel') or 'A')} "
+                        f"message from {ctx.get('name') or ctx.get('from')}: “{(ctx.get('text') or '')[:120]}”"}, "next"
             return {"ok": True, "result": f"Started by {run['by']}"}, "next"
+        if t in ("email", "whatsapp", "call", "webhook"):
+            return await self._channel_node(run, node, last), "next"
         if t == "wait":
             await asyncio.sleep(float(cfg.get("seconds") or 0))
             return {**_carry(last), "note": f"Waited {float(cfg.get('seconds') or 0):g} s"}, "next"
@@ -513,6 +565,54 @@ class Flows:
         if changed:
             self.E().store.kv_set(RUNS_KEY, runs)
 
+    def on_message(self, ctx: dict) -> list[str]:
+        """A customer's message has been handled (its case resolved, parked or refused): start every flow
+        whose Start waits for messages on that channel (and with those words, when it asks for some)."""
+        started = []
+        for f in self.all():
+            start = next((n for n in f["nodes"] if n["type"] == "start"), None)
+            cfg = (start or {}).get("config") or {}
+            if cfg.get("on") != "message" or f.get("paused"):
+                continue
+            want = cfg.get("channel") or "any"
+            if want != "any" and want != ctx.get("channel"):
+                continue
+            words = (cfg.get("contains") or "").strip().lower()
+            if words and words not in (ctx.get("text") or "").lower():
+                continue
+            who = ctx.get("name") or ctx.get("from") or "a customer"
+            run = self.start(f["id"], f"{CHANNEL_WORD.get(ctx.get('channel'), 'message')} · {who}"[:32], ctx=ctx)
+            started.append(run["id"])
+        return started
+
+    async def _channel_node(self, run: dict, node: dict, last: dict) -> dict:
+        """Send email, Send WhatsApp, Phone call, Call a webhook: the office's channels, from a flow."""
+        t, cfg = node["type"], node["config"]
+        ch = self.C()
+        by = f"flow · {run['name']}"[:32]
+        text = fill(str(cfg.get("text") or ""), last, run)
+        try:
+            if t == "webhook":
+                from .channels.http import request as http_request
+                url = str(cfg["url"]).strip()
+                carry = _carry(last)
+                payload = {**carry, "message": carry.get("text"), "flow": run["name"], "run": run["id"], "text": text}
+                await asyncio.to_thread(http_request, "POST", url, json_body=payload, timeout=20)
+                return {**_carry(last), "note": f"Posted to {url.split('/')[2] if '//' in url else url}"}
+            if ch is None:
+                raise RuntimeError("channels are not running")
+            to = fill(str(cfg.get("to") or ""), last, run).strip()
+            if not to:
+                raise ValueError("there is nobody to send it to (the run has no {from})")
+            if t == "call":
+                r = await ch.call(to, text, case_id=last.get("case_id"), by=by)
+                return {**_carry(last), "note": f"Calling {to} ({r.get('sid') or 'queued'})"}
+            subject = fill(str(cfg.get("subject") or ""), last, run) if t == "email" else ""
+            await ch.send(t, to, text, subject=subject, case_id=last.get("case_id"), by=by)
+            return {**_carry(last), "note": f"{'Emailed' if t == 'email' else 'WhatsApped'} {to}: {text[:120]}"}
+        except Exception as ex:  # a channel that is not set up, or a provider that said no
+            return {**_carry(last), "ok": False, "failed": True, "result": f"Could not {NODE_TYPES[t]['label'].lower()}: {ex}"}
+
     def fire_due(self, now: float | None = None) -> list[str]:
         now = now or time.time()
         fired = []
@@ -552,7 +652,8 @@ class Flows:
 
 def _carry(last: dict) -> dict:
     """What a pass-through step (a check, a wait, a chat post) hands on: the last real result."""
-    return {k: last[k] for k in ("ok", "result", "case_id", "route", "status", "amount", "op_id") if last.get(k) is not None}
+    return {k: last[k] for k in ("ok", "result", "case_id", "route", "status", "amount", "op_id", "from", "name",
+                                 "channel", "text", "customer_id") if last.get(k) is not None}
 
 
 def register(app: FastAPI, E: Callable, F: Callable[[], Flows]) -> None:
@@ -560,7 +661,7 @@ def register(app: FastAPI, E: Callable, F: Callable[[], Flows]) -> None:
     def flows_list():
         e = E()
         return {"flows": F().all(), "runs": F().runs(40), "waiting": F().waiting(), "types": NODE_TYPES, "fields": FIELDS,
-                "ops": OPS, "ops_for": OPS_FOR, "task_depts": TASK_DEPTS, "depts": [{"id": d["id"], "name": d["name"]} for d in DEPARTMENTS],
+                "ops": OPS, "ops_for": OPS_FOR, "start_on": START_ON, "start_channels": START_CHANNELS, "task_depts": TASK_DEPTS, "depts": [{"id": d["id"], "name": d["name"]} for d in DEPARTMENTS],
                 "customers": [{"id": c["id"], "name": c["name"]} for c in e.rails.customers()],
                 "can": {d: ops_mod.can_do(d) for d in TASK_DEPTS}}
 

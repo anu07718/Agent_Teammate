@@ -235,6 +235,32 @@ await step("9. Flows: build the guide's morning audit flow (New, When, palette c
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/wf-flow.png` });
 });
 
+await step("10. The call page: Start the call, no microphone so type instead, the agent answers with a case, End", async () => {
+  const c = await browser.newContext({ viewport: { width: 420, height: 860 } });
+  // this browser has no microphone: speech recognition reports it, as Chrome does when it is blocked
+  await c.addInitScript(() => {
+    class NoMic { start() { setTimeout(() => { this.onerror?.({ error: "not-allowed" }); this.onend?.(); }, 20); } abort() {} stop() {} }
+    window.SpeechRecognition = NoMic; window.webkitSpeechRecognition = NoMic;
+  });
+  const call = await c.newPage();
+  call.on("pageerror", (e) => errors.push(`call page: ${e.message}`));
+  await call.goto(`${URL}/call`);
+  await call.getByLabel("Who is calling").selectOption("C-1001");
+  await call.getByRole("button", { name: "Start the call" }).click();
+  await call.locator('[data-who="nirnaya"]', { hasText: "Hello Aarav" }).waitFor();
+  await call.getByRole("alert").filter({ hasText: "The microphone is blocked" }).waitFor();
+  await call.getByLabel("Type a message").fill("My UPI payment of 2,450 rupees to FreshMart failed three days ago but the money was debited");
+  await call.getByRole("button", { name: "Send", exact: true }).click();
+  const answer = call.locator('[data-who="nirnaya"]').filter({ hasText: /case NR-\d+/ }).first();
+  await answer.waitFor({ timeout: 60000 });
+  const id = (await answer.innerText()).match(/NR-\d+/)[0];
+  expect((await api(`/api/cases/${id}`)).customer_id === "C-1001", "the call's case is not Aarav's");
+  await call.getByRole("button", { name: "End call" }).click();
+  await call.getByText("You ended the call.").waitFor();
+  expect((await api("/api/channels/conversations")).some((x) => x.channel === "web" && x.case_ids.includes(id)), "the call is not in Channels");
+  await c.close();
+});
+
 await step("checklist 8: Model health runs end to end, every node done, 100%", async () => {
   const mh = (await api("/api/flows")).flows.find((f) => f.name === "Model health");
   await page.getByRole("combobox", { name: "Flow" }).selectOption(mh.id);

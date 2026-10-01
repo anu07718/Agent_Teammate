@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import os
 import tempfile
@@ -14,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, benchmark, docparse, flows, office, reports
+from . import __version__, benchmark, channels, docparse, flows, office, reports
 from .agents import DEPARTMENTS
 from .engine import Engine
 from .policy import GRAPH_HASH, SUPERSTEPS
@@ -23,6 +24,9 @@ from .presets import PRESETS
 from .routines import Routines
 from .team import Team, clean_name
 
+# open even when NIRNAYA_ACCESS_KEY is set: providers sign their own requests, customers use the call page
+OPEN_PATHS = ("/api/channels/whatsapp/webhook", "/api/channels/waha/webhook", "/api/channels/voice/twilio/",
+              "/api/channels/email/inbound", "/api/channels/hook", "/api/channels/web/")
 WEB_DIST = Path(os.environ.get("NIRNAYA_WEB", Path(__file__).resolve().parents[2] / "web" / "dist"))
 
 
@@ -90,19 +94,40 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
         state["ops"] = Ops(lambda: state["engine"])
         state["routines"] = Routines(eng, state["ops"])
         state["team"].hook(eng.bus)
-        state["flows"] = flows.Flows(lambda: state["engine"], lambda: state["ops"], lambda: state["team"])
+        state["flows"] = flows.Flows(lambda: state["engine"], lambda: state["ops"], lambda: state["team"],
+                                     lambda: state["channels"])
         state["flows"].recover()
         state["routines"].flows = state["flows"]
+        state["channels"] = channels.Channels(lambda: state["engine"], lambda: state["flows"])
+        state["channels"].hook(eng.bus)
+        await state["channels"].start(background)
         if background:
             await eng.recover()
             state["routines"].start()
         yield
+        state["channels"].stop()
         state["routines"].stop()
         for t in list(eng.tasks.values()):
             t.cancel()
 
     state["team"] = Team(lambda: state["engine"])
     app = FastAPI(title="Nirnaya", version=__version__, lifespan=lifespan)
+
+    @app.middleware("http")
+    async def access_key(request: Request, call_next):
+        """NIRNAYA_ACCESS_KEY locks the API for a server on the internet. Provider webhooks (each checks its
+        own signature), the customer call page and the health check stay open; the app asks for the key."""
+        key = os.environ.get("NIRNAYA_ACCESS_KEY", "")
+        path = request.url.path
+        if key and request.method != "OPTIONS" and (path.startswith("/api/") or path == "/mcp") \
+                and not path.startswith(OPEN_PATHS) and path != "/api/health":
+            given = request.headers.get("x-nirnaya-key") or request.cookies.get("nirnaya_key") or \
+                request.query_params.get("key") or ""
+            if not hmac.compare_digest(given.encode(), key.encode()):
+                return JSONResponse({"detail": "this Nirnaya server needs its access key", "key_required": True},
+                                    status_code=401)
+        return await call_next(request)
+
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
     def E() -> Engine:
@@ -129,9 +154,18 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
                 "cases": [e.summary(c) for c in e.store.list_cases(100)], "stats": e.stats(),
                 "customers": customers, "presets": PRESETS, "supersteps": SUPERSTEPS, "drift": e.drift_status,
                 "policy_hash": e.policy.policy_hash(), "integrations": integrations(),
+                "channels": _channel_status(),
                 "waiting": {"cases": sum(1 for c in e.store.list_cases(500) if c.get("pending")),
                             "ops": sum(1 for o in state["ops"].all() if o["state"] == "waiting"),
                             "flows": len(state["flows"].waiting())}}
+
+    def _channel_status() -> dict:
+        ch = state.get("channels")
+        if ch is None:
+            return {}
+        cfg = ch.config()
+        return {k: {"enabled": bool(cfg[k]["enabled"]), "ok": ch.status[k]["ok"], "error": ch.status[k]["error"],
+                    "provider": cfg[k].get("provider") or cfg[k].get("send") or ""} for k in ("email", "whatsapp", "voice", "hook")}
 
     @app.get("/api/integrations")
     def integrations():
@@ -523,6 +557,7 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
     office.register(app, E, lambda: state["routines"], lambda: state["ops"], lambda: state["team"],
                     lambda: state["flows"])
     flows.register(app, E, lambda: state["flows"])
+    channels.register(app, E, lambda: state["channels"])
 
     # ── the web app ──────────────────────────────────────────────────────────
     if WEB_DIST.exists():

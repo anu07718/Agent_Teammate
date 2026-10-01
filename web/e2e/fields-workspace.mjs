@@ -70,6 +70,7 @@ const VIEWS = [
   ["Office", () => page.locator(".o-root").waitFor()],
   ["Cases", () => page.getByRole("textbox", { name: "Filter cases" }).waitFor()],
   ["Approvals", () => page.getByRole("heading", { name: "Approvals" }).waitFor()],
+  ["Channels", () => page.getByRole("heading", { name: "Channels", exact: true }).waitFor()],
   ["Flows", () => page.getByTestId("pipeline").waitFor()],
   ["Supervisor", () => page.getByRole("heading", { name: "Supervisor console" }).waitFor()],
   ["Brain", () => page.getByText("Context graph").waitFor()],
@@ -78,14 +79,16 @@ const VIEWS = [
   ["Trail", () => page.getByRole("heading", { name: "Ledger Trail" }).waitFor()],
   ["Settings", () => page.getByText("Use Nirnaya from another agent (MCP)").waitFor()],
 ];
-await step("every view opens from its button and from its key (1–9, 0)", async () => {
-  expect((await nav().getByRole("button").count()) === 10, "not ten views");
+await step("every view opens from its button, and the first ten from their key (1–9, 0); Settings has no key", async () => {
+  expect((await nav().getByRole("button").count()) === 11, "not eleven views");
   for (const [name, check] of VIEWS.slice(1)) { await go(name); await check(); }
-  for (let i = 1; i < VIEWS.length; i++) {
+  for (let i = 1; i < 10; i++) {
     await page.evaluate(() => document.activeElement?.blur()); // keys go to the page, not a focused field
     await page.keyboard.press(i === 9 ? "0" : String(i + 1));
     await VIEWS[i][1]();
   }
+  expect((await nav().getByRole("button", { name: "Trail", exact: true }).getAttribute("title")) === "Trail (0)", "Trail is not key 0");
+  expect((await nav().getByRole("button", { name: "Settings", exact: true }).getAttribute("title")) === "Settings", "Settings shows a key");
   await go("Office");
   await page.locator(".o-root").waitFor();
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
@@ -398,7 +401,7 @@ await step("your name from the workspace header", async () => {
   await until(async () => (await api("/api/team")).people.some((p) => p.name === "Wendy W"));
 });
 
-await step("on a phone: the tab bar's six tabs each open their view, with nothing off the screen", async () => {
+await step("on a phone: the tab bar's seven tabs each open their view, with nothing off the screen; Cases shows the list or a case", async () => {
   const phone = await (await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })).newPage();
   phone.on("pageerror", (e) => errors.push(`phone: ${e.message}`));
   await phone.goto(`${URL}/?as=Pat`);
@@ -406,12 +409,27 @@ await step("on a phone: the tab bar's six tabs each open their view, with nothin
   await phone.getByRole("button", { name: "Workspace", exact: true }).click();
   const bar = phone.getByRole("navigation", { name: "Views" }).last();
   const tabs = await bar.getByRole("button").allInnerTexts();
-  expect(tabs.map((t) => t.trim()).join() === "Office,Cases,Approvals,Flows,Supervisor,Settings", `tabs ${tabs}`);
-  for (const t of ["Cases", "Approvals", "Flows", "Supervisor", "Settings"]) {
+  expect(tabs.map((t) => t.trim()).join() === "Office,Cases,Approvals,Channels,Flows,Supervisor,Settings", `tabs ${tabs}`);
+  for (const t of ["Cases", "Approvals", "Channels", "Flows", "Supervisor", "Settings"]) {
     await bar.getByRole("button", { name: t }).click();
     await phone.waitForTimeout(600);
     expect(!(await phone.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${t} scrolls sideways`);
   }
+  // Cases on a phone: the list fills the screen; a case opens over it; ◂ Cases goes back
+  await bar.getByRole("button", { name: "Cases" }).click();
+  const filter = phone.getByRole("textbox", { name: "Filter cases" });
+  await filter.waitFor();
+  expect((await filter.boundingBox()).width > 300, "the case list does not fill the phone");
+  const first = phone.locator("aside button").filter({ hasText: /NR-\d+/ }).first();
+  const id = (await first.innerText()).match(/NR-\d+/)[0];
+  await first.click();
+  await phone.getByRole("button", { name: "Back to the cases" }).waitFor();
+  expect(!(await filter.isVisible()), "the list is still beside the case");
+  await phone.getByRole("tab", { name: "Timeline" }).waitFor();
+  expect((await phone.getByRole("button", { name: "Back to the cases" }).boundingBox()).x < 40, "no back button at the left");
+  expect(!(await phone.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${id} scrolls sideways`);
+  await phone.getByRole("button", { name: "Back to the cases" }).click();
+  await filter.waitFor();
   await bar.getByRole("button", { name: "Office" }).click();
   await phone.locator(".o-root").waitFor();
   await phone.close();

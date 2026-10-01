@@ -188,13 +188,17 @@ waits. Answer **Yes** or **No** on the node, in Approvals, or at the Support Lea
 
 | Node | Fields | What happens |
 |---|---|---|
-| Start | When (empty = by hand) | where a run begins; on a schedule it runs by itself |
+| Start | Starts (*by hand or on a schedule*, or *when a message arrives*); When (empty = by hand), or Messages from (any channel, email, WhatsApp, a phone call, the call page, a webhook) and Only if the message mentions | where a run begins; on a schedule it runs by itself; on a message it runs after the agents have handled that message |
 | Customer message | Customer, Channel, the message (or a sample chip) | opens a real case; waits until it is resolved, or until someone approves it |
 | Department task | Department (Verification, Decision, Commit & Reply, Oversight), the task (or an example chip) | that department does it, as if you typed it in the office |
 | Check | what to check, how, the value | goes out **yes** or **no** |
 | Ask a person | the question (`{case}` and `{result}` fill in) | waits for a yes or no from anyone on the team |
 | Post to team chat | the department, the message | posts in that department lead's chat |
 | Wait | seconds | pauses |
+| Send email | To (an address, or `{from}` for whoever wrote in), Subject, Message | sends through Channels → Email |
+| Send WhatsApp | To (a number with its country code, or `{from}`), Message | sends through Channels → WhatsApp |
+| Phone call | To, what the agent says | phones them through Channels → Calls; the agent says it, then talks with them |
+| Call a webhook | URL, Text | POSTs the run so far as JSON (an n8n Webhook node, Make, Zapier, your own code) |
 
 What a Check can look at, and how:
 
@@ -207,7 +211,9 @@ What a Check can look at, and how:
 | the case's amount (₹) | is, is not, >, < | a number (₹ and commas are fine) |
 
 In a chat post or a question, these fill in from the run: `{result}`, `{case}`, `{route}`, `{status}`,
-`{by}`, `{flow}`.
+`{by}`, `{flow}`. In a flow that starts on a message, `{from}` (their address or number), `{name}`,
+`{text}` (what they wrote) and `{channel}` do too. A channel step whose channel is switched off fails on
+its node and says why.
 
 Other controls:
 - Drag from a node's right-hand dot to another node to wire them by hand. Click a wire to select it, then
@@ -222,15 +228,45 @@ If **Save** shows a red line, it tells you what to fix. For example, a departmen
 task, a task has a schedule in it (put the schedule on Start), the wires go round in a loop, or there is
 nothing to compare with. Nothing is saved until it is right.
 
-## 10. The workspace
+## 10. Real customers: the call page, email, WhatsApp and calls
 
-Press **WORKSPACE** in the top bar (or **W**). The views are along the left; **1–9** and **0** switch
-between them.
+The agents can answer real people. The quickest way to see it needs nothing set up: the call page.
+
+1. Open **http://127.0.0.1:8000/call** in Chrome or Edge (on a phone too, at your server's address).
+2. Pick who is calling (a demo customer, or *Someone new*) and the language. Press **Start the call**
+   and allow the microphone.
+3. Say what happened, for example *my UPI payment of 2,450 rupees to FreshMart failed three days ago but
+   the money was debited*. The agent answers out loud and names the case it opened. Say *no, that's all*
+   to finish, or press **End**.
+4. No microphone? Type in the box instead, or press **Mute** first. In Firefox the page is a chat.
+
+The call opens a case like any other: it is in **Cases** and in the office, and the conversation is in
+**Workspace → Channels → Inbox**.
+
+**Channels** (in the workspace, or **M** in the office) connects real email, WhatsApp, phone calls and
+n8n, on free tiers. [channels.md](channels.md) is the step-by-step guide: what is free, where each value
+comes from, and how to put your server on the internet. In short:
+- **Email:** your Gmail with an app password. Customers' emails are answered in the same thread.
+  Escalations are forwarded, and the supervisor approves by replying APPROVE.
+- **WhatsApp:** Meta's free test number, or WAHA with your own number. Messages are answered on WhatsApp.
+- **Calls:** a Twilio trial. The agent answers the phone, talks, and can call customers back.
+- **Webhooks:** any tool that can send a request (n8n, Make, Zapier) can bring Telegram, Instagram or a
+  form to the agents and get the answer back.
+
+Under **Contacts**, link your own email address and phone number to a demo customer, to try the agents
+on that customer's payments. Flows can start when a message arrives, and answer with the **Send email**,
+**Send WhatsApp**, **Phone call** and **Call a webhook** steps (section 9).
+
+## 11. The workspace
+
+Press **WORKSPACE** in the top bar (or **W**). The views are along the left. **1–9** and **0** switch
+between the first ten; Settings has no key.
 
 | View | What to do there |
 |---|---|
 | **Cases** | Filter the list. Open a case and read its tabs: **Timeline** (the ten steps and the conversation), **Evidence**, **Decision** (the score against the threshold), **Shadow & Seal**, **Trail & checkpoints**. Mark an autonomous decision right or wrong with 👍 / 👎 (these become training labels). Press **Undo** on a hedged action. **Packet** opens the evidence packet; **Export .xlsx** downloads the case as a workbook |
 | **Approvals** | Everything waiting for a person: sealed cases (**Approve**, **Edit** then **Approve edited**, **Reject**, **Move the ground**), department tasks (**Approve**, **Reject** with a note), and flow questions (**Yes**, **No** with a note, **Open flow**) |
+| **Channels** | Real email, WhatsApp, phone calls and webhooks (section 10). **Inbox**: every conversation, live; open one to read it and write back yourself. **Email**, **WhatsApp**, **Calls**, **Webhooks**: switch a channel on, fill in its fields (each says where to find it), see the address to paste into the provider, and **Try it**. **Contacts**: whose email or phone is whose, and what to do with strangers |
 | **Flows** | as in section 9 |
 | **Supervisor** | For each action: the error ceiling **α** and the autonomy (**Suggest**, **Hedge**, **Act**). Also the certified thresholds, the reliability chart, deflection against precision, **Recalibrate**, the drift monitor (**Inject drift** to see it fail closed, **Clear**), and the routines with **Run** |
 | **Brain** | The context graph: highlight, click a node, follow its links. Case memory: search past cases and what held |
@@ -241,8 +277,9 @@ between them.
 
 The header has the live log (every step, tool call and decision as it happens; the backtick key `` ` `` opens it too) and
 the theme switch. The footer's count takes you to
-Approvals. On a phone, the tab bar at the bottom has Office, Cases, Approvals, Flows, Supervisor and
-Settings.
+Approvals. On a phone, the tab bar at the bottom has Office, Cases, Approvals, Channels, Flows,
+Supervisor and Settings. On a phone, Cases shows the list; tap a case to open it and **◂ Cases** to go
+back. A case reached from Channels or Approvals opens straight away.
 
 ### Working as a team
 
@@ -282,7 +319,7 @@ If all nine pass, the agents are working. To check everything automatically, run
 (`make e2e`, or the scripts in `web/e2e/`; see the README). `web/e2e/workflow.mjs` does exactly this
 checklist in a real browser.
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | You see | It means | Do this |
 |---|---|---|
@@ -294,4 +331,5 @@ checklist in a real browser.
 | Every action hedges or asks you, even easy ones | the drift alarm is on: the agents fail closed | Supervisor → look at the drift card; **Clear** after a test, or **Recalibrate** |
 | A booked task did not run | it is in the past, or it was cancelled | Book it again for a time ahead; times are your computer's clock |
 | A flow will not save | the red line names the node and the problem | Fix that node, then Save |
+| An email, WhatsApp message or call gets no answer | the sender is not a contact, or the channel is off | Channels → Contacts: link them (or set the channel to answer anyone). More in [channels.md](channels.md#troubleshooting) |
 | You want a clean start | — | Ledger → **Reset world** resets the bank. Starting the server with `--reset` clears all cases |

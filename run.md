@@ -86,8 +86,19 @@ py -3.11 -m nirnaya --log nirnaya.log             # file log (desktop / no conso
 
 1. Open the office → Task Status (right).
 2. Pick a customer → **SAMPLES** → choose one → **ADD**.
-3. Keys: **1–6** departments · **B** board · **G** Brain · **P** calendar · **C** chat with lead · **D** dark · **F** flows · **W** workspace.
+3. Keys: **1–6** departments · **B** board · **G** Brain · **P** calendar · **C** chat with lead · **D** dark · **F** flows · **M** channels · **W** workspace.
 4. **FLOWS** (or **F**) → **Live** shows how the agents are working now; **Builder** → pick an example flow → **Run**.
+5. Talk to the agent: open http://127.0.0.1:8000/call in Chrome or Edge, press **Start the call**, allow the microphone.
+
+### Real email, WhatsApp and calls
+
+**Channels** (workspace, or **M** in the office) connects your Gmail, a WhatsApp number and a Twilio trial,
+all on free tiers. Step by step: [channels.md](channels.md). WhatsApp and Twilio need a public https address:
+
+```bash
+cloudflared tunnel --url http://localhost:8000   # free, no account; paste the https address into Channels → Public address
+NIRNAYA_ACCESS_KEY=<long random text> make run   # lock the app before it is on the internet (PowerShell: $env:NIRNAYA_ACCESS_KEY="...")
+```
 
 ### Working as a team
 

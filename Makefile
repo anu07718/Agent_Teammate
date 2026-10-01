@@ -2,7 +2,7 @@
 PY ?= python3
 PORT ?= 8000
 
-.PHONY: install build run dev test test-backend test-web e2e e2e-phone e2e-flows e2e-team e2e-workflow e2e-fields audit exe apk icons clean
+.PHONY: install build run dev test test-backend test-web test-mail mail-server e2e e2e-phone e2e-flows e2e-team e2e-workflow e2e-fields e2e-channels audit exe apk icons clean
 
 install:
 	$(PY) -m pip install -e "backend[dev,llm,docs,monitoring]"
@@ -27,6 +27,19 @@ test-backend:
 test-web:
 	cd web && npx tsc -b --noEmit && npm run build
 
+# a real SMTP (:3025) and IMAP (:3143) server for the email tests (GreenMail, needs Java 17+); leave it running
+GREENMAIL ?= $(HOME)/.cache/nirnaya/greenmail-standalone-2.1.14.jar
+mail-server:
+	@mkdir -p $(dir $(GREENMAIL))
+	@test -f $(GREENMAIL) || curl -fsSL -o $(GREENMAIL) https://repo1.maven.org/maven2/com/icegreen/greenmail-standalone/2.1.14/greenmail-standalone-2.1.14.jar
+	@echo "0cb7511420b76f63c6ed437088149dc8f7fc3a08  $(GREENMAIL)" | sha1sum -c --quiet
+	java -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=127.0.0.1 \
+	  -Dgreenmail.users=support:secret@nirnaya.test,boss:secret@bank.test -jar $(GREENMAIL)
+
+# email through the real mail server (start `make mail-server` in another terminal first)
+test-mail:
+	cd backend && $(PY) -m pytest -q tests/test_channels.py -k "real_mail_server or email"
+
 # needs a running server: `make run` in another terminal
 e2e:
 	cd web && npm run e2e
@@ -49,6 +62,11 @@ e2e-workflow:
 # every field, menu option and condition: the office (~25 min under software WebGL), the workspace, Flows
 e2e-fields:
 	cd web && node e2e/fields-office.mjs && node e2e/fields-workspace.mjs && node e2e/fields-flows.mjs
+
+# Channels in a real browser: every field, real email (needs `make mail-server`), WhatsApp and Twilio stand-ins,
+# a flow on a WhatsApp message, approve by email, the call page (needs a running server)
+e2e-channels:
+	cd web && node e2e/channels.mjs
 
 # a supervisor's walk through every view and button (slow: about ten minutes)
 audit:

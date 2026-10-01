@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { api } from "./api";
 import App from "./App";
+import { CallPage } from "./channels/CallPage";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
@@ -20,12 +21,16 @@ if (dsn) {
     .catch(() => undefined);
 }
 
-void refresh();
-connect(api.eventsUrl());
-setInterval(() => void refresh(), 15_000);
+// /call is the customer's page: no office, no team presence, nothing behind the access key
+const callPage = /^\/call\/?$/.test(window.location.pathname);
+if (!callPage) {
+  void refresh();
+  connect(api.eventsUrl());
+  setInterval(() => void refresh(), 15_000);
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    {callPage ? <CallPage /> : <App />}
   </StrictMode>,
 );

@@ -3,7 +3,7 @@ import { api } from "./api";
 import { me, streamParams, type Person } from "./team";
 import type { Agent, AppState, CaseSummary, NEvent } from "./types";
 
-export type View = "office" | "workspace" | "approvals" | "flows" | "supervisor" | "brain" | "ledger" | "benchmark" | "trail" | "settings";
+export type View = "office" | "workspace" | "approvals" | "channels" | "flows" | "supervisor" | "brain" | "ledger" | "benchmark" | "trail" | "settings";
 
 export interface Toast { id: number; text: string; tone: "info" | "good" | "warn" | "bad"; caseId?: string }
 
@@ -22,6 +22,10 @@ export interface UIState {
   logOpen: boolean;
   version: number;
   people: Person[];
+  /** the server answered 401: it needs its access key */
+  needKey: boolean;
+  /** on a phone, Cases shows the open case (true) or the list (false) */
+  caseOnPhone: boolean;
 }
 
 const initialTheme = (() => {
@@ -34,7 +38,8 @@ const initialTheme = (() => {
 
 let state: UIState = {
   app: null, connected: false, error: null, events: [], view: "office", openCases: [], activeCase: null,
-  selectedAgent: null, pulses: {}, toasts: [], theme: initialTheme, logOpen: false, version: 0, people: [],
+  selectedAgent: null, pulses: {}, toasts: [], theme: initialTheme, logOpen: false, version: 0, people: [], needKey: false,
+  caseOnPhone: false,
 };
 const listeners = new Set<() => void>();
 
@@ -65,27 +70,30 @@ export function toast(text: string, tone: Toast["tone"] = "info", caseId?: strin
   setTimeout(() => setState((s) => ({ toasts: s.toasts.filter((x) => x.id !== t.id) })), 5200);
 }
 
-export function openCase(id: string) {
+/** open a case in Cases; `show` also puts it in front on a phone, where the list and the case take turns */
+export function openCase(id: string, show = true) {
   setState((s) => ({
     view: "workspace",
     activeCase: id,
     openCases: s.openCases.includes(id) ? s.openCases : [...s.openCases.slice(-7), id],
+    caseOnPhone: show || s.caseOnPhone,
   }));
 }
 
 export function closeCase(id: string) {
   setState((s) => {
     const open = s.openCases.filter((x) => x !== id);
-    return { openCases: open, activeCase: s.activeCase === id ? open[open.length - 1] ?? null : s.activeCase };
+    return { openCases: open, activeCase: s.activeCase === id ? open[open.length - 1] ?? null : s.activeCase, caseOnPhone: open.length ? s.caseOnPhone : false };
   });
 }
 
 export async function refresh() {
   try {
     const app = await api.state();
-    setState({ app, error: null });
+    setState({ app, error: null, needKey: false });
   } catch (e) {
-    setState({ error: (e as Error).message });
+    const keyRequired = (e as { keyRequired?: boolean }).keyRequired;
+    setState({ error: (e as Error).message, ...(keyRequired ? { needKey: true } : {}) });
   }
 }
 
@@ -184,6 +192,7 @@ export function connect(url: string) {
   es.onerror = () => {
     setState({ connected: false });
     es?.close();
+    void refresh(); // a 401 here means the server wants its access key: refresh() finds out and asks
     retry = setTimeout(() => connect(url), 2500);
   };
 }

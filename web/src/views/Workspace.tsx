@@ -1,4 +1,4 @@
-import { Check, CheckCheck, ClipboardList, ExternalLink, FileSpreadsheet, Inbox, RotateCcw, ShieldAlert, ThumbsDown, ThumbsUp, Workflow, X } from "lucide-react";
+import { Check, CheckCheck, ClipboardList, ExternalLink, FileSpreadsheet, Forward, Inbox, Phone, RotateCcw, ShieldAlert, ThumbsDown, ThumbsUp, Workflow, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { ApprovalCard, DiffTable } from "../components/ApprovalCard";
@@ -7,6 +7,7 @@ import { ACTION_LABEL, INTENT_LABEL, ago, clock, inr, pct, short } from "../lib/
 import { oapi, type Op, type OfficeSnap } from "../office/data";
 import { closeCase, openCase, setState, toast, useUI, EMPTY } from "../store";
 import { showFlow } from "../flows/api";
+import { capi, CHANNEL_LABEL, type Conv } from "../channels/api";
 import type { CaseDetail, Score } from "../types";
 
 const GROUPS: { id: string; label: string; test: (c: any) => boolean }[] = [
@@ -16,13 +17,13 @@ const GROUPS: { id: string; label: string; test: (c: any) => boolean }[] = [
   { id: "refused", label: "Refused", test: (c) => c.status === "refused" },
 ];
 
-function CaseList() {
+function CaseList({ className }: { className?: string }) {
   const cases = useUI((s) => s.app?.cases ?? EMPTY);
   const active = useUI((s) => s.activeCase);
   const [q, setQ] = useState("");
   const filtered = cases.filter((c) => !q || `${c.id} ${c.customer_name} ${c.intent} ${c.preview}`.toLowerCase().includes(q.toLowerCase()));
   return (
-    <aside className="flex w-[280px] shrink-0 flex-col border-r border-line bg-panel">
+    <aside className={cx("w-full shrink-0 flex-col border-r border-line bg-panel md:flex md:w-[280px]", className)}>
       <div className="border-b border-line p-2.5">
         <input aria-label="Filter cases" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter cases…"
           className="h-8 w-full rounded-md border border-line-strong bg-panel-2 px-2.5 text-[12.5px] outline-none focus:border-accent" />
@@ -104,17 +105,53 @@ function DecisionTab({ c }: { c: CaseDetail }) {
   );
 }
 
+function CaseAction({ kind, caseId, defaultTo, onDone }: { kind: "forward" | "call"; caseId: string; defaultTo: string; onDone: () => void }) {
+  const [to, setTo] = useState(defaultTo);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <form className="flex flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-4 py-2 text-[12.5px]" onSubmit={async (e) => {
+      e.preventDefault();
+      setBusy(true);
+      try {
+        if (kind === "forward") { const r = await capi.forward(caseId, to.trim(), note.trim()); toast(`Forwarded ${caseId} to ${r.to}`, "good"); }
+        else { await capi.call(caseId, to.trim(), note.trim()); toast(`Calling ${to || "the customer"}…`, "good"); }
+        onDone();
+      } catch (x) { toast((x as Error).message, "bad"); } finally { setBusy(false); }
+    }}>
+      <span className="font-medium">{kind === "forward" ? "Forward by email to" : "Call"}</span>
+      <input aria-label={kind === "forward" ? "Forward to" : "Phone number"} value={to} onChange={(e) => setTo(e.target.value)}
+        placeholder={kind === "forward" ? "the escalation address, or anyone@example.com" : "the customer's number, e.g. +91 98765 43210"}
+        className="h-8 min-w-60 flex-1 rounded-md border border-line-strong bg-panel px-2.5" />
+      <input aria-label={kind === "forward" ? "Note" : "What to say"} value={note} onChange={(e) => setNote(e.target.value)}
+        placeholder={kind === "forward" ? "a note (optional)" : "what the agent says first (optional: the case's last reply)"}
+        className="h-8 min-w-48 flex-1 rounded-md border border-line-strong bg-panel px-2.5" />
+      <Button type="submit" variant="primary" disabled={busy}>{kind === "forward" ? "Forward" : "Call now"}</Button>
+      <Button type="button" variant="ghost" onClick={onDone}>Cancel</Button>
+    </form>
+  );
+}
+
 function CaseView({ id }: { id: string }) {
   const version = useUI((s) => s.events.filter((e) => e.case_id === id || e.case?.id === id).length);
   const [c, setC] = useState<CaseDetail | null>(null);
   const [tab, setTab] = useState<"overview" | "evidence" | "decision" | "seal" | "trail">("overview");
   const [approval, setApproval] = useState<any>(null);
+  const [chan, setChan] = useState<Conv | null>(null);
+  const [act, setAct] = useState<null | "forward" | "call">(null);
+  const channels = useUI((s) => s.app?.channels);
+  const chanVersion = useUI((s) => s.events.filter((e) => e.kind === "channel.message" && e.message?.case_id === id).length);
 
   useEffect(() => {
     let live = true;
     api.caseDetail(id).then((d) => live && setC(d)).catch((e) => toast(e.message, "bad"));
     return () => { live = false; };
   }, [id, version]);
+  useEffect(() => {
+    let live = true;
+    capi.caseChannel(id).then((d) => live && setChan(d)).catch(() => live && setChan(null));
+    return () => { live = false; };
+  }, [id, version, chanVersion]);
   useEffect(() => {
     if (c?.pending) api.approvals().then((a) => setApproval(a.find((x) => x.case.id === id) ?? null));
     else setApproval(null);
@@ -140,10 +177,13 @@ function CaseView({ id }: { id: string }) {
             <Button size="sm" variant="ghost" title="Audit: this autonomous decision was right" onClick={() => api.audit(c.id, true).then(() => toast("Labelled correct", "good"))}><ThumbsUp size={13} /></Button>
             <Button size="sm" variant="ghost" title="Audit: this autonomous decision was wrong" onClick={() => api.audit(c.id, false).then(() => toast("Labelled wrong; the drift monitor counts it", "warn"))}><ThumbsDown size={13} /></Button>
           </>}
+          {channels?.email?.enabled && <Button size="sm" variant={act === "forward" ? "primary" : "ghost"} onClick={() => setAct(act === "forward" ? null : "forward")}><Forward size={13} /> Forward</Button>}
+          {channels?.voice?.enabled && <Button size="sm" variant={act === "call" ? "primary" : "ghost"} onClick={() => setAct(act === "call" ? null : "call")}><Phone size={13} /> Call</Button>}
           <a href={api.previewUrl(c.id)} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost"><ExternalLink size={13} /> Packet</Button></a>
           <a href={api.exportUrl(c.id)}><Button size="sm"><FileSpreadsheet size={13} /> Export .xlsx</Button></a>
         </div>
       </div>
+      {act && <CaseAction kind={act} caseId={c.id} defaultTo={act === "call" ? (chan && ["whatsapp", "voice"].includes(chan.channel) ? chan.address : "") : ""} onDone={() => setAct(null)} />}
       {c.seal_broken && (
         <div className="flex items-center gap-2 border-b border-hedge/30 bg-hedge/10 px-4 py-2 text-[12.5px]">
           <ShieldAlert size={14} className="text-hedge" /> Seal broken: {c.seal_broken.why}. Old seal <Mono>{short(c.seal_broken.old_seal, 12)}</Mono>. The case was re-checked against the live ledger.
@@ -184,6 +224,22 @@ function CaseView({ id }: { id: string }) {
                 {c.guard && <div className="text-[11.5px] text-muted">Promise Guard: {c.guard.ok ? "passed" : "blocked"} · {c.guard.claims_checked} claim(s) checked against the evidence</div>}
               </div>
             </Card>
+            {chan && (
+              <Card title={<span className="flex items-center gap-2">On {CHANNEL_LABEL[chan.channel] ?? chan.channel} <Mono className="text-faint">{chan.address}</Mono></span>}
+                actions={<Button size="sm" variant="ghost" onClick={() => setState({ view: "channels" })}>Open in Channels</Button>} className="xl:col-span-2">
+                <ul className="space-y-1 text-[12px]" data-testid="case-channel">
+                  {chan.messages.filter((m) => !m.case_id || m.case_id === c.id).slice(-12).map((m, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="w-16 shrink-0 font-mono text-[11px] text-faint">{clock(m.ts)}</span>
+                      <span className={cx("w-6 shrink-0", m.dir === "in" ? "text-accent" : "text-act")}>{m.dir === "in" ? "←" : "→"}</span>
+                      <span className="min-w-0 flex-1 truncate" title={m.text}>{m.text}</span>
+                      {m.status && <Badge tone={m.status === "failed" ? "bad" : m.status === "read" || m.status === "delivered" ? "good" : "muted"}>{m.status}</Badge>}
+                    </li>
+                  ))}
+                </ul>
+                {chan.messages.some((m) => m.status === "failed") && <p className="mt-2 text-[11.5px] text-escalate">{chan.messages.filter((m) => m.status === "failed").at(-1)?.error}</p>}
+              </Card>
+            )}
           </div>
         )}
         {tab === "evidence" && (
@@ -274,14 +330,17 @@ export function WorkspaceView() {
   const active = useUI((s) => s.activeCase);
   const cases = useUI((s) => s.app?.cases ?? EMPTY);
   const byId = useMemo(() => Object.fromEntries(cases.map((c) => [c.id, c])), [cases]);
+  const onPhone = useUI((s) => s.caseOnPhone && !!s.activeCase);
   useEffect(() => {
-    if (!active && cases.length) openCase(cases[0].id);
+    if (!active && cases.length) openCase(cases[0].id, false);
   }, [active, cases]);
   return (
     <div className="flex h-full min-h-0">
-      <CaseList />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <CaseList className={onPhone ? "hidden" : "flex"} />
+      <div className={cx("min-w-0 flex-1 flex-col md:flex", onPhone ? "flex" : "hidden")}>
         <div className="flex h-9 shrink-0 items-end gap-0.5 overflow-x-auto border-b border-line bg-panel px-1">
+          <button className="mb-1 mr-1 flex shrink-0 cursor-pointer items-center rounded px-1.5 py-1 text-[12px] text-accent hover:bg-panel-2 md:hidden"
+            onClick={() => setState({ caseOnPhone: false })} aria-label="Back to the cases">◂ Cases</button>
           {open.map((id) => (
             <div key={id} className={cx("group flex h-8 items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 text-[12px]", active === id ? "border-line bg-bg" : "border-transparent text-muted hover:text-fg")}>
               <button className="flex cursor-pointer items-center gap-1.5" onClick={() => setState({ activeCase: id })}>
