@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, benchmark, channels, docparse, flows, office, relay, reports
+from . import __version__, benchmark, channels, docparse, feed, flows, office, pg, relay, reports
 from .agents import DEPARTMENTS
 from .engine import Engine
 from .policy import GRAPH_HASH, SUPERSTEPS
@@ -26,7 +26,7 @@ from .team import Team, clean_name
 
 # open even when NIRNAYA_ACCESS_KEY is set: providers sign their own requests, customers use the call page
 OPEN_PATHS = ("/api/channels/whatsapp/webhook", "/api/channels/waha/webhook", "/api/channels/voice/twilio/",
-              "/api/channels/email/inbound", "/api/channels/hook", "/api/channels/web/")
+              "/api/channels/email/inbound", "/api/channels/hook", "/api/channels/web/", "/api/pg/razorpay/webhook")
 WEB_DIST = Path(os.environ.get("NIRNAYA_WEB", Path(__file__).resolve().parents[2] / "web" / "dist"))
 
 
@@ -64,6 +64,12 @@ class PolicyChange(BaseModel):
 class RailEvent(BaseModel):
     txn_id: str
     event: str
+
+
+class DataIn(BaseModel):
+    kind: str = "transactions"
+    csv: str = Field(max_length=feed.MAX_BYTES + 1000)
+    filename: str = "import.csv"
 
 
 class WorkspaceIn(BaseModel):
@@ -163,7 +169,8 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
         customers = [{"id": c["id"], "name": c["name"], "segment": c["segment"]} for c in e.rails.customers()]
         return {"agents": e.roster.public(), "departments": DEPARTMENTS, "tools": e.gateway.describe(),
                 "cases": [e.summary(c) for c in e.store.list_cases(100)], "stats": e.stats(),
-                "customers": customers, "presets": PRESETS, "supersteps": SUPERSTEPS, "drift": e.drift_status,
+                "customers": customers, "supersteps": SUPERSTEPS, "drift": e.drift_status,
+                "presets": [p for p in PRESETS if e.rails.demo_on() and e.rails.customer(p["customer"])],  # demo scripts
                 "policy_hash": e.policy.policy_hash(), "integrations": integrations(),
                 "channels": _channel_status(),
                 "waiting": {"cases": sum(1 for c in e.store.list_cases(500) if c.get("pending")),
@@ -182,6 +189,10 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
     def integrations():
         e = E()
         return {"llm": e.llm.summary(),
+                "pg": {"ready": e.pg.ready(), "label": pg.LABEL,
+                       "payments": sum(1 for t in e.rails.state["txns"].values() if t.get("source") == pg.SOURCE)},
+                "data": {"demo": e.rails.demo_on(),
+                         "imported": sum(1 for t in e.rails.state["txns"].values() if t.get("source") == "import")},
                 "monitoring": {"enabled": monitoring, "provider": "Sentry SDK"},
                 "documents": docparse.available(), "officecli": reports.officecli_available(),
                 "mcp": {"endpoint": "/mcp", "tools": len(MCP_TOOLS)}}
@@ -434,12 +445,64 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
                          "utr": t["utr"], "npci_status": t["npci_status"], "debit_status": t["debit_status"],
                          "reversal": t["reversal"]["status"], "refund": t["refund"]["status"],
                          "dispute": (t.get("dispute") or {}).get("status"), "version": t["version"],
-                         "created_at": t["created_at"], "can": e.rails.natural_event(t["id"])})
+                         "created_at": t["created_at"], "can": e.rails.natural_event(t["id"]),
+                         "source": t.get("source", "demo"), "batch": t.get("batch"),
+                         "pg": {k: (t.get("pg") or {}).get(k) for k in ("status", "method", "rrn", "amount_refunded")}
+                         if t.get("pg") else None, "duplicate_of": t.get("duplicate_of")})
         accts = [{"account": tok(a["id"]), "customer_id": a["customer_id"], "balance": a["balance"],
                   "version": a["version"]} for a in e.rails.state["accounts"].values()]
         return {"transactions": txns, "accounts": accts, "wallet_credits": e.rails.state["wallet_credits"],
                 "disputes": e.rails.state["disputes"], "blocks": e.rails.state["blocks"],
                 "down": e.rails.state.get("down", [])}
+
+    # ── fed data: your own customers and payments, checked row by row (feed.py) ──
+    def _data_changed(e, what: str):
+        e.graph.rebuild(e.rails, lambda v: e.tok.tokenise(v)[0])
+        e.bus.publish("rail.event", txn_id=None, event=what)
+
+    @app.post("/api/data/preview")
+    def data_preview(body: DataIn):
+        return feed.check(E().rails, body.csv, body.kind)
+
+    @app.post("/api/data/import")
+    def data_import(body: DataIn):
+        e = E()
+        res = feed.commit(e.rails, body.csv, body.kind, body.filename)
+        if res["imported"]:
+            e.trail.append("-", "data.imported", "you", {"batch": res["batch"], "kind": body.kind, "rows": res["imported"],
+                                                         "rejected": res["rejected"], "file": body.filename[:60]})
+            _data_changed(e, "data.imported")
+        return res
+
+    @app.get("/api/data")
+    def data_list():
+        e = E()
+        return {"demo": e.rails.demo_on(), "batches": feed.batches(e.rails), "max_amount": feed.max_amount(),
+                "columns": {"transactions": feed.TXN_COLUMNS, "customers": feed.CUSTOMER_COLUMNS}}
+
+    @app.get("/api/data/template/{kind}.csv")
+    def data_template(kind: str):
+        if kind not in ("transactions", "customers"):
+            raise HTTPException(404, "transactions or customers")
+        return Response(feed.template(kind), media_type="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="nirnaya-{kind}.csv"'})
+
+    @app.delete("/api/data/import/{batch}")
+    def data_remove(batch: str):
+        e = E()
+        n = e.rails.remove_fed(batch=batch)
+        e.trail.append("-", "data.removed", "you", {"batch": batch, "transactions": n})
+        _data_changed(e, "data.removed")
+        return {"removed": n, "batches": feed.batches(e.rails)}
+
+    @app.post("/api/data/demo")
+    def data_demo(on: bool = True):
+        """Hide the demo bank's customers and payments (only fed data stays), or bring them back."""
+        e = E()
+        e.rails.set_demo(on)
+        e.trail.append("-", "data.demo", "you", {"on": on})
+        _data_changed(e, "data.demo")
+        return {"demo": e.rails.demo_on()}
 
     @app.post("/api/sim/rail-event")
     def rail_event(body: RailEvent):
@@ -613,6 +676,7 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
                     lambda: state["flows"])
     flows.register(app, E, lambda: state["flows"])
     channels.register(app, E, lambda: state["channels"])
+    pg.register(app, E)
 
     # ── the web app ──────────────────────────────────────────────────────────
     if WEB_DIST.exists():

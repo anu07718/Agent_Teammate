@@ -170,6 +170,7 @@ function CaseView({ id }: { id: string }) {
         <span className="text-[12.5px] text-muted">{c.customer_name} · {c.customer_id} · {c.channel}</span>
         {c.intent && <Badge>{INTENT_LABEL[c.intent] ?? c.intent}</Badge>}
         {c.txn && <span className="text-[12.5px] tabular">{inr(c.txn.amount)} · <Mono>{c.txn.id}</Mono> · {c.txn.merchant}</span>}
+        {c.txn && <span data-testid="case-source"><Badge tone={c.txn.source === "razorpay_test" ? "accent" : "muted"}>{c.txn.source === "razorpay_test" ? "Razorpay test" : c.txn.source === "import" ? "Imported" : "Demo bank"}</Badge></span>}
         {c.first_reply_s != null && <Badge tone="accent">first reply {c.first_reply_s}s</Badge>}
         <div className="ml-auto flex flex-wrap gap-1.5">
           {hedged && <Button size="sm" onClick={() => api.undo(c.id).then(() => toast("Undone", "info"))}><RotateCcw size={13} /> Undo</Button>}

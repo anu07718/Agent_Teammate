@@ -123,7 +123,7 @@ export interface CaseDetail extends CaseSummary {
     profile?: Record<string, unknown>;
     novelty?: number;
   };
-  txn?: { id: string; amount: number; merchant: string; utr: string; created_at: number } | null;
+  txn?: { id: string; amount: number; merchant: string; utr: string; created_at: number; source?: string } | null;
   plan?: { specialist: string; txn_id: string | null; actions: Action[]; facts: string[] };
   scores?: Score[];
   shadow?: { baseline: string; diff: { field: string; before: unknown; after: unknown }[] } | null;

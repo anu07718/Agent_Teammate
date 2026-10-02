@@ -34,6 +34,8 @@ T = {
                      "they say it hasn't reached them, share this UTR with them.",
         "already_reversed": "Good news: the {amount} from this payment has already been reversed to your account "
                             "(ref {rrn}).",
+        "not_debited": "Your payment of {amount} to {merchant} failed before any money was taken, so nothing left your "
+                       "account. You can try the payment again.",
         "pending": "Your payment of {amount} (UTR {utr}) is still waiting for a final status from the UPI switch. If it "
                    "fails, the money comes back to your account automatically.",
         "within_tat": "Your payment of {amount} to {merchant} failed at the UPI switch. The money comes back to your "
@@ -64,6 +66,8 @@ T = {
         "within_tat": "Aapka {amount} ka payment {merchant} ko UPI switch par fail hua. Paisa {due} tak apne aap aapke "
                       "account mein wapas aa jayega. Aapko kuch karne ki zaroorat nahi hai.",
         "already_reversed": "Achhi khabar: is payment ke {amount} aapke account mein wapas aa chuke hain (ref {rrn}).",
+        "not_debited": "Aapka {amount} ka payment {merchant} ko paisa katne se pehle hi fail ho gaya, isliye account se "
+                       "kuch nahi gaya. Aap payment dobara kar sakte hain.",
         "succeeded": "Aapka {amount} ka payment {merchant} ko successful hua (UTR {utr}) aur merchant ko mil gaya. Agar "
                      "woh kahein ki nahi mila, to unhe yeh UTR dein.",
         "reverse_failed_debit": "Maine {merchant} ke failed payment ke {amount} aapke account mein wapas kar diye hain.",

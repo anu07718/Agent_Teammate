@@ -51,6 +51,7 @@ DENY = [
     ("*", r"^/api/workspace"), ("*", r"^/api/events"), ("PUT", r"^/api/llm$"), ("PUT", r"^/api/channels$"),
     ("*", r"^/api/channels/(whatsapp|waha)/webhook"), ("*", r"^/api/channels/voice/twilio/"),
     ("*", r"^/api/channels/email/inbound"), ("POST", r"^/api/channels/hook$"), ("POST", r"^/api/team/me$"),
+    ("PUT", r"^/api/pg$"), ("*", r"^/api/pg/razorpay/webhook"),
 ]
 
 

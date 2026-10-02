@@ -74,7 +74,7 @@ const VIEWS = [
   ["Flows", () => page.getByTestId("pipeline").waitFor()],
   ["Supervisor", () => page.getByRole("heading", { name: "Supervisor console" }).waitFor()],
   ["Brain", () => page.getByText("Context graph").waitFor()],
-  ["Ledger", () => page.getByRole("heading", { name: "Live systems (simulated)" }).waitFor()],
+  ["Ledger", () => page.getByRole("heading", { name: "Ledger", exact: true }).waitFor()],
   ["Benchmark", () => page.getByRole("heading", { name: "Simulated customers" }).waitFor()],
   ["Trail", () => page.getByRole("heading", { name: "Ledger Trail" }).waitFor()],
   ["Settings", () => page.getByText("Use Nirnaya from another agent (MCP)").waitFor()],
@@ -343,6 +343,21 @@ await step("Ledger: each payment's outside event lands once (the right kind), th
   await page.getByRole("button", { name: "Reset world" }).click();
   await until(async () => (await api("/api/ledger")).transactions.every((t) => t.version === 1));
   expect(!bad.length, bad.join(" · "));
+});
+
+await step("Ledger: feed your own data: Preview refuses a bad row and saves nothing, Import keeps the good one, Remove takes it out", async () => {
+  await page.getByLabel("What to import").selectOption("customers");
+  await page.getByLabel("CSV text").fill("name,phone,upi_id\nKavya Rao,+91 98450 12345,kavya.rao@okaxis\nK,12345,bad@@\n");
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await page.getByTestId("import-result").getByText(/1 pass/i).waitFor();
+  await page.locator('li[data-line="3"]').getByText(/10-digit Indian mobile/).waitFor();
+  expect(!(await api("/api/state")).customers.some((c) => c.name === "Kavya Rao"), "a preview saved a customer");
+  await page.getByRole("button", { name: /^Import \d/ }).click();
+  const b = await until(async () => (await api("/api/data")).batches.find((x) => x.customers === 1));
+  expect((await api("/api/state")).customers.some((c) => c.name === "Kavya Rao"), "the good row was not imported");
+  await page.locator(`li[data-batch="${b.batch}"]`).getByRole("button", { name: /^Remove/ }).click();
+  await until(async () => !(await api("/api/data")).batches.some((x) => x.batch === b.batch));
+  expect(!(await api("/api/state")).customers.some((c) => c.name === "Kavya Rao"), "Remove left the customer");
 });
 
 await step("Benchmark: k = 1, 2 and 3 each run and are archived", async () => {

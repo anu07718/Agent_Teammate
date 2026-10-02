@@ -286,7 +286,7 @@ between the first ten; Settings has no key.
 | **Flows** | as in section 9 |
 | **Supervisor** | For each action: the error ceiling **α** and the autonomy (**Suggest**, **Hedge**, **Act**). Also the certified thresholds, the reliability chart, deflection against precision, **Recalibrate**, the drift monitor (**Inject drift** to see it fail closed, **Clear**), and the routines with **Run** |
 | **Brain** | The context graph: highlight, click a node, follow its links. Case memory: search past cases and what held |
-| **Ledger** | The simulated bank as a spreadsheet. Switch a system's outage on and off to see the agents cope. Land an outside event on a payment (an auto-reversal or a merchant refund; each lands once). **Reset world** puts it back |
+| **Ledger** | Every payment as a spreadsheet; the **Source** column says Demo bank, Razorpay test or Imported. **Real UPI payments** and **Feed your own data** are on the right (below). Switch a system's outage on and off to see the agents cope. Land an outside event on a demo bank payment (an auto-reversal or a merchant refund; each lands once). **Reset world** puts the demo bank back; what you fed in stays |
 | **Benchmark** | Choose **k** (1, 2 or 3) and **Run benchmark**: simulated customers, each asked k ways. Wrong autonomous actions should be 0 |
 | **Trail** | The hash-chained audit log. **Verify chain** says it is intact; **Tamper test** shows an edit being caught. Case links open the case |
 | **Settings** | The server address (for the phone and the Windows app), the free **language model** (below), how to connect another agent over MCP, evidence parsing (upload a statement: UTRs are found and phone numbers tokenised), and **Simulate a crash and restart** (parked approvals survive) |
@@ -297,6 +297,29 @@ the theme switch, which changes the office too. The footer's count takes you to
 Approvals. On a phone, the tab bar at the bottom has Office, Cases, Approvals, Channels, Flows,
 Supervisor and Settings. On a phone, Cases shows the list; tap a case to open it and **◂ Cases** to go
 back. A case reached from Channels or Approvals opens straight away.
+
+### Real payments and your own data
+
+The demo bank's payments are made up, and say so. For real ones (all free, see [docs/upi.md](docs/upi.md)):
+
+**Real UPI payments (Razorpay test mode).**
+1. Make a free Razorpay account; stay in Test mode and generate a test key on the API keys page.
+2. Ledger → **Real UPI payments**: paste the Key Id and Key Secret, **Save**, then **Test**. Only
+   `rzp_test_…` keys are accepted.
+3. **Make a test payment**: pick a customer, an amount and a merchant, **Create a payment link**, and pay
+   it on Razorpay's page with the UPI ID `success@razorpay` (`failure@razorpay` makes a failed payment).
+4. **Sync now**. The payment shows in the Ledger as Razorpay test, and the ₹ tile lights in the top bar.
+5. Open a case as that customer. A case on a Razorpay payment always waits for a person before money
+   moves (the case header says **Razorpay test**). Approve it and the refund is made on Razorpay.
+6. For changes to arrive by themselves, give Nirnaya a public address (Channels → Public address) and
+   add the webhook URL from the card in Razorpay → Webhooks, with the webhook secret.
+
+**Feed your own data.**
+1. Ledger → **Feed your own data**. Choose **Customers** or **Transactions** and download the **Template**.
+2. Fill it in (customers first: transactions name a customer by id or phone). Choose the file, or paste it.
+3. **Preview**: each refused row says why. Nothing is saved yet.
+4. **Import** keeps the rows that passed. Each import is listed with **Remove**.
+5. Untick **The demo bank's customers and payments** to work on your own data alone.
 
 ### A free language model
 

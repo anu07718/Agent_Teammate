@@ -26,14 +26,16 @@ export function ThemeToggle({ className }: { className?: string }) {
 
 const KEY_OF: Record<string, string> = {
   "UPI switch": "upi", "Core banking": "bank", "Refund engine": "refunds", CRM: "crm", "Wallet ledger": "wallet",
-  "Dispute desk": "disputes", "Card & UPI control": "controls", Messaging: "messaging",
+  "Dispute desk": "disputes", "Card & UPI control": "controls", Messaging: "messaging", "Razorpay (test)": "razorpay",
 };
 
 /** the systems Nirnaya is connected to, as the office shows them: a tile each, lit while a tool is called */
 export function ConnTiles({ className }: { className?: string }) {
   const tools = useUI((s) => s.app?.tools ?? EMPTY);
+  const pg = useUI((s) => !!s.app?.integrations?.pg?.ready);
   const pulses = useUI((s) => s.pulses);
-  const systems = [...new Set(tools.map((t) => t.system))].filter((s) => KEY_OF[s]);
+  // the Razorpay tile shows only once test keys are saved
+  const systems = [...new Set(tools.map((t) => t.system))].filter((s) => KEY_OF[s] && (KEY_OF[s] !== "razorpay" || pg));
   const now = Date.now();
   return (
     <div className={cx("o-conn", className)} aria-label="Connected systems">

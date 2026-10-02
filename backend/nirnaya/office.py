@@ -85,7 +85,8 @@ def connectors(e) -> list[dict]:
     tools = e.gateway.describe()
     down = set(e.rails.state.get("down", []))
     out = []
-    for c in CONNECTORS:
+    extra = [{"key": "razorpay", "name": "Razorpay (test)", "depts": ["verification", "commit"]}] if e.pg.ready() else []
+    for c in CONNECTORS + extra:
         mine = [t for t in tools if t["system"] == c["name"]]
         breaker = "open" if any(t["breaker"] == "open" for t in mine) else \
             ("warning" if any(t["breaker"] == "warning" for t in mine) else "closed")

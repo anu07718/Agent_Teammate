@@ -26,6 +26,7 @@ from .events import EventBus
 from .gateway import Gateway, GatewayError
 from .graph import Graph
 from .llm import LLM
+from .pg import PG
 from .memory import Memory
 from .pii import Tokeniser
 from .policy import GRAPH_HASH, SUPERSTEPS, Policy
@@ -59,6 +60,8 @@ class Engine:
         self.graph = Graph(self.store)
         self.graph.build_from(self.rails, lambda v: self.tok.tokenise(v)[0])
         self.roster = Roster()
+        self.pg = PG(self.store, self.rails, self.bus)
+        self.gateway.pg = self.pg
         self.llm = llm if llm is not None else LLM(self.store)
         self.llm.bind(self.store)
         if calibrator is not None:
@@ -304,6 +307,8 @@ class Engine:
                 ev["errors"].append(f"{tool}: {e}")
 
         jobs = [read("profile", "crm.profile", customer_id=cid)]
+        if tid and (self.rails.txn(tid) or {}).get("source") == "razorpay_test":
+            await read("pg", "pg.payment", txn_id=tid)   # first, so the other reads see the live payment
         if tid:
             jobs += [read("upi", "upi.status", txn_id=tid), read("debit", "bank.debit_status", txn_id=tid),
                      read("refund", "refund.status", txn_id=tid)]
@@ -313,7 +318,8 @@ class Engine:
         if tid:
             t = self.rails.txn(tid)
             case["txn"] = {"id": tid, "amount": t["amount"], "merchant": t["merchant"] if "@" not in t["merchant"]
-                           else self.tok.tokenise(t["merchant"])[0], "utr": t["utr"], "created_at": t["created_at"]}
+                           else self.tok.tokenise(t["merchant"])[0], "utr": t["utr"], "created_at": t["created_at"],
+                           "source": t.get("source", "demo")}
             ev["novelty"] = 0.0 if self.graph.merchant_seen_before(cid, t["merchant"], tid) else 1.0
         else:
             case["txn"] = None
@@ -360,6 +366,10 @@ class Engine:
         lam_hedge = th["hedge"]["lambda"] if th["hedge"]["lambda"] is not None else inf
         if case["sentry"]["verdict"] == "adjudicate" and a["type"] not in INFO:
             return "ESCALATE", "Sentry asked for a human on this case"
+        t = self.rails.txn(a.get("txn_id") or "") or {}
+        if t.get("source") == "razorpay_test" and at.moves_money:
+            return "ESCALATE", ("a real gateway payment (Razorpay, test mode): a person approves any money "
+                                "movement on it, and a gateway refund cannot be undone")
         if rung == 0:
             return "ESCALATE", f"{at.label} is in suggest-only mode (autonomy rung 0)"
         if score >= lam_act and rung >= 2:

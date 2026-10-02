@@ -1,5 +1,5 @@
 // Small shared pieces of the office UI: time words, avatars, connector icons.
-import { ArrowLeftRight, Landmark, MessageSquareText, Scale, ShieldBan, Sparkles, UserRound, Undo2, Wallet } from "lucide-react";
+import { ArrowLeftRight, IndianRupee, Landmark, MessageSquareText, Scale, ShieldBan, Sparkles, UserRound, Undo2, Wallet } from "lucide-react";
 import { POD_STYLE, type PodId } from "./layout";
 
 export function span(ms: number) {
@@ -36,5 +36,6 @@ export const CONN_ICON: Record<string, { icon: any; color: string }> = {
   disputes: { icon: Scale, color: "#a16207" },
   controls: { icon: ShieldBan, color: "#be123c" },
   messaging: { icon: MessageSquareText, color: "#15803d" },
+  razorpay: { icon: IndianRupee, color: "#2563eb" },
   model: { icon: Sparkles, color: "#7b5bd6" },
 };

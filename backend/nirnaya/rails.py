@@ -7,6 +7,7 @@ The state persists in the store so a restart sees the same world.
 from __future__ import annotations
 
 import copy
+import re
 import time
 from typing import Any
 
@@ -51,8 +52,12 @@ def _seed(now: float) -> dict:
         txn("T-5009", "C-1004", 3_999.0, "GadgetHub", 8, "SUCCESS", True, "412345678909",
             refund={"status": "PENDING", "initiated_at": now - 7 * DAY}),
     ]
+    for c in customers.values():
+        c["source"] = "demo"
+    for t in txns:
+        t["source"] = "demo"
     return {"customers": customers, "accounts": accounts, "txns": {t["id"]: t for t in txns},
-            "wallet_credits": [], "blocks": [], "disputes": [], "down": [], "seeded_at": now}
+            "wallet_credits": [], "blocks": [], "disputes": [], "down": [], "seeded_at": now, "demo": True}
 
 
 class Rails:
@@ -65,7 +70,91 @@ class Rails:
         self.store.kv_set("rails", self.state)
 
     def reset(self) -> None:
+        """The demo bank back to its seeded state. What you fed in (imports, gateway payments) stays, and so
+        does the demo switch: remove fed data with remove_fed."""
+        fed = lambda x: x.get("source") not in (None, "demo")   # noqa: E731
+        txns = {k: t for k, t in self.state["txns"].items() if fed(t)}
+        people = {k: c for k, c in self.state["customers"].items() if fed(c)}
+        accounts = {c["account"]: self.state["accounts"][c["account"]] for c in people.values()
+                    if c.get("account") in self.state["accounts"]}
+        demo = self.demo_on()
         self.state = _seed(time.time())
+        self.state["customers"].update(people)
+        self.state["accounts"].update(accounts)
+        self.state["txns"].update(txns)
+        if not demo:
+            self.set_demo(False)
+        self._save()
+
+    # ── fed data: imports and gateway payments, each marked with where it came from ──
+    def add_customer(self, *, name: str, phone: str = "", vpa: str = "", email: str = "", segment: str = "retail",
+                     source: str = "import", cid: str | None = None) -> dict:
+        nums = [int(k[2:]) for k in self.state["customers"] if re.fullmatch(r"C-\d+", k)]
+        cid = cid or f"C-{max([2000] + nums) + 1}"
+        if cid in self.state["customers"]:
+            raise ValueError(f"customer {cid} already exists")
+        digits = re.sub(r"\D", "", cid) or "0"
+        acct = f"{900000000000 + int(digits):012d}"
+        self.state["accounts"][acct] = {"id": acct, "customer_id": cid, "balance": 0.0, "version": 1, "external": True}
+        c = {"id": cid, "name": name, "phone": phone, "vpa": vpa, "email": email, "account": acct, "card": "",
+             "prior_disputes": 0, "segment": segment, "source": source}
+        self.state["customers"][cid] = c
+        self._save()
+        return c
+
+    def upsert_external(self, tid: str, fields: dict) -> bool:
+        """Create or update a fed transaction. Bumps its version (so a Seal notices) only when something changed."""
+        t = self.state["txns"].get(tid)
+        if t is None:
+            cid = fields["customer_id"]
+            t = {"id": tid, "utr": "", "customer_id": cid, "account_id": self.state["customers"][cid]["account"],
+                 "amount": 0.0, "merchant": "", "created_at": time.time(), "debit_status": "DEBITED",
+                 "npci_status": "PENDING", "beneficiary_credited": False, "reversal": {"status": "NONE"},
+                 "refund": {"status": "NONE"}, "dispute": None, "duplicate_of": None, "version": 0}
+            self.state["txns"][tid] = t
+        changed = any(t.get(k) != v for k, v in fields.items())
+        if changed:
+            t.update(copy.deepcopy(fields))
+            t["account_id"] = self.state["customers"][t["customer_id"]]["account"]
+            t["version"] += 1
+            self.state["accounts"][t["account_id"]]["version"] += 1
+            self._save()
+        return changed
+
+    def remove_fed(self, *, batch: str | None = None, source: str | None = None) -> int:
+        """Remove imported or gateway transactions (and customers left with nothing)."""
+        gone = [tid for tid, t in self.state["txns"].items()
+                if t.get("source") not in (None, "demo") and (batch is None or t.get("batch") == batch)
+                and (source is None or t.get("source") == source)]
+        for tid in gone:
+            del self.state["txns"][tid]
+        used = {t["customer_id"] for t in self.state["txns"].values()}
+        for cid, c in list(self.state["customers"].items()):
+            if c.get("source") not in (None, "demo") and cid not in used and (batch is None or c.get("batch") == batch):
+                self.state["accounts"].pop(c["account"], None)
+                del self.state["customers"][cid]
+        self._save()
+        return len(gone)
+
+    def demo_on(self) -> bool:
+        return self.state.get("demo", True) is not False
+
+    def set_demo(self, on: bool) -> None:
+        """Hide the demo bank's payments (and its customers, unless a payment you fed in belongs to one: a
+        Razorpay payment from Meera's phone keeps Meera), so only what you fed in is there; or bring them back."""
+        if on and not self.demo_on():
+            seed = _seed(time.time())
+            for part in ("customers", "accounts", "txns"):
+                for k, v in seed[part].items():
+                    self.state[part].setdefault(k, v)
+        elif not on:
+            for tid in [k for k, t in self.state["txns"].items() if t.get("source", "demo") == "demo"]:
+                del self.state["txns"][tid]
+            used = {t["customer_id"] for t in self.state["txns"].values()}
+            for cid in [k for k, c in self.state["customers"].items() if c.get("source", "demo") == "demo" and k not in used]:
+                self.state["accounts"].pop(self.state["customers"][cid]["account"], None)
+                del self.state["customers"][cid]
+        self.state["demo"] = on
         self._save()
 
     # ── reads ────────────────────────────────────────────────────────────────
@@ -198,6 +287,8 @@ class Rails:
         """What can still happen to this payment from outside: a failed debit gets the bank's auto-reversal,
         a payment that went through can be refunded by the merchant. Each happens once."""
         t = self.state["txns"][tid]
+        if t.get("source", "demo") != "demo":  # a real or imported payment: only its own source changes it
+            return None
         if t["npci_status"] == "FAILED" and t["debit_status"] == "DEBITED" and t["reversal"]["status"] != "REVERSED":
             return "reversal_lands"
         if t["npci_status"] == "SUCCESS" and t["refund"]["status"] != "PROCESSED":
@@ -206,6 +297,9 @@ class Rails:
 
     def outside_event(self, tid: str, event: str) -> dict:
         t = self.state["txns"][tid]
+        if t.get("source", "demo") != "demo":
+            raise ValueError(f"{tid} is a {'Razorpay' if t.get('source') == 'razorpay_test' else 'fed'} payment: "
+                             "simulated events only land on the demo bank's payments")
         if event == "reversal_lands":
             if t["reversal"]["status"] == "REVERSED":
                 raise ValueError(f"{tid} is already reversed")

@@ -9,6 +9,8 @@ your own machine. The services below are optional extras, and each one says what
 | Language model (optional) | [Groq](#groq), [Gemini](#google-gemini), [OpenRouter](#openrouter-free-models-only), [Mistral](#mistral-experiment-plan), [Ollama](#ollama-on-your-own-computer) | see each below | no | that provider rests and the next one answers; with none, the rules work alone |
 | Shared workspaces (the person+ button) | [Firebase Realtime Database](#shared-workspaces-the-person-button), Spark plan | 100 people connected at once, 1 GB stored, 10 GB a month downloaded | no | sharing pauses until next month; everyone's own Nirnaya keeps working |
 | The website for your team | [Vercel](#the-website-on-vercel) Hobby, or Firebase Hosting / Cloudflare Pages | Vercel Hobby: personal, non-commercial projects | no | Vercel waits 30 days before serving again |
+| Real UPI payments (optional) | [Razorpay test mode](docs/upi.md) | free, no KYC: real API, webhooks and refunds, no real money | no | does not run out; live keys are refused |
+| Your own customers and payments | CSV import in the Ledger | free, on your machine | no | |
 | Email | Gmail (IMAP + SMTP with an app password), Brevo, Resend | [channels.md](channels.md) | no | |
 | WhatsApp | Meta's WhatsApp Cloud API, free test number | [channels.md](channels.md) | no | |
 | Phone calls | the call page, `/call`: customers talk to the agent from Chrome, Edge or Safari | free, no account | no | |
@@ -155,3 +157,4 @@ free option.
 - Anthropic's Claude API: removed. Nirnaya no longer reads `ANTHROPIC_API_KEY`.
 - Paid model plans, paid credits and paid Firebase (Blaze).
 - Twilio beyond its trial credit.
+- Razorpay live mode: it moves real money and needs KYC. Nirnaya accepts only `rzp_test_` keys.

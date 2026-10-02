@@ -102,7 +102,7 @@ Reply → Oversight).
 | **Flows** | **Live**: the ten-step case pipeline with the desks on each step, how many cases are at each step now, and every case's progress; department tasks and flow runs beside it. **Builder**: drag nodes onto a canvas, wire them, save, run (below) |
 | **Supervisor** | Per-action error ceiling α and autonomy rung, certified thresholds per amount band, the reliability diagram, deflection vs precision, drift monitor, routines |
 | **Brain** | Context graph (customers, accounts, UPI IDs, transactions, merchants, cases, policies) and case memory with what held |
-| **Ledger** | The simulated live systems as a spreadsheet; outages and outside events to test resilience |
+| **Ledger** | Every payment as a spreadsheet, labelled Demo bank, Razorpay test or Imported. Connect Razorpay's free test mode for real gateway payments and refunds, feed your own customers and payments from a CSV, switch the demo bank off; outages and outside events to test resilience |
 | **Benchmark** | Simulated customers, pass^k over paraphrases, experiment history |
 | **Trail** | Hash-chained audit log with verification and a tamper test |
 | **Settings** | Server address (for the phone and desktop builds), integrations, MCP config, evidence parsing, crash-and-restart |
@@ -133,6 +133,22 @@ is real: tasks are cards on the office board, cases appear in Cases, and the des
 Three example flows come with it: a morning audit check, a duplicate-charge drill and a model-health run.
 
 ![A flow waiting for a person's OK](docs/screenshots/flows-builder.png)
+
+### Real payments and your own data
+
+The demo bank is there for the scripted scenes, and it is labelled. Two ways to work on real payments,
+both free:
+
+- **Razorpay test mode.** Paste a free test key (no KYC, no card) in Ledger → Real UPI payments, make a
+  test payment link and pay it with `success@razorpay`. Nirnaya pulls the payment with Razorpay's API,
+  takes its changes by signed webhook, reads it live before every decision, and refunds it on Razorpay
+  only after a person approves. A refund is never above what is still refundable and never made twice.
+  Live keys are refused.
+- **Feed your own data.** Ledger → Feed your own data: download the template, Preview, Import. Every row
+  is checked (UTR, UPI ID, Indian mobile, amount within the UPI limit, dates, duplicates, spreadsheet
+  formulas, hidden instructions), and an import can be removed in one click.
+
+What is real, what is not, why, and the answers to the questions judges ask: [docs/upi.md](docs/upi.md).
 
 ### Working as a team
 

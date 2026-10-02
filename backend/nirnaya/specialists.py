@@ -94,12 +94,26 @@ def plan(policy: Policy, rails: Rails, intent: str, customer_id: str, match: dic
     upi, debit, refund = evidence.get("upi", {}), evidence.get("debit", {}), evidence.get("refund", {})
     amount = t["amount"]
     facts += [f"Transaction {tid} of {rs(amount)} to {t['merchant']} on {_date(t['created_at'])}",
-              f"UTR {t['utr']}"]
+              f"UTR {t['utr']}" if t["utr"] else "No UTR from the bank yet"]
     agree = 1.0 if upi and debit else 0.5
+    pg = evidence.get("pg")
+    if t.get("source") == "razorpay_test":
+        if pg:
+            facts.append(f"Razorpay (test mode) has {tid} as {pg.get('status')}"
+                         + (f" by {pg['method'].upper()}" if pg.get("method") else "")
+                         + (f", RRN {pg['rrn']}" if pg.get("rrn") else "")
+                         + (f"; {rs(pg['amount_refunded'])} already refunded" if pg.get("amount_refunded") else ""))
+        else:
+            facts.append("Razorpay could not be checked just now, so nothing moves without a person")
+            agree = 0.5
 
     if intent == "failed_debit":
         facts.append(f"UPI switch status: {upi.get('npci_status', 'unknown')}; account debit: {debit.get('debit_status', 'unknown')}")
-        if upi.get("npci_status") == "SUCCESS":
+        if debit.get("debit_status") == "NOT_DEBITED":
+            why = (pg or {}).get("error_description")
+            facts.append("The payment failed before any money was taken" + (f" ({why})" if why else ""))
+            act("share_status", reason="failed without a debit", agree=agree, key="not_debited")
+        elif upi.get("npci_status") == "SUCCESS":
             facts.append(f"The payment succeeded and {t['merchant']} was credited")
             act("share_status", reason="payment actually succeeded", agree=agree, key="succeeded")
         elif t["reversal"]["status"] == "REVERSED":

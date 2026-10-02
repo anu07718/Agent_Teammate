@@ -54,6 +54,7 @@ class Gateway:
     bus: EventBus
     policy: Policy
     tools: dict[str, Tool] = field(default_factory=dict)
+    pg: Any = None            # the payment gateway in test mode (pg.py), for payments that came from it
 
     def __post_init__(self):
         r = self.rails
@@ -85,6 +86,16 @@ class Gateway:
             return {"customer_id": customer_id, "prior_disputes": c["prior_disputes"], "segment": c["segment"],
                     "txn_count": len(r.txns_for(customer_id))}
 
+        def pg_payment(txn_id):
+            t = need(txn_id)
+            if t.get("source") != "razorpay_test" or not self.pg:
+                raise GatewayError(f"{txn_id} is not a gateway payment")
+            self.pg.refresh(txn_id)            # the live payment, not our copy of it
+            t = need(txn_id)
+            return {"txn_id": txn_id, **{k: (t.get("pg") or {}).get(k) for k in
+                    ("id", "status", "method", "rrn", "amount_refunded", "refund_status", "error_code", "error_description")},
+                    "amount": t["amount"]}
+
         reads = [
             Tool("upi.status", "UPI switch", "Final status of a UPI payment at the switch", "read", _obj(TXN, ["txn_id"]),
                  upi_status),
@@ -94,6 +105,8 @@ class Gateway:
                  refund_status),
             Tool("crm.profile", "CRM", "Customer history relevant to risk", "read",
                  _obj({"customer_id": {"type": "string"}}, ["customer_id"]), profile),
+            Tool("pg.payment", "Razorpay (test)", "The live payment on Razorpay, in test mode", "read",
+                 _obj(TXN, ["txn_id"]), pg_payment),
         ]
         writes = [
             Tool("bank.reverse", "Core banking", "Reverse a failed debit back to the account", "write",
@@ -106,6 +119,8 @@ class Gateway:
                  _obj(TXN, ["txn_id"]), None),
             Tool("instrument.block", "Card & UPI control", "Block a card or UPI ID", "write",
                  _obj({"customer_id": {"type": "string"}}, ["customer_id"]), None),
+            Tool("pg.refund", "Razorpay (test)", "Refund a Razorpay payment (test mode; cannot be undone)", "write",
+                 _obj({**TXN, "amount": {"type": "number"}}, ["txn_id", "amount"]), None, moves_money=True),
             Tool("notify.send", "Messaging", "Send the reply on the customer's channel", "write",
                  _obj({"customer_id": {"type": "string"}, "text": {"type": "string"}}, ["customer_id", "text"]),
                  None),
@@ -161,6 +176,14 @@ class Gateway:
 
     def execute_sealed(self, *, case_id: str, customer_id: str, txn_id: str, actions: list[dict], seal: str,
                        recheck: dict, agent: str = "commit") -> dict:
+        t0 = self.rails.txn(txn_id)
+        if t0 and t0.get("source") == "razorpay_test" and self.pg:
+            try:   # the payment as Razorpay has it now: if it moved since the seal, the seal no longer matches
+                self.pg.refresh(txn_id)
+            except Exception as e:
+                self.bus.publish("tool.called", tool="pg.payment", system="Razorpay (test)", agent=agent,
+                                 case_id=case_id, ok=False, error=str(e))
+                return {"ok": False, "reason": f"Razorpay could not be checked: {e}", "receipts": []}
         check = seal_mod.verify(seal, {"actions": actions}, recheck, self.rails.version_of(txn_id),
                                 self.policy.policy_hash())
         if not check["ok"]:
@@ -184,9 +207,14 @@ class Gateway:
         if at.moves_money and amount > at.policy_cap:
             return {"ok": False, "action": a["type"], "error": f"₹{amount:,.0f} is above the policy cap"}
         r = self.rails
+        external = bool(tid) and (r.txn(tid) or {}).get("source") == "razorpay_test"
 
         def run():
             kind = a["type"]
+            if external and kind in ("refund_duplicate", "reverse_failed_debit"):
+                if not self.pg:
+                    raise GatewayError("the payment gateway is not set up")
+                return self.pg.refund_for(tid, amount, idem, case_id), None   # a gateway refund has no undo
             if kind == "reverse_failed_debit":
                 res = r.reverse(tid, amount)
                 return res, {"tool": "bank.reverse.undo", "txn_id": tid}
@@ -207,12 +235,14 @@ class Gateway:
         tool = {"reverse_failed_debit": "bank.reverse", "refund_duplicate": "bank.refund",
                 "tat_compensation": "wallet.credit", "chargeback_credit": "wallet.credit",
                 "raise_dispute": "dispute.raise", "block_instrument": "instrument.block"}[a["type"]]
+        if external and a["type"] in ("refund_duplicate", "reverse_failed_debit"):
+            tool = "pg.refund"
         try:
             res, undo = self._guarded(tool, run, agent=agent, case_id=case_id)
         except GatewayError as e:
             return {"ok": False, "action": a["type"], "error": str(e)}
         receipt = {"ok": True, "action": a["type"], "tool": tool, "amount": amount, "result": res,
-                   "undo": undo if at.reversible else None, "idempotency_key": idem}
+                   "undo": undo if at.reversible and undo else None, "idempotency_key": idem}
         self.store.idem_put(idem, tool, receipt)
         return receipt
 

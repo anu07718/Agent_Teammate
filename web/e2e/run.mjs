@@ -237,7 +237,7 @@ await step("the other workspace views render (brain, ledger), and Office goes ba
   await go("Brain");
   await page.getByText("Context graph").waitFor();
   await go("Ledger");
-  await page.getByText("Live systems (simulated)").waitFor();
+  await page.getByRole("heading", { name: "Ledger", exact: true }).waitFor();
   await page.waitForTimeout(2500);
   await go("Office");
   await page.getByTestId("office").waitFor();

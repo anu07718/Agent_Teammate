@@ -35,9 +35,10 @@ class Graph:
             acct = f"account:{tokenise(c['account'])}"
             self.node(acct, "account", tokenise(c["account"]))
             self.edge(cid, acct, "owns")
-            vpa = f"vpa:{tokenise(c['vpa'])}"
-            self.node(vpa, "vpa", tokenise(c["vpa"]))
-            self.edge(cid, vpa, "owns")
+            if c.get("vpa"):
+                vpa = f"vpa:{tokenise(c['vpa'])}"
+                self.node(vpa, "vpa", tokenise(c["vpa"]))
+                self.edge(cid, vpa, "owns")
             for t in rails.txns_for(c["id"]):
                 tid = f"txn:{t['id']}"
                 self.node(tid, "txn", f"{t['id']} · ₹{t['amount']:,.0f}", amount=t["amount"], utr=t["utr"],
@@ -47,6 +48,15 @@ class Graph:
                 mid = f"merchant:{tokenise(merchant) if '@' in merchant else merchant}"
                 self.node(mid, "merchant", tokenise(merchant) if "@" in merchant else merchant)
                 self.edge(tid, mid, "to")
+
+    def rebuild(self, rails: Rails, tokenise) -> None:
+        """After data is imported or removed: the customers and payments as they are now. Cases and
+        memories stay, and keep their links to whatever still exists."""
+        kinds = ("customer", "account", "vpa", "txn", "merchant")
+        self.store.execute(f"DELETE FROM graph_nodes WHERE kind IN ({','.join('?' * len(kinds))})", kinds)
+        self.build_from(rails, tokenise)
+        self.store.execute("DELETE FROM graph_edges WHERE src NOT IN (SELECT id FROM graph_nodes) "
+                           "OR dst NOT IN (SELECT id FROM graph_nodes)", ())
 
     def link_case(self, case_id: str, intent: str, txn_id: str | None, customer_id: str) -> None:
         self.node(f"case:{case_id}", "case", case_id, intent=intent)
