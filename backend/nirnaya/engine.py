@@ -59,7 +59,8 @@ class Engine:
         self.graph = Graph(self.store)
         self.graph.build_from(self.rails, lambda v: self.tok.tokenise(v)[0])
         self.roster = Roster()
-        self.llm = llm if llm is not None else LLM()
+        self.llm = llm if llm is not None else LLM(self.store)
+        self.llm.bind(self.store)
         if calibrator is not None:
             self.calibrator = calibrator
         else:

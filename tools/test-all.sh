@@ -9,7 +9,8 @@
 #   QUICK=1 ...                          skip the two slow ones (fields-office ~25 min, audit ~15 min)
 #
 # Also runs the backend tests, the typecheck and the build (website only). Starts a real SMTP/IMAP server
-# for the email checks (GreenMail, `make mail-server`, needs Java) when none is running. Writes
+# for the email checks (GreenMail, `make mail-server`, needs Java) and Google's Firebase database emulator
+# for the shared-workspace checks (`make relay-emulator`, needs Java) when they are not running. Writes
 # test-results/<target>/report.md; screenshots of failures go next to it. Exit code 1 if anything failed.
 set -uo pipefail
 
@@ -20,7 +21,7 @@ PORT="${PORT:-8000}"
 KPORT=$((PORT + 1))
 PY="${PY:-python3}"
 WINE="${WINE:-$(command -v /opt/wine-stable/bin/wine wine 2>/dev/null | head -1)}"
-ALL="run workflow fields-office fields-workspace fields-flows flows team phone-client channels audit"
+ALL="run workflow fields-office fields-workspace fields-flows flows team phone-client channels workspace audit"
 SUITES="${SUITES:-$ALL}"
 [ "${QUICK:-0}" = "1" ] && SUITES="$(echo " $SUITES " | sed 's/ fields-office / /; s/ audit / /')"
 mkdir -p "$OUT/data" "$OUT/shots"
@@ -42,6 +43,8 @@ stop_servers() {
 }
 
 needs_key() { case "$1" in channels|phone-client) return 0 ;; esac; return 1; } # the lock-screen checks
+needs_second() { [ "$1" = workspace ]; }  # a second server, for a member who has one (as the Windows app does)
+second_key() { needs_key "$1" && echo e2e-key; }
 
 start_servers() { # name
   stop_servers
@@ -52,8 +55,8 @@ start_servers() { # name
       local web="$ROOT/web/dist"; [ "$TARGET" = apk ] && web="$APKWWW"
       (cd "$ROOT/backend" && exec "$PY" -m nirnaya --port "$PORT" --db "$db.db" --web "$web" --reset) >> "$OUT/server-$1.log" 2>&1 &
       SRV=$!
-      if needs_key "$1"; then
-        (cd "$ROOT/backend" && NIRNAYA_ACCESS_KEY=e2e-key exec "$PY" -m nirnaya --port "$KPORT" --db "$db-keyed.db" --web "$web" --reset) >> "$OUT/server-$1.log" 2>&1 &
+      if needs_key "$1" || needs_second "$1"; then
+        (cd "$ROOT/backend" && NIRNAYA_ACCESS_KEY="$(second_key "$1")" exec "$PY" -m nirnaya --port "$KPORT" --db "$db-keyed.db" --web "$web" --reset) >> "$OUT/server-$1.log" 2>&1 &
         KSRV=$!
       fi ;;
     exe)
@@ -61,8 +64,8 @@ start_servers() { # name
       (cd "$app" && WINEDEBUG=-all WINEPREFIX="${WINEPREFIX:-$ROOT/exe/.cache/wine}" exec "$WINE" python/python.exe -m nirnaya \
         --port "$PORT" --db "C:\\nirnaya-tests\\$1.db" --web web --reset) >> "$OUT/server-$1.log" 2>&1 &
       SRV=$!
-      if needs_key "$1"; then
-        (cd "$app" && NIRNAYA_ACCESS_KEY=e2e-key WINEDEBUG=-all WINEPREFIX="${WINEPREFIX:-$ROOT/exe/.cache/wine}" exec "$WINE" python/python.exe -m nirnaya \
+      if needs_key "$1" || needs_second "$1"; then
+        (cd "$app" && NIRNAYA_ACCESS_KEY="$(second_key "$1")" WINEDEBUG=-all WINEPREFIX="${WINEPREFIX:-$ROOT/exe/.cache/wine}" exec "$WINE" python/python.exe -m nirnaya \
           --port "$KPORT" --db "C:\\nirnaya-tests\\$1-keyed.db" --web web --reset) >> "$OUT/server-$1.log" 2>&1 &
         KSRV=$!
       fi ;;
@@ -79,7 +82,11 @@ record() { # name, checks, result, seconds, notes
   [ "$3" = "pass" ] || failed=1
 }
 
-cleanup() { stop_servers; [ -n "$MAILPID" ] && { kill "$MAILPID" 2>/dev/null; pkill -f "greenmail-standalone-.*\.jar" 2>/dev/null; }; }
+cleanup() {
+  stop_servers
+  [ -n "$MAILPID" ] && { kill "$MAILPID" 2>/dev/null; pkill -f "greenmail-standalone-.*\.jar" 2>/dev/null; }
+  [ -n "${RELAYPID:-}" ] && { kill "$RELAYPID" 2>/dev/null; pkill -f "firebase-database-emulator-.*\.jar" 2>/dev/null; }
+}
 trap cleanup EXIT
 
 # ── what to test ────────────────────────────────────────────────────────────
@@ -114,6 +121,16 @@ if ! port_open 3025 || ! port_open 3143; then
 fi
 port_open 3025 && port_open 3143 && echo "mail server on :3025 / :3143" || echo "no mail server: the email checks will fail (install Java 17+)"
 
+# ── the relay database's emulator for shared workspaces ─────────────────────
+RELAYPID=""
+if ! port_open 9000 && command -v java >/dev/null; then
+  say "relay database (Firebase emulator)"
+  (cd "$ROOT" && exec make -s relay-emulator) >> "$OUT/relay-emulator.log" 2>&1 &
+  RELAYPID=$!
+  for _ in $(seq 1 60); do grep -q "rules loaded" "$OUT/relay-emulator.log" 2>/dev/null && break; sleep 1; done
+fi
+port_open 9000 && echo "relay database on :9000" || echo "no relay database: the shared-workspace checks will fail (install Java 17+)"
+
 # ── backend, typecheck, build ───────────────────────────────────────────────
 if [ "$TARGET" = web ]; then
   say "backend tests"
@@ -137,6 +154,7 @@ for s in $SUITES; do
   if ! start_servers "$s"; then record "$s" 0 fail 0 "the server did not start"; continue; fi
   env=(NIRNAYA_URL="http://127.0.0.1:$PORT" SHOTS="$OUT/shots/$s")
   needs_key "$s" && env+=(KEYED_URL="http://127.0.0.1:$KPORT")
+  needs_second "$s" && env+=(SECOND_URL="http://127.0.0.1:$KPORT")
   [ "$TARGET" = apk ] && env+=(APP_DIST="$APKWWW")
   if [ "$s" = audit ]; then
     out="$(cd "$ROOT/web" && env "${env[@]}" timeout 3600 node e2e/audit.mjs 2>&1)"; code=$?

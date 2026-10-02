@@ -93,8 +93,7 @@ async def run(main_engine, k: int = 3, label: str = "") -> dict:
     from .engine import Engine
     from .llm import LLM
 
-    llm = LLM()
-    llm.client = None  # the benchmark is deterministic: rules only
+    llm = LLM(off=True)  # the benchmark is deterministic: rules only
     sandbox = Engine(Store(":memory:"), step_delay=0, llm=llm, calibrator=main_engine.calibrator)
     for aid, a in main_engine.policy.actions.items():
         sandbox.policy.actions[aid].alpha, sandbox.policy.actions[aid].rung = a.alpha, a.rung

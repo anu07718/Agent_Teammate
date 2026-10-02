@@ -153,7 +153,7 @@ def _agent_name(e, aid: str) -> str:
 
 
 async def answer(e, agent_id: str, question: str) -> dict:
-    """An agent answers in its role, grounded in what it actually did (Claude when configured, rules otherwise)."""
+    """An agent answers in its role, grounded in what it actually did (a free language model when one is set up, rules otherwise)."""
     a = e.roster.agents[agent_id]
     recent = [ev for ev in e.bus.recent(400) if ev.get("agent") == agent_id or agent_id in (ev.get("agents") or [])][-25:]
     lines = [f"{time.strftime('%H:%M:%S', time.localtime(ev['ts']))} {ev['kind']} "
@@ -198,7 +198,7 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
         return {"pods": DEPARTMENTS, "connectors": connectors(e), "kpis": kpis(e), "ops": O().all()[-150:],
                 "routines": R().public(), "kinds": {k: {"dept": v["dept"], "agent": v["agent"], "title": v["title"],
                                                         "routine": v["routine"], "help": v["help"]} for k, v in KINDS.items()},
-                "llm": {"enabled": e.llm.enabled}, "now": time.time(), "flow_waits": F().waiting() if F else []}
+                "llm": e.llm.summary(), "now": time.time(), "flow_waits": F().waiting() if F else []}
 
     @app.get("/api/office/interpret")
     def interpret(dept: str, text: str = ""):

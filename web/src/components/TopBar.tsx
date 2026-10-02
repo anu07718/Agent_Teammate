@@ -5,10 +5,11 @@ import { CONN_ICON } from "../office/bits";
 import { setTheme, useUI, EMPTY } from "../store";
 import { cx } from "./ui";
 
-export function Clock() {
+/** the time, ticking; a steady width, so the bar never shifts by a pixel each second */
+export function Clock({ className }: { className?: string }) {
   const [t, setT] = useState(() => new Date());
   useEffect(() => { const h = setInterval(() => setT(new Date()), 1000); return () => clearInterval(h); }, []);
-  return <span className="o-clock">{t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }).toLowerCase()}</span>;
+  return <span className={cx("o-clock", className)}>{t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }).toLowerCase()}</span>;
 }
 
 /** light (paper) or dark (near-black), for the office and the workspace alike; D in the office too */
@@ -49,5 +50,25 @@ export function ConnTiles({ className }: { className?: string }) {
         );
       })}
     </div>
+  );
+}
+
+export interface LlmSummary { enabled: boolean; provider?: string | null; label?: string | null; short?: string | null; model?: string | null; error?: string | null }
+
+/** which free language model the agents reason with, or that they run on rules alone */
+export function ReasonsWith({ llm, className, tileClass }: { llm?: LlmSummary | null; className?: string; tileClass?: string }) {
+  const on = !!llm?.enabled;
+  const title = on ? `${llm?.label}${llm?.model ? ` · ${llm.model}` : ""}: refines understanding and drafts replies (free tier). Change it in Settings.`
+    : "Rules only. Add a free model (Groq, Gemini, OpenRouter, Mistral or Ollama) in Settings.";
+  const I = CONN_ICON.model.icon;
+  return (
+    <>
+      <span className={cx("o-lab o-caps", className)} title={title} data-testid="reasons-with">
+        <span className="o-dot" style={{ background: on ? "var(--o-green)" : "var(--o-faint)" }} />{on ? `REASONS WITH ${(llm?.short ?? "").toUpperCase()}` : "RULES ONLY"}
+      </span>
+      <span className={cx("o-tile", tileClass)} title={title} style={{ opacity: on ? 1 : 0.45 }}>
+        <I color={CONN_ICON.model.color} strokeWidth={2.2} />
+      </span>
+    </>
   );
 }

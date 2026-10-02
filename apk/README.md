@@ -7,7 +7,17 @@ server you host.
 **Install:** copy `dist/Nirnaya-0.1.0.apk` to the phone and open it. Allow "install unknown apps" for
 the app you opened it from. It needs Android 7.0 or newer.
 
-## Connect it to a server
+## Join a workspace with a code (anywhere, no server needed)
+
+The easiest way: someone runs Nirnaya (the Windows app, or `make run`) and presses **person+ → Create a
+workspace**. On the phone, press **JOIN WITH A CODE**, type the code and press **JOIN**. The phone is then in
+their office, over the internet, through the free shared-workspace database
+([free.md](../free.md#shared-workspaces-the-person-button)); it does not need to be on the same Wi-Fi, and
+the Windows app's own server works for this even though it only listens on its own computer. Build the
+APK with `VITE_NIRNAYA_RELAY` set ([web/.env.example](../web/.env.example)) so the database address is
+built in; otherwise the phone asks for it once.
+
+## Or connect it to a server on your Wi-Fi
 
 The phone does not run the server itself. FastAPI needs pydantic-core, which has no Android build, so the
 server cannot be packed into the APK. Run the server where the cases live instead:

@@ -41,7 +41,7 @@
   background: #fff; border: 1px solid var(--o-line); box-shadow: 0 1px 2px rgba(23, 22, 20, 0.06);
   transition: transform 0.2s var(--o-ease), opacity 0.3s; flex: none;
 }
-.dark .o-tile { background: #f3f2ec; }
+html.dark .o-tile { background: #f3f2ec; }
 .o-tile svg { width: 15px; height: 15px; }
 .o-tile.off { opacity: 0.35; filter: grayscale(1); }
 .o-tile.hot { animation: o-pulse 0.9s var(--o-ease); }
@@ -59,7 +59,7 @@
 .o-btn:hover { border-color: var(--o-ink); }
 .o-btn.dark { background: var(--o-ink); color: var(--o-bg); border-color: var(--o-ink); }
 .o-btn.amber { border-color: var(--o-amber); color: var(--o-amber); background: var(--o-amber-bg); }
-.o-clock { font-family: var(--o-serif); font-size: 22px; white-space: nowrap; min-width: 118px; text-align: right; }
+.o-clock { font-family: var(--o-serif); font-size: 22px; white-space: nowrap; min-width: 118px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
 
 /* ── department cards, pills, the Brain tag ── */
 .o-card {
@@ -389,5 +389,5 @@ select.o-mini { appearance: auto; padding-right: 2px; max-width: 92px; }
 /* narrower desktops: the top bar keeps every tile; buttons go icon-only, then the clock and the model tile */
 @media (max-width: 1720px) { .o-top .o-lab.o-runs { display: none; } .o-top { gap: 13px; } }
 @media (max-width: 1560px) { .o-top .o-btn .lbl { display: none; } .o-top .o-btn { padding: 0 11px; } }
-@media (max-width: 1440px) { .o-top .o-runs { display: none; } .o-clock { min-width: 0; font-size: 19px; } .o-top { gap: 12px; } }
+@media (max-width: 1440px) { .o-top .o-runs { display: none; } .o-clock { min-width: 96px; font-size: 19px; } .o-top { gap: 12px; } }
 @media (max-width: 1260px) { .o-top .o-gauge { display: none; } }

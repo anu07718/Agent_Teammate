@@ -1,0 +1,22 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "w": {
+      "$code": {
+        ".read": "$code.matches(/^[A-Z0-9]{10}$/)",
+        ".write": "$code.matches(/^[A-Z0-9]{10}$/) && (data.child('host').exists() || newData.child('host').exists())",
+        "host": { ".validate": "newData.hasChildren(['name', 'ts'])" },
+        "req": {
+          "$rid": {
+            ".validate": "$rid.length <= 40 && newData.hasChildren(['c', 'm', 'p']) && newData.child('p').isString() && newData.child('p').val().beginsWith('/api/') && newData.child('p').val().length < 2000"
+          }
+        },
+        "res": { "$member": { "$rid": { ".validate": "newData.hasChild('s')" } } },
+        "ev": { "$slot": { ".validate": "newData.hasChild('n')" } },
+        "members": { "$member": { ".validate": "newData.hasChildren(['name', 'ts'])" } },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

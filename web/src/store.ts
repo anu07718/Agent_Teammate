@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { api } from "./api";
+import { joined, relayEvents, relayPresence } from "./relay";
 import { me, streamParams, type Person } from "./team";
 import type { Agent, AppState, CaseSummary, NEvent } from "./types";
 
@@ -26,6 +27,8 @@ export interface UIState {
   needKey: boolean;
   /** on a phone, Cases shows the open case (true) or the list (false) */
   caseOnPhone: boolean;
+  /** in someone else's workspace: why their server is not answering ("offline", "closed"…), if it is not */
+  hostState: string | null;
 }
 
 // light (paper) unless chosen otherwise; one theme for the office and the workspace (the office kept its own
@@ -42,7 +45,7 @@ const initialTheme = (() => {
 let state: UIState = {
   app: null, connected: false, error: null, events: [], view: "office", openCases: [], activeCase: null,
   selectedAgent: null, pulses: {}, toasts: [], theme: initialTheme, logOpen: false, version: 0, people: [], needKey: false,
-  caseOnPhone: false,
+  caseOnPhone: false, hostState: null,
 };
 const listeners = new Set<() => void>();
 
@@ -177,9 +180,22 @@ function softRefresh() {
 let es: EventSource | null = null;
 let retry: ReturnType<typeof setTimeout> | null = null;
 
+let stopRelay: (() => void) | null = null;
+
 export function connect(url: string) {
   es?.close();
+  stopRelay?.();
+  stopRelay = null;
   if (retry) clearTimeout(retry);
+  if (joined()) { // someone else's workspace: their events come through the relay
+    stopRelay = relayEvents(onEvent, (connected, why) => {
+      const was = state.connected;
+      setState({ connected, hostState: why ?? null });
+      if (connected && !was) void refresh();
+    });
+    relayPresence({ view: state.view });
+    return;
+  }
   es = new EventSource(`${url}${url.includes("?") ? "&" : "?"}${streamParams(state.view)}`);
   es.onopen = () => {
     setState({ connected: true });

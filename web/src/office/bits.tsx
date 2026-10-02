@@ -36,5 +36,5 @@ export const CONN_ICON: Record<string, { icon: any; color: string }> = {
   disputes: { icon: Scale, color: "#a16207" },
   controls: { icon: ShieldBan, color: "#be123c" },
   messaging: { icon: MessageSquareText, color: "#15803d" },
-  claude: { icon: Sparkles, color: "#c96442" },
+  model: { icon: Sparkles, color: "#7b5bd6" },
 };

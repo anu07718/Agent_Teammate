@@ -3,7 +3,7 @@ Nirnaya for Windows bundles these programs. Each keeps its own licence.
 Neutralinojs 6.9.0 (the window)            MIT License, https://github.com/neutralinojs/neutralinojs
 Python 3.12 embeddable package             Python Software Foundation License, see python\LICENSE.txt
 Python packages in python\Lib\site-packages  each package's licence is in its *.dist-info folder
-  (FastAPI, Starlette, Uvicorn, Pydantic, NumPy, openpyxl, python-multipart, pypdf, anthropic and
+  (FastAPI, Starlette, Uvicorn, Pydantic, NumPy, openpyxl, python-multipart, pypdf and
   their dependencies)
 Microsoft Edge WebView2 Runtime bootstrapper  run by the installer only when WebView2 is missing;
   Microsoft Software License Terms, https://developer.microsoft.com/microsoft-edge/webview2/

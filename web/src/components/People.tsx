@@ -18,8 +18,9 @@ export function People({ max = 5, size = 24, className = "" }: { max?: number; s
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(me().name);
   const box = useRef<HTMLDivElement>(null);
-  const mine = people.find((p) => p.client === me().client);
-  const others = people.filter((p) => p.client !== me().client);
+  const isMe = (p: Person) => p.client === me().client || p.client === `r-${me().client}`; // r-: you, in someone's shared workspace
+  const mine = people.find(isMe);
+  const others = people.filter((p) => !isMe(p));
   useEffect(() => {
     if (!editing) return;
     const off = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setEditing(false); };

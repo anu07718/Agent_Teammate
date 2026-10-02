@@ -10,12 +10,12 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Body, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, benchmark, channels, docparse, flows, office, reports
+from . import __version__, benchmark, channels, docparse, flows, office, relay, reports
 from .agents import DEPARTMENTS
 from .engine import Engine
 from .policy import GRAPH_HASH, SUPERSTEPS
@@ -66,6 +66,12 @@ class RailEvent(BaseModel):
     event: str
 
 
+class WorkspaceIn(BaseModel):
+    url: str | None = None
+    name: str | None = Field(default=None, max_length=80)
+    by: str | None = None
+
+
 class Ask(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
 
@@ -101,10 +107,15 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
         state["channels"] = channels.Channels(lambda: state["engine"], lambda: state["flows"])
         state["channels"].hook(eng.bus)
         await state["channels"].start(background)
+        state["relay"] = relay.Relay(app, lambda: state["engine"].store, lambda: state["engine"].bus,
+                                     lambda: state["team"], lambda: os.environ.get("NIRNAYA_ACCESS_KEY", ""))
+        state["relay"].hook(eng.bus)
         if background:
             await eng.recover()
             state["routines"].start()
+            await state["relay"].resume()
         yield
+        await state["relay"].shutdown()
         state["channels"].stop()
         state["routines"].stop()
         for t in list(eng.tasks.values()):
@@ -170,11 +181,55 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
     @app.get("/api/integrations")
     def integrations():
         e = E()
-        return {"llm": {"enabled": e.llm.enabled, "model": os.environ.get("NIRNAYA_MODEL", "claude-opus-5-5"),
-                        "error": e.llm.error},
+        return {"llm": e.llm.summary(),
                 "monitoring": {"enabled": monitoring, "provider": "Sentry SDK"},
                 "documents": docparse.available(), "officecli": reports.officecli_available(),
                 "mcp": {"endpoint": "/mcp", "tools": len(MCP_TOOLS)}}
+
+    # ── shared workspaces: others join with a code, through a free Firebase relay (relay.py) ──
+    @app.get("/api/workspace")
+    def workspace():
+        return state["relay"].status()
+
+    @app.post("/api/workspace/create")
+    async def workspace_create(body: WorkspaceIn):
+        """Host a workspace (or make a new code for it, which shuts out everyone who had the old one)."""
+        try:
+            return await state["relay"].create(body.url, body.name, clean_name(body.by, "My"))
+        except (ValueError, relay.RelayError) as ex:
+            raise HTTPException(400, str(ex))
+
+    @app.post("/api/workspace/stop")
+    async def workspace_stop():
+        return await state["relay"].stop()
+
+    @app.post("/api/workspace/check")
+    def workspace_check(body: WorkspaceIn):
+        """Is this database set up right (address and rules)? Writes and removes a test entry."""
+        try:
+            return relay.probe(body.url or "")
+        except (ValueError, relay.RelayError) as ex:
+            raise HTTPException(400, str(ex))
+
+    # ── the language model: free providers only, tried in order (llm.py) ────
+    @app.get("/api/llm")
+    def llm_get():
+        return E().llm.describe()
+
+    @app.put("/api/llm")
+    def llm_put(body: dict = Body(...)):
+        try:
+            E().llm.update(body)
+        except ValueError as ex:
+            raise HTTPException(400, str(ex))
+        return E().llm.describe()
+
+    @app.post("/api/llm/test/{provider}")
+    def llm_test(provider: str):
+        try:
+            return E().llm.test(provider)
+        except ValueError as ex:
+            raise HTTPException(404, str(ex))
 
     @app.get("/api/events")
     async def events(request: Request, who: str | None = None, client: str | None = None, view: str | None = None):

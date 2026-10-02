@@ -1,3 +1,5 @@
+import { nativeFetch } from "./net";
+import { joined, relayFetch } from "./relay";
 import { by } from "./team";
 import type { AppState, CaseDetail } from "./types";
 
@@ -39,11 +41,12 @@ export function withKey(url: string): string {
   const k = accessKey();
   return k ? `${url}${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(k)}` : url;
 }
-// every fetch to the API carries the key: one wrapper instead of a header at every call site
-const nativeFetch = window.fetch.bind(window);
+// every fetch to the API carries the key, and goes to the host while you are in someone's shared workspace:
+// one wrapper instead of a change at every call site
 window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   const k = accessKey();
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (joined() && /\/api\//.test(url)) return relayFetch(input, init);
   if (!k || !/\/api\/|\/mcp$/.test(url)) return nativeFetch(input, init);
   const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
   headers.set("X-Nirnaya-Key", k);
@@ -124,3 +127,22 @@ export const api = {
   previewUrl: (id: string) => withKey(`${apiBase()}/api/cases/${id}/export.html`),
   eventsUrl: () => withKey(`${apiBase()}/api/events`),
 };
+
+/** a link to a file the API makes (the packet, the .xlsx): opened through the host in a shared workspace */
+export function apiLink(url: string, download?: string) {
+  if (!joined()) return { href: url };
+  return {
+    href: url,
+    onClick: async (e: { preventDefault: () => void }) => {
+      e.preventDefault();
+      const win = download ? null : window.open("", "_blank");
+      const r = await fetch(url);
+      const blob = URL.createObjectURL(await r.blob());
+      if (download) {
+        const a = document.createElement("a");
+        a.href = blob; a.download = download; a.click();
+      } else if (win) win.location.href = blob;
+      setTimeout(() => URL.revokeObjectURL(blob), 60_000);
+    },
+  };
+}

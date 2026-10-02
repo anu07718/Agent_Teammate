@@ -17,9 +17,13 @@ Optional env (everything else works offline on the simulated bank):
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude refines understanding and drafts replies |
-| `NIRNAYA_MODEL` | Model id (default `claude-opus-5-5`) |
-| `NIRNAYA_LLM` | `off` or `auto` |
+| `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY` | A free language model refines understanding and drafts replies (or add the keys in Settings); see [free.md](free.md) |
+| `OLLAMA_HOST` | A model on your own computer (default `127.0.0.1:11434`, found by itself when Ollama runs) |
+| `NIRNAYA_LLM_URL`, `NIRNAYA_LLM_KEY`, `NIRNAYA_LLM_MODEL` | Any other OpenAI-compatible server (LM Studio, llamafile, vLLM) |
+| `NIRNAYA_<PROVIDER>_MODEL`, `NIRNAYA_LLM_ORDER` | Pin a model (`NIRNAYA_GROQ_MODEL=…`); the order providers are tried in (`groq,gemini,…`) |
+| `NIRNAYA_LLM` | `off` switches the model off; `auto` (default) uses whatever is set up |
+| `NIRNAYA_RELAY_URL` | The free Firebase database for shared workspaces (or paste it in the person+ dialog) |
+| `VITE_NIRNAYA_RELAY` | The same address, built into the web app, the Windows app and the APK (`web/.env.production`, or Vercel's settings) |
 | `NIRNAYA_DB` | Override SQLite path |
 | `NIRNAYA_STEP_DELAY` | Animation pacing (`0` in tests) |
 | `SENTRY_DSN` / `VITE_SENTRY_DSN` | Error monitoring |
@@ -183,7 +187,7 @@ More detail: [apk/README.md](apk/README.md).
 
 The window starts a bundled server on a free port in **8765–8769** and opens the same office UI. Data lives under `%LOCALAPPDATA%\Nirnaya` (`nirnaya.db`, `nirnaya.log`).
 
-To use Claude: set `ANTHROPIC_API_KEY` in Windows user environment variables, then reopen Nirnaya.
+For a free language model, open **Settings → Language model** and paste a free key (Groq, Gemini, OpenRouter or Mistral), or run Ollama on the same computer. To share your workspace, press **person+** in the top bar ([free.md](free.md)).
 
 ### Build the installer yourself
 

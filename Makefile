@@ -2,7 +2,7 @@
 PY ?= python3
 PORT ?= 8000
 
-.PHONY: install build run dev test test-all test-backend test-web test-mail mail-server e2e e2e-phone e2e-flows e2e-team e2e-workflow e2e-fields e2e-channels audit exe apk icons clean
+.PHONY: install build run dev test test-all test-backend test-web test-mail mail-server relay-emulator e2e e2e-phone e2e-flows e2e-team e2e-workflow e2e-fields e2e-channels e2e-workspace audit exe apk icons clean
 
 install:
 	$(PY) -m pip install -e "backend[dev,llm,docs,monitoring]"
@@ -43,6 +43,18 @@ mail-server:
 	  -Dgreenmail.users=support:secret@nirnaya.test,boss:secret@bank.test -jar $(GREENMAIL)
 
 # email through the real mail server (start `make mail-server` in another terminal first)
+# a local stand-in for the free Firebase Realtime Database that shared workspaces use (needs Java 11+):
+# the same REST and streaming API, with firebase/database.rules.json loaded. Point the app at
+# http://127.0.0.1:9000/?ns=demo-nirnaya (Settings → Shared workspaces, or NIRNAYA_RELAY_URL).
+RTDB ?= $(HOME)/.cache/nirnaya/firebase-database-emulator-v4.11.2.jar
+relay-emulator:
+	@mkdir -p $(dir $(RTDB))
+	@test -f $(RTDB) || curl -fsSL -o $(RTDB) https://storage.googleapis.com/firebase-preview-drop/emulator/firebase-database-emulator-v4.11.2.jar
+	@echo "68e5f0cd7637f72e347519ff6180b1ed4f2f9dcc  $(RTDB)" | sha1sum -c --quiet
+	@(sleep 4; curl -fsS -X PUT "http://127.0.0.1:9000/.settings/rules.json?ns=demo-nirnaya" -H "Authorization: Bearer owner" \
+	  --data-binary @firebase/database.rules.json >/dev/null && echo "rules loaded: http://127.0.0.1:9000/?ns=demo-nirnaya") &
+	java -jar $(RTDB) --host 127.0.0.1 --port 9000
+
 test-mail:
 	cd backend && $(PY) -m pytest -q tests/test_channels.py -k "real_mail_server or email"
 
@@ -73,6 +85,10 @@ e2e-fields:
 # a flow on a WhatsApp message, approve by email, the call page (needs a running server)
 e2e-channels:
 	cd web && node e2e/channels.mjs
+
+# shared workspaces: needs `make relay-emulator` and two servers (SECOND_URL for the second)
+e2e-workspace:
+	cd web && node e2e/workspace.mjs
 
 # a supervisor's walk through every view and button (slow: about ten minutes)
 audit:

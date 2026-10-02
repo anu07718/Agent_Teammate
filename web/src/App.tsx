@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { api, setAccessKey } from "./api";
 import { ChannelsView } from "./channels/ChannelsView";
 import { People } from "./components/People";
-import { Clock, ConnTiles, ThemeToggle } from "./components/TopBar";
+import { Clock, ConnTiles, ReasonsWith, ThemeToggle } from "./components/TopBar";
+import { CollabButton, JoinedPill } from "./components/Collab";
 import { cx } from "./components/ui";
 import { FlowsView } from "./flows/FlowsView";
 import { clock, pct } from "./lib/format";
-import { CONN_ICON } from "./office/bits";
 import { OfficePage } from "./office/OfficePage";
 import { connect, getState, openCase, refresh, setState, useUI, type View, EMPTY } from "./store";
 import { tellView } from "./team";
@@ -157,10 +157,7 @@ export default function App() {
         <ConnTiles className="max-lg:hidden!" />
         <span className="o-sp" />
         {app && <>
-          <span className="o-lab o-caps max-[1400px]:hidden!"><span className="o-dot" style={{ background: app.integrations.llm.enabled ? "var(--o-green)" : "var(--o-faint)" }} />REASONS WITH</span>
-          <span className="o-tile max-[1400px]:hidden!" title={app.integrations.llm.enabled ? "Claude refines understanding and drafts replies" : "Rules only: set ANTHROPIC_API_KEY to add Claude"} style={{ opacity: app.integrations.llm.enabled ? 1 : 0.45 }}>
-            <CONN_ICON.claude.icon color={CONN_ICON.claude.color} strokeWidth={2.2} />
-          </span>
+          <ReasonsWith llm={app.integrations.llm} className="max-[1600px]:hidden!" tileClass="max-[1400px]:hidden!" />
           <span className="o-gauge o-caps max-lg:hidden!" title="today's cases, how many Nirnaya finished on its own, and the cost per case">
             TODAY<b>{casesToday}</b>{casesToday === 1 ? "CASE" : "CASES"}<span className="sep">·</span><b>{pct(app.stats.autonomy)}</b>ALONE
             {app.stats.cost_per_case != null && <><span className="sep max-2xl:hidden!">·</span><b className="max-2xl:hidden!">₹{app.stats.cost_per_case.toFixed(1)}</b><span className="max-2xl:hidden!">PER CASE</span></>}
@@ -176,9 +173,11 @@ export default function App() {
           <button className="o-btn amber o-caps max-sm:hidden!" onClick={() => setState({ view: "approvals" })} title="waiting for a person: open Approvals" aria-label={`${pending} waiting for you`}>⚠ {pending}</button>
         )}
         <button aria-label="Toggle the live log" title="the live log (`)" onClick={() => setState((s) => ({ logOpen: !s.logOpen }))} className={cx("o-tile o-theme max-sm:hidden!", logOpen && "on")}><Terminal /></button>
+        <JoinedPill className="max-sm:max-w-[130px]" />
+        <CollabButton />
         <ThemeToggle />
         <People size={26} max={4} />
-        <span className="max-xl:hidden!"><Clock /></span>
+        <Clock className="max-xl:hidden!" />
       </header>
       <div className="flex min-h-0 flex-1">
         <nav className="hidden w-14 shrink-0 flex-col items-center gap-1.5 border-r border-line bg-bg py-3 md:flex" aria-label="Views">

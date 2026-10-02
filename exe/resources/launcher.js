@@ -146,7 +146,7 @@ async function start() {
 
 function open(port) {
   say("Opening…");
-  window.location.replace(`http://127.0.0.1:${port}/`);
+  window.location.replace(`http://127.0.0.1:${port}/?app=exe`); // the app notes it runs in the Windows window
 }
 
 $("retry").onclick = () => start();

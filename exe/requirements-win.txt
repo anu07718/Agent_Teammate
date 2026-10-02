@@ -7,7 +7,6 @@ pydantic==2.13.5
 openpyxl==3.1.5
 python-multipart==0.0.32
 pypdf>=5,<7
-anthropic>=0.40,<1
 # markers like `colorama; platform_system == "Windows"` are read for the build machine, so list them here
 colorama==0.4.6
 tzdata

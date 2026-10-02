@@ -25,8 +25,11 @@ Nirnaya.exe (Neutralino window, WebView2)
 - `--exit-with` stops the server when the window closes, even if the window crashes.
 - If the server does not start, the window shows the reason and the end of the log, with **Try again**
   and **Open the log**.
-- To use Claude for understanding and replies, set `ANTHROPIC_API_KEY` in your Windows user environment
-  variables before opening Nirnaya. Everything else works offline.
+- For a free language model, open Settings → Language model and paste a free key (Groq, Gemini,
+  OpenRouter or Mistral), or run Ollama on the same computer. Everything else works offline.
+- **person+** in the top bar shares this computer's agents with a code, or joins someone else's workspace
+  (free Firebase database; [free.md](../free.md)). The window's server only listens on 127.0.0.1, and it
+  still can host: it reaches the database outbound, so nothing has to reach this computer.
 
 ## Folder
 

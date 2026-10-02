@@ -1,6 +1,7 @@
 // Who you are to the rest of the team, and who else is here. Your name travels with everything you do
 // (approvals, tasks, chat, flows), and the event stream tells the server you are online and on which view.
 import { apiBase } from "./api";
+import { joined, relayPresence } from "./relay";
 
 export interface Person { client: string; name: string; color: string; since: number; last: number; view: string; focus: string | null }
 
@@ -49,6 +50,7 @@ export function tellView(view: string, focus: string | null = null) {
 }
 
 async function tell(body: { name?: string; view?: string; focus?: string | null }) {
+  if (joined()) { relayPresence(body); return; } // in someone's shared workspace: tell its host
   try {
     await fetch(apiBase() + "/api/team/me", {
       method: "POST", headers: { "Content-Type": "application/json" },

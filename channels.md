@@ -21,7 +21,7 @@ so start there.
 | Email by API | Resend | Free plan | 3,000 a month, 100 a day |
 | WhatsApp | Meta WhatsApp Cloud API with Meta's test number | The app, the test number and the API are free; replies inside the 24-hour window are free | The test number sends to up to 5 numbers you add. From 1 October 2026 respond.io reports that only the first 1,000 of those replies a month per number are free; check Meta's pricing page |
 | WhatsApp | WAHA Core, self-hosted in Docker | Free (Apache-2.0) | Not an official API: it drives WhatsApp Web, so WhatsApp can ban the number. Use a spare number |
-| Phone calls | Twilio trial | 75 call minutes | Calls only numbers you verify (up to 5), only in the country you signed up in |
+| Phone calls | Twilio trial | 75 call minutes | **A trial, not a free tier**: it ends when the credit is used. Calls only numbers you verify (up to 5), only in the country you signed up in. The call page (`/call`, below) is the free way, for good |
 | Talking in the browser | The call page, `/call` | Free, no phone line | Chrome, Edge or Safari for voice; elsewhere it is a chat |
 | A public address | Cloudflare quick tunnel (`cloudflared`) | Free, no account | The address changes each time you start it |
 | Automation | n8n, self-hosted | Free | Runs on your computer or server |

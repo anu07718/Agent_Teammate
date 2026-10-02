@@ -17,3 +17,7 @@ web/e2e/shots/
 
 # tools/test-all.sh reports
 test-results/
+
+# local build settings (web/.env.example says what goes in them)
+web/.env.local
+web/.env.*.local

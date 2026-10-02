@@ -74,6 +74,25 @@ class Team:
         return sorted(({k: v for k, v in p.items() if k != "conns"} for p in self.people.values()),
                       key=lambda p: p["since"])
 
+    def remote(self, client: str, name: str | None, view: str | None, focus: str | None, via: str) -> None:
+        """Someone who joined the shared workspace with its code (relay.py), from wherever they are."""
+        name = clean_name(name)
+        new = {"name": name, "color": color_for(name), "view": (view or "office")[:40],
+               "focus": (focus or None) and str(focus)[:60], "via": str(via)[:12], "remote": True}
+        p = self.people.get(client)
+        if p and all(p.get(k) == v for k, v in new.items()):
+            p["last"] = time.time()
+            return
+        if p:
+            p.update(new, last=time.time())
+        else:
+            self.people[client] = {"client": client, "since": time.time(), "last": time.time(), "conns": 1, **new}
+        self._publish()
+
+    def remote_gone(self, client: str) -> None:
+        if self.people.pop(client, None):
+            self._publish()
+
     def _publish(self) -> None:
         self.E().bus.publish("presence", people=self.online())
 

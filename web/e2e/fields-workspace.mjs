@@ -370,15 +370,78 @@ await step("Trail: Verify chain says intact; Tamper test catches the edit; a cas
   expect((await page.locator("h2.font-mono").innerText()).includes(C.failed), "the case did not open");
 });
 
+await step("Settings, language model: every free provider's row, the order, a key saved and never shown, Test on a stand-in model, off and on", async () => {
+  // a stand-in OpenAI-compatible server, as LM Studio, llamafile or Ollama would be
+  const { createServer } = await import("node:http");
+  const fake = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", () => {
+      res.setHeader("Content-Type", "application/json");
+      if (req.url.endsWith("/models")) return res.end(JSON.stringify({ data: [{ id: "tiny-local-1b" }, { id: "nomic-embed" }] }));
+      res.end(JSON.stringify({ choices: [{ message: { content: "OK" }, finish_reason: "stop" }] }));
+    });
+  });
+  await new Promise((r) => fake.listen(0, "127.0.0.1", r));
+  try {
+    await go("Settings");
+    const rows = page.locator("[data-provider]");
+    await rows.first().waitFor();
+    const ids = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-provider")));
+    expect(JSON.stringify(ids) === JSON.stringify(["groq", "gemini", "openrouter", "mistral", "ollama", "custom"]), `rows ${ids}`);
+    for (const id of ids) {
+      const r = page.locator(`[data-provider="${id}"]`);
+      for (const name of ["Save", "Test"]) expect(await r.getByRole("button", { name }).count() === 1, `${id}: no ${name}`);
+      expect(await r.getByRole("combobox").count() === 1, `${id}: no model menu`);
+      expect(/free|computer|server/i.test(await r.innerText()), `${id}: no free-tier note`);
+    }
+    // order: move Gemini up, then back
+    await page.getByRole("button", { name: "Move Google Gemini up" }).click();
+    await until(async () => (await api("/api/llm")).providers[0].id === "gemini");
+    await page.getByRole("button", { name: "Move Google Gemini down" }).click();
+    await until(async () => (await api("/api/llm")).providers[0].id === "groq");
+    // a key saves on the server and the page never gets it back
+    const groq = page.locator('[data-provider="groq"]');
+    await groq.getByLabel("Groq key").fill("gsk_e2e_secret_key");
+    await groq.getByRole("button", { name: "Save" }).click();
+    await toast("Groq saved").waitFor();
+    const d = await api("/api/llm");
+    expect(d.providers[0].key_set && !JSON.stringify(d).includes("gsk_e2e_secret_key"), "the key came back");
+    await groq.getByPlaceholder(/saved/).waitFor();
+    await groq.getByText("Remove the saved key").click();
+    await until(async () => !(await api("/api/llm")).providers[0].key_set);
+    // a local server: Test lists its chat models (not the embedding one) and says it works
+    const custom = page.locator('[data-provider="custom"]');
+    await custom.getByLabel("Use Another OpenAI-compatible server").check();
+    await custom.getByLabel("Another OpenAI-compatible server address").fill(`http://127.0.0.1:${fake.address().port}/v1`);
+    await custom.getByRole("button", { name: "Test" }).click();
+    const res = custom.getByTestId("test-custom");
+    await until(async () => /Works: tiny-local-1b answered “OK”/.test(await res.innerText()), 20000);
+    expect(/1 free model/.test(await res.innerText()), await res.innerText());
+    await until(async () => (await api("/api/state")).integrations.llm.enabled);
+    // the top bar names it (its label shows on wide screens, so read the text itself)
+    await until(async () => /REASONS WITH LOCAL/.test(await page.getByTestId("reasons-with").first().textContent()));
+    // the master switch, then tidy up
+    await page.getByLabel("Use a language model").uncheck();
+    await until(async () => !(await api("/api/state")).integrations.llm.enabled);
+    await page.getByLabel("Use a language model").check();
+    await custom.getByLabel("Use Another OpenAI-compatible server").uncheck();
+    await until(async () => !(await api("/api/state")).integrations.llm.enabled);
+  } finally {
+    fake.close();
+  }
+});
+
 await step("Settings: the server address saves and stays live; an evidence file is parsed; restart keeps parked approvals", async () => {
   await go("Settings");
   const box = page.getByRole("textbox", { name: "Server URL" });
+  const saveServer = page.locator("form", { has: box }).getByRole("button", { name: "Save", exact: true });
   await box.fill(URL);
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await saveServer.click();
   await toast("Server updated").waitFor();
   await page.getByText("LIVE").first().waitFor();
   await box.fill("");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await saveServer.click();
   const f = join(tmpdir(), `statement-${Date.now()}.txt`);
   writeFileSync(f, "Bank statement\n30 Sep: UPI debit ₹18,500 to QuickPay Store, UTR 412345678906, not done by me.\nCall me on 9123456789.");
   await page.locator('input[type="file"]').setInputFiles(f);

@@ -13,7 +13,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-llm = ["anthropic>=0.40"]
 monitoring = ["sentry-sdk[fastapi]>=2.0"]
 docs = ["pypdf>=4.0"]
 dev = ["pytest>=8", "httpx>=0.27"]

@@ -20,6 +20,15 @@ a call page in the browser, and take messages from n8n. Escalations are forwarde
 by replying APPROVE. [channels.md](channels.md) sets each one up on free tiers: Gmail, Meta's WhatsApp
 test number or WAHA, a Twilio trial, a Cloudflare tunnel.
 
+**Free tiers only.** The optional language model is a free one: Groq, Google Gemini, OpenRouter's free
+models, Mistral's Experiment plan, or a model on your own computer (Ollama, LM Studio, llamafile), tried
+in order, with the rules carrying on when none answers. Shared workspaces go through a free Firebase
+database. [free.md](free.md) lists every service, its free limits, and how to set it up without a card.
+
+**Work together from anywhere.** The person+ button in the top bar creates a workspace with a code
+(`K7QM2-XRP4T`). Whoever enters the code, on the website, the phone app or the Windows app, sees your
+agents live and works with them. Only you change keys and settings.
+
 ## Run it
 
 ```bash
@@ -30,8 +39,10 @@ make run          # builds the web app, serves everything on http://127.0.0.1:80
 Or with Docker: `docker build -t nirnaya . && docker run -p 8000:8000 -v nirnaya:/data nirnaya`.
 
 Development with hot reload: `make dev` (API on :8000, web on :5173).
-Optional: `ANTHROPIC_API_KEY` to let Claude refine understanding and draft replies (rules run without it),
-`SENTRY_DSN` / `VITE_SENTRY_DSN` for error monitoring. Everything else works offline on a simulated bank.
+Optional: a free language model key (`GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`,
+`MISTRAL_API_KEY`) or Ollama running locally, or set them in **Settings** (the rules run without one);
+`VITE_NIRNAYA_RELAY` for shared workspaces; `SENTRY_DSN` / `VITE_SENTRY_DSN` for error monitoring. Everything
+else works offline on a simulated bank. See [free.md](free.md).
 
 ### On Windows and Android
 
@@ -125,7 +136,14 @@ Three example flows come with it: a morning audit check, a duplicate-charge dril
 
 ### Working as a team
 
-Everyone who opens the same server works in the same office:
+Everyone in the same workspace works in the same office: people on your server, and anyone who joined
+with your code from the website, the phone app or the Windows app.
+- **Share with a code.** The person+ button: **Create a workspace** gives a code, **Join a workspace**
+  takes one. Members see who else is in, which view each is on and from which app; **New code** shuts
+  out the old one, **Stop sharing** ends it. ([free.md](free.md#shared-workspaces-the-person-button))
+
+  ![Work together: a workspace code and who is in](docs/screenshots/work-together.png)
+
 - **Who is here.** Avatars in the top bar show who is online and which view or department they are on; a
   department card shows who is looking at it. Click your own avatar to set your name.
 - **One chat.** What anyone asks an agent, the agent's answer, and every approval, rejection or undo (with
@@ -149,7 +167,7 @@ workflow and policy hashes.
 1. **Intake.** The PII tokeniser swaps phone, card, account, UPI ID, PAN and Aadhaar for format-preserving
    tokens. **Sentry** screens for injection, credential sharing, velocity and outsized amounts in under
    200 ms, with no model on the path.
-2. **Understand.** Intent and details in English and Hinglish; Claude refines them when configured.
+2. **Understand.** Intent and details in English and Hinglish; a free language model refines them when one is set up.
 3. **Evidence.** Parallel read-only calls through the Tool Gateway to the UPI switch, core banking, the
    refund engine and the CRM, plus similar past cases and the context graph.
 4. **Plan.** A specialist (UPI disputes, refunds, risk, accounts) proposes typed actions. A plan cannot
@@ -185,7 +203,7 @@ inside the APK. [workflow.md](workflow.md#13-test-everything-automatically) says
 [docs/test-report.md](docs/test-report.md) is the last full run of all three (everything passed).
 
 ```bash
-make test-backend   # 77 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
+make test-backend   # 95 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
                     # restart durability, checkpoint chaining, tamper detection, drift fail-closed, MCP, HTTP,
                     # office ops, plain-words schedules, routines, the Brain graph, agent chat, the desktop
                     # app's server flags, flows (validation, branches, waiting on cases and people, stale
@@ -193,7 +211,11 @@ make test-backend   # 77 tests: the α ceiling on fresh data, stale approvals re
                     # on actions), the ledger's outside events landing once, drift staying quiet on ordinary
                     # traffic, policy changes made at the same moment, and the channels (signed webhooks
                     # from Meta, WAHA and Twilio, email threads, a phone call turn by turn, the call page,
-                    # n8n, flows on a message, the access key) against stand-in providers
+                    # n8n, flows on a message, the access key) against stand-in providers; the free language
+                    # models (a 429 moves to the next provider, broken JSON from small models, OpenRouter's
+                    # free models only, keys never shown); shared workspaces through Google's Firebase
+                    # emulator with the real rules (host-only actions, new code, restart, open databases refused)
+make relay-emulator # Google's emulator of the Firebase Realtime Database, with firebase/database.rules.json
 make mail-server    # a real SMTP and IMAP server (GreenMail) on :3025 / :3143; then, in another terminal,
 make test-mail      # email through it: threaded replies, robots ignored, forward, APPROVE by email
 make test-web       # typecheck + production build
@@ -216,6 +238,9 @@ make e2e-fields     # every field, menu option and condition, checked on the ser
 make e2e-channels   # Channels in a real browser (22 checks): every field, real email through GreenMail,
                     #   WhatsApp and Twilio stand-ins, n8n, a flow on a WhatsApp message, forward and call
                     #   from a case, APPROVE by email, the call page by voice (mocked) and by typing, the lock
+make e2e-workspace  # shared workspaces (14 checks): create, join from the plain web app and from a second
+                    #   server, live events, approve on the host's agents, files through the host, host-only
+                    #   settings, a new code, leave, stop (needs make relay-emulator and SECOND_URL)
 make audit          # a supervisor's walk: every view and button, dark/light, desktop/phone; errors, failed
                     # requests, clipped text, fonts (writes web/e2e/shots/audit/audit.json)
 ```
@@ -232,10 +257,12 @@ rejection, undo and audit adds a real one.
 
 | Path | Contents |
 |---|---|
-| `backend/nirnaya/` | Engine, API, MCP server (Python, FastAPI); `flows.py` (flows and their runs), `team.py` (presence and the shared chat), `channels/` (email, WhatsApp, calls, the call page, webhooks) |
+| `backend/nirnaya/` | Engine, API, MCP server (Python, FastAPI); `flows.py` (flows and their runs), `team.py` (presence and the shared chat), `channels/` (email, WhatsApp, calls, the call page, webhooks), `llm.py` (the free language models), `relay.py` (shared workspaces) |
 | `backend/tests/` | pytest suite |
 | `web/` | Web app (React, Vite, Tailwind): the 3D office in `web/src/office/` (three.js), the Flows tab in `web/src/flows/`, Channels and the call page in `web/src/channels/`, the workspace views, Univer ledger, Playwright e2e in `web/e2e/` |
 | `channels.md` | Setting up real email, WhatsApp, phone calls and n8n on free tiers |
+| `free.md` | Every service Nirnaya can use and its free tier: the language models, the shared-workspace database, hosting the website |
+| `firebase/` | The rules for the shared-workspace database |
 | `exe/` | The Windows app: Neutralino window, launcher, bundled-Python build, NSIS installer; `exe/dist/` has the installer |
 | `apk/` | The Android app: Capacitor project and build; `apk/dist/` has the APK |
 | `tools/make_icons.py` | Draws the app icons for both from the favicon's mark |

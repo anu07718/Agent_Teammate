@@ -9,6 +9,7 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/instrument-serif/400.css";
 import "./index.css";
+import { joined } from "./relay";
 import { connect, getState, refresh, setTheme } from "./store";
 
 setTheme(getState().theme);
@@ -26,7 +27,9 @@ const callPage = /^\/call\/?$/.test(window.location.pathname);
 if (!callPage) {
   void refresh();
   connect(api.eventsUrl());
-  setInterval(() => void refresh(), 15_000);
+  // a backstop to the live events; slower in someone's shared workspace, where every byte comes through
+  // the free relay database's monthly allowance
+  setInterval(() => void refresh(), joined() ? 60_000 : 15_000);
 }
 
 createRoot(document.getElementById("root")!).render(

@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiBase, setApiBase } from "../api";
 import { Avatar, People } from "../components/People";
 import { getState, onEvents, setState, setTheme, useUI, EMPTY } from "../store";
-import { Clock, ThemeToggle } from "../components/TopBar";
+import { Clock, ReasonsWith, ThemeToggle } from "../components/TopBar";
+import { CollabButton, CollabDialog, JoinedPill } from "../components/Collab";
+import { joined } from "../relay";
 import { me, tellView, type Person } from "../team";
 import type { NEvent } from "../types";
 import { CONN_ICON } from "./bits";
@@ -26,6 +28,7 @@ const narrow = () => window.innerWidth <= 820;
 function ServerConnect() {
   const [url, setUrl] = useState(() => apiBase() || "");
   const [open, setOpen] = useState(() => !!(window as any).Capacitor?.isNativePlatform?.());
+  const [joining, setJoining] = useState(false);
   const save = () => {
     const u = url.trim().replace(/\/$/, "");
     setApiBase(u && !/^https?:\/\//.test(u) ? `http://${u}` : u);
@@ -34,6 +37,8 @@ function ServerConnect() {
   return (
     <div className="o-offline" data-testid="server-connect">
       Can't reach the Nirnaya server{apiBase() ? ` at ${apiBase()}` : ""}.
+      <button className="o-actbtn" style={{ marginLeft: 10 }} onClick={() => setJoining(true)} data-testid="join-with-code">JOIN WITH A CODE</button>
+      {joining && <CollabDialog onClose={() => setJoining(false)} start="join" />}
       {!open ? <button className="o-actbtn" style={{ marginLeft: 10 }} onClick={() => setOpen(true)}>SET SERVER</button> : (
         <div className="o-conn-form">
           <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.20:8000" aria-label="Server address"
@@ -195,7 +200,7 @@ export function OfficePage() {
     wiresRef.current = new Wires(svgRef.current!);
     for (const [k, el] of binds.current) s.bind(k, el);
     void refreshOffice();
-    const h = setInterval(() => void refreshOffice(), 15_000);
+    const h = setInterval(() => void refreshOffice(), joined() ? 60_000 : 15_000); // live events do the rest
     return () => { clearInterval(h); s.dispose(); sceneRef.current = null; };
   }, []);
   const openAgentRef = useRef(openAgent); openAgentRef.current = openAgent;
@@ -433,10 +438,7 @@ export function OfficePage() {
           })}
         </div>
         <span className="o-sp" />
-        <span className="o-lab o-caps o-runs"><span className="o-dot" style={{ background: snap?.llm.enabled ? "var(--o-green)" : "var(--o-faint)" }} />REASONS WITH</span>
-        <span className="o-tile o-runs" title={snap?.llm.enabled ? "Claude refines understanding and drafts replies" : "Rules only: set ANTHROPIC_API_KEY to add Claude"} style={{ opacity: snap?.llm.enabled ? 1 : 0.45 }}>
-          <CONN_ICON.claude.icon color={CONN_ICON.claude.color} strokeWidth={2.2} />
-        </span>
+        <ReasonsWith llm={snap?.llm} className="o-runs" tileClass="o-runs" />
         <span className="o-gauge o-caps" title="today's cases, how many Nirnaya finished on its own, and the cost per case">
           TODAY<b>{casesToday}</b>{casesToday === 1 ? "CASE" : "CASES"}<span className="sep">·</span><b>{stats ? Math.round(stats.autonomy * 100) : 0}%</b>ALONE
           {stats?.cost_per_case != null && <><span className="sep">·</span><b>₹{stats.cost_per_case.toFixed(1)}</b>PER CASE</>}
@@ -447,6 +449,8 @@ export function OfficePage() {
         {waitingAll.length > 0 && (
           <button className="o-btn amber o-caps" onClick={() => zoomToTask(waitingAll[0])} title="go to the first thing waiting for you">⚠ {waitingAll.length}</button>
         )}
+        <JoinedPill />
+        <CollabButton />
         <ThemeToggle />
         <People className="o-people" size={26} max={4} />
         <Clock />

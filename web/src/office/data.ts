@@ -24,7 +24,7 @@ export interface Pod { id: PodId; name: string; blurb: string; lead: string }
 export interface OfficeSnap {
   pods: Pod[]; connectors: Connector[]; kpis: Record<string, [string, string | number][]>; ops: Op[]; routines: Routine[];
   kinds: Record<string, { dept: PodId; agent: string; title: string; routine: boolean; help: string }>;
-  llm: { enabled: boolean }; now: number;
+  llm: import("../components/TopBar").LlmSummary; now: number;
   flow_waits: { run_id: string; node: string; flow: string; flow_id?: string; question: string; since: number; by: string }[];
 }
 export interface Interpretation {

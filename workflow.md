@@ -19,6 +19,8 @@ you. Departments also take tasks you give them in plain words, now or on a sched
 | Schedule tasks so the agents do them by themselves | [6. Make it repeat, or book it for later](#6-make-it-repeat-or-book-it-for-later) |
 | Automate a chain of steps (with checks and approvals) | [9. Flows](#9-flows-your-own-workflows-run-by-the-agents) |
 | Let real customers reach the agents (email, WhatsApp, calls) | [10. Real customers](#10-real-customers-the-call-page-email-whatsapp-and-calls), and [channels.md](channels.md) for the setup |
+| Give the agents a free language model (no card) | [A free language model](#a-free-language-model), and [free.md](free.md) |
+| Work with people elsewhere: share your workspace with a code, or join theirs | [Work together from anywhere](#work-together-from-anywhere-the-person-button) |
 | Know for sure that the agents work and finish their tasks | [The checklist](#checklist-are-my-agents-working-and-finishing-their-tasks) (five minutes, by hand) |
 | Test every button and option automatically | [13. Test everything automatically](#13-test-everything-automatically) (one command) |
 | Fix something that looks wrong | [12. Troubleshooting](#12-troubleshooting) |
@@ -287,7 +289,7 @@ between the first ten; Settings has no key.
 | **Ledger** | The simulated bank as a spreadsheet. Switch a system's outage on and off to see the agents cope. Land an outside event on a payment (an auto-reversal or a merchant refund; each lands once). **Reset world** puts it back |
 | **Benchmark** | Choose **k** (1, 2 or 3) and **Run benchmark**: simulated customers, each asked k ways. Wrong autonomous actions should be 0 |
 | **Trail** | The hash-chained audit log. **Verify chain** says it is intact; **Tamper test** shows an edit being caught. Case links open the case |
-| **Settings** | The server address (for the phone and the Windows app), how to connect another agent over MCP, evidence parsing (upload a statement: UTRs are found and phone numbers tokenised), and **Simulate a crash and restart** (parked approvals survive) |
+| **Settings** | The server address (for the phone and the Windows app), the free **language model** (below), how to connect another agent over MCP, evidence parsing (upload a statement: UTRs are found and phone numbers tokenised), and **Simulate a crash and restart** (parked approvals survive) |
 
 The workspace's top bar is the office's own: the systems Nirnaya is connected to, today's cases, **OFFICE** to go
 back, the live log (every step, tool call and decision as it happens; the backtick key `` ` `` opens it too) and
@@ -296,13 +298,56 @@ Approvals. On a phone, the tab bar at the bottom has Office, Cases, Approvals, C
 Supervisor and Settings. On a phone, Cases shows the list; tap a case to open it and **◂ Cases** to go
 back. A case reached from Channels or Approvals opens straight away.
 
+### A free language model
+
+The agents work without one. With one, a model refines what a customer means, drafts the reply and lets
+an agent answer your questions in its own words. The rules still decide, and the Promise Guard still
+checks every word. Only free tiers are used. Set it up in **Settings → Language model · free tiers only**:
+
+1. Get a free key: **Groq** ([console.groq.com/keys](https://console.groq.com/keys)) is the quickest.
+   **Google Gemini**, **OpenRouter** (its free models only) and **Mistral** (the Experiment plan) work
+   too. **Ollama** runs a model on your own computer, with no key at all.
+2. Paste the key in its row and press **Test**. It lists the provider's free models, and the line under
+   the row says **Works: … answered "OK" in … ms**. Pick a model, or leave **Automatic**, and press **Save**.
+3. The arrows set the order the providers are tried in. When one runs out of its free quota, it rests and
+   the next one answers. The row says **resting** and for how long.
+
+The top bars then say **REASONS WITH GROQ** (or whichever answered last); with none, **RULES ONLY**.
+Every limit and every sign-up step is in [free.md](free.md#a-free-language-model).
+
 ### Working as a team
 
-Everyone who opens the same server address works in the same office. Teammates' avatars show in the top
+Everyone who opens the same server address works in the same office, and so does everyone who joined it
+with its code (next section). Teammates' avatars show in the top
 bar, with the view or department each one is on. Chats, approvals, tasks and flows are shared and carry
 the name of whoever did them. When a teammate approves something, it pops up for you. If someone saves a
 flow you are editing, you are told and nothing is overwritten. To work together, open the server's
 address on each computer. The phone app connects to it too.
+
+### Work together from anywhere (the person+ button)
+
+For people who are not on your network: on the website (Vercel), on the phone app, or in their own
+Windows app. It needs the free shared-workspace database set up once for the team
+([free.md](free.md#set-up-the-free-database-about-5-minutes-once-for-the-whole-team)).
+
+**Share yours.**
+1. Press the **person+** tile in the top bar (office or workspace). **Work together** opens.
+2. **Create a workspace**: give it a name. Paste the database address if it is not built in, and press
+   **CREATE A WORKSPACE**. A code like **K7QM2-XRP4T** appears, with **COPY** and **SHARING**.
+3. Send the code to your team. As people join, they appear under **In your workspace now**, with the view
+   they are on and the app they use. The person+ tile shows how many are in.
+4. **NEW CODE** shuts out everyone who had the old code. **STOP SHARING** ends the workspace. When your
+   computer or server stops, members see that you are offline; after a restart, the same code works again.
+
+**Join someone's.**
+1. In the app, press **person+** (or **JOIN WITH A CODE** when the phone app or the website has no server)
+   → **Join a workspace**. Type the code (capitals, dashes and spaces do not matter) and press **JOIN**.
+2. The page reloads into their office. The top bar says **IN ASHA'S WORKSPACE**. Everything you see and do
+   is now on their agents: their cases, approvals, flows, chats and log. Your name goes on what you do.
+3. Only the host changes API keys, channel settings and the workspace. If you try, you are told that only
+   the host can.
+4. Press the **IN …** pill (or person+) → **LEAVE AND GO BACK** to return to your own Nirnaya. If the host
+   stops sharing or makes a new code, the pill says **WORKSPACE CLOSED**.
 
 ---
 
@@ -347,13 +392,17 @@ real browser.
 | A booked task did not run | it is in the past, or it was cancelled | Book it again for a time ahead; times are your computer's clock |
 | A flow will not save | the red line names the node and the problem | Fix that node, then Save |
 | An email, WhatsApp message or call gets no answer | the sender is not a contact, or the channel is off | Channels → Contacts: link them (or set the channel to answer anyone). More in [channels.md](channels.md#troubleshooting) |
+| The top bar says **RULES ONLY** | no free language model is set up, or all of them are out of quota for now | Settings → Language model: add a key and press **Test**; a **resting** row comes back by itself |
+| **Join** says no workspace has that code | a typo, or the host made a new code or stopped sharing | Ask the host for the current code (person+ shows it) |
+| The pill says **… · OFFLINE** | the host's Nirnaya is not running | Wait for the host to start it; nothing is lost |
+| **Create** says the database refused, or is open to everyone | the database's rules are not Nirnaya's | Paste [firebase/database.rules.json](firebase/database.rules.json) into Realtime Database → Rules and Publish |
 | You want a clean start | — | Ledger → **Reset world** resets the bank. Starting the server with `--reset` clears all cases |
 
 ## 13. Test everything automatically
 
 One command checks every part of Nirnaya the way a person would use it, in a real browser, and writes a
-report. You need Python, Node and, for the email checks, Java 17 or newer (it starts a local mail server
-for them by itself).
+report. You need Python, Node and, for the email and sharing checks, Java 17 or newer (it starts a local
+mail server and Google's Firebase database emulator by itself).
 
 ```bash
 make test-all                 # the website: about 75 minutes
@@ -368,7 +417,7 @@ and the full output is in `log.txt`. "Everything passed" means every check below
 
 | Suite | Checks | What it does |
 |---|---|---|
-| backend (pytest) | 77 | the engine's guarantees: the error ceiling, stale approvals refused, exactly-once commits, restarts, the audit chain, drift, MCP, office tasks, schedules, flows, the team, and the channels against stand-in providers and a real mail server |
+| backend (pytest) | 95 | the engine's guarantees: the error ceiling, stale approvals refused, exactly-once commits, restarts, the audit chain, drift, MCP, office tasks, schedules, flows, the team, the channels against stand-in providers and a real mail server, the free language models (quota, fallbacks, free models only), and shared workspaces through Google's Firebase emulator with the real rules |
 | `run` | 17 | the main path through the office and the workspace, approvals in the office chat, a phone layout |
 | `workflow` | 15 | this guide followed step by step, sections 1 to 10 and the checklist |
 | `fields-office` | 19 | every office control: the six departments, all 11 samples and their outcomes, 4 customers × 5 channels, every department's example tasks, approve and reject in the rail, 11 repeat cadences, routine controls, filters, the calendar, the board, the Brain, all 19 agents' chats |
@@ -378,6 +427,7 @@ and the full output is in `log.txt`. "Everything passed" means every check below
 | `team` | 9 | two people on one server: who is online, the shared chat, names on actions, a flow one saves and the other runs |
 | `phone-client` | 8 | the Android app's flow: asks for the server, connects, works, Cases and Channels on the phone, a server with an access key |
 | `channels` | 22 | every Channels field; real email through the mail server; WhatsApp and Twilio stand-ins; n8n; a flow on a WhatsApp message; forward and call from a case; APPROVE by email; the call page by voice and by typing; the lock screen |
+| `workspace` | 14 | sharing with a code: create, wrong and unknown codes, join from the plain web app (as on Vercel and the APK) and from a second server (as in the Windows app), live events, a case and an approval on the host's agents, files through the host, host-only settings, a new code, leave, stop |
 | `audit` | every button | a supervisor's walk: every view and button in dark and light, on a computer and a phone, looking for errors, failed requests, clipped text and sideways scrolling |
 
 The last full run, on the website, the Windows app and the APK's files, is in

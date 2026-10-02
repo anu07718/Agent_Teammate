@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(html.dark *));
 
 @theme inline {
   --color-bg: var(--bg);
@@ -77,7 +77,7 @@
   color-scheme: light;
 }
 
-.dark {
+html.dark {
   --o-bg: #0d0d0c;
   --o-bg-2: #070706;
   --o-card: #161615;
@@ -125,7 +125,7 @@ body {
 @media (prefers-reduced-motion: reduce) { .pulse, .blink, .slide-in { animation: none; } }
 
 /* the team's avatars and name popover follow the workspace theme */
-:root, .dark { --people-ring: var(--panel); --people-bg: var(--raised); --people-fg: var(--fg); --people-line: var(--line-strong); }
+:root, html.dark { --people-ring: var(--panel); --people-bg: var(--raised); --people-fg: var(--fg); --people-line: var(--line-strong); }
 
 /* the office's type, for the workspace too */
 .caps { font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
@@ -136,7 +136,7 @@ body {
 /* the workspace bar uses the office's top bar, in the page's flow instead of over the 3D office */
 .o-top.o-top-static { position: relative; flex: none; height: auto; min-height: 52px; }
 .o-theme svg { width: 15px; height: 15px; color: var(--o-ink); }
-.dark .o-tile.o-theme { background: var(--o-card); }
+html.dark .o-tile.o-theme { background: var(--o-card); }
 /* LIVE / OFFLINE, as a quiet pill like the office's */
 .o-live { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 999px; white-space: nowrap;
   border: 1px solid color-mix(in srgb, var(--o-green) 45%, transparent); color: var(--o-green); }
@@ -145,3 +145,29 @@ body {
 .o-live.off .o-dot { background: var(--o-red); animation: none; }
 .o-tile.o-theme.on { border-color: var(--o-ink); }
 
+
+/* ── work together: the person+ dialog (components/Collab.tsx), in the office's look ── */
+.cw-back { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px;
+  background: color-mix(in srgb, var(--o-ink) 30%, transparent); }
+.cw { position: relative; width: 100%; max-width: 480px; max-height: calc(100vh - 32px); overflow-y: auto; padding: 22px 22px 20px;
+  background: var(--o-card); color: var(--o-ink); border: 1px solid var(--o-line); border-radius: 16px; box-shadow: var(--o-shadow);
+  font-family: var(--o-ui); font-size: 13px; text-align: left; user-select: text; }
+.cw button { cursor: pointer; }
+.cw button:disabled { opacity: 0.45; cursor: default; }
+.cw-x { position: absolute; top: 14px; right: 14px; color: var(--o-grey); }
+.cw-tabs { display: flex; gap: 18px; margin: 16px 0 14px; border-bottom: 1px solid var(--o-line); }
+.cw-tabs button { height: 34px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--o-grey);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+.cw-tabs button.on { color: var(--o-ink); border-color: var(--o-ink); }
+.cw-in { display: block; width: 100%; height: 36px; margin: 5px 0 10px; padding: 0 12px; border-radius: 10px; outline: none;
+  border: 1px solid var(--o-line-2); background: var(--o-bg); color: var(--o-ink); font-size: 13px; }
+.cw-in:focus { border-color: var(--o-ink); }
+.cw-in:disabled { opacity: 0.6; }
+.cw-codein { height: 52px; font-family: var(--o-serif); font-size: 28px; letter-spacing: 0.12em; text-align: center; }
+.cw-code { margin: 14px 0 12px; font-family: var(--o-serif); font-size: 40px; line-height: 1; letter-spacing: 0.1em; user-select: all; }
+.cw-av { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; flex: none;
+  background: var(--o-ink); color: var(--o-bg); font-size: 9px; font-weight: 600; }
+.cw-note { font-size: 12.5px; line-height: 1.5; color: var(--o-grey); }
+.cw-btn { position: relative; }
+.cw-dot { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; min-width: 14px; height: 14px; padding: 0 3px;
+  border-radius: 7px; border: 2px solid var(--o-bg); background: var(--o-green); color: #fff; font-size: 9px; font-weight: 700; line-height: 1; }

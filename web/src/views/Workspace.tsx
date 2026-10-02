@@ -1,6 +1,6 @@
 import { Check, CheckCheck, ClipboardList, ExternalLink, FileSpreadsheet, Forward, Inbox, Phone, RotateCcw, ShieldAlert, ThumbsDown, ThumbsUp, Workflow, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../api";
+import { api, apiLink } from "../api";
 import { ApprovalCard, DiffTable } from "../components/ApprovalCard";
 import { Badge, Button, Card, Empty, KV, Mono, RouteBadge, StatusDot, Tabs, cx } from "../components/ui";
 import { ACTION_LABEL, INTENT_LABEL, ago, clock, inr, pct, short } from "../lib/format";
@@ -179,8 +179,8 @@ function CaseView({ id }: { id: string }) {
           </>}
           {channels?.email?.enabled && <Button size="sm" variant={act === "forward" ? "primary" : "ghost"} onClick={() => setAct(act === "forward" ? null : "forward")}><Forward size={13} /> Forward</Button>}
           {channels?.voice?.enabled && <Button size="sm" variant={act === "call" ? "primary" : "ghost"} onClick={() => setAct(act === "call" ? null : "call")}><Phone size={13} /> Call</Button>}
-          <a href={api.previewUrl(c.id)} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost"><ExternalLink size={13} /> Packet</Button></a>
-          <a href={api.exportUrl(c.id)}><Button size="sm"><FileSpreadsheet size={13} /> Export .xlsx</Button></a>
+          <a {...apiLink(api.previewUrl(c.id))} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost"><ExternalLink size={13} /> Packet</Button></a>
+          <a {...apiLink(api.exportUrl(c.id), `${c.id}.xlsx`)}><Button size="sm"><FileSpreadsheet size={13} /> Export .xlsx</Button></a>
         </div>
       </div>
       {act && <CaseAction kind={act} caseId={c.id} defaultTo={act === "call" ? (chan && ["whatsapp", "voice"].includes(chan.channel) ? chan.address : "") : ""} onDone={() => setAct(null)} />}
