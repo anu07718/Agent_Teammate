@@ -378,6 +378,9 @@ and the full output is in `log.txt`. "Everything passed" means every check below
 | `channels` | 22 | every Channels field; real email through the mail server; WhatsApp and Twilio stand-ins; n8n; a flow on a WhatsApp message; forward and call from a case; APPROVE by email; the call page by voice and by typing; the lock screen |
 | `audit` | every button | a supervisor's walk: every view and button in dark and light, on a computer and a phone, looking for errors, failed requests, clipped text and sideways scrolling |
 
+The last full run, on the website, the Windows app and the APK's files, is in
+[docs/test-report.md](docs/test-report.md): everything passed.
+
 To run one suite against a server you already started: `make run` in one terminal, then for example
 `cd web && node e2e/workflow.mjs`. Some suites need a fresh server (start it with `--reset`).
 

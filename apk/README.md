@@ -59,5 +59,12 @@ a store release, set `NIRNAYA_KEYSTORE`, `NIRNAYA_KEYSTORE_PASS`, `NIRNAYA_KEY_A
   the APK serves them from `http://localhost`, and marked the page as the native shell. First launch asked for the server; entering the address connected the office live; a message
   typed on the phone became a resolved case on the server; the address survived a restart.
 
+- After the channels were added: `make test-all TARGET=apk` unpacked the APK's web files, found them byte
+  for byte the same as `web/dist` (145 files), served them from the server for every browser suite, and
+  every suite passed on them: `run` (17), `workflow` (15), `fields-office` (19), `fields-workspace` (23),
+  `fields-flows` (26), `flows` (9), `team` (9), `phone-client` (8: the server prompt, Cases and Channels on
+  a phone, a server with an access key) and `channels` (22), and the audit (226 clicks, 0 problems).
+  See [docs/test-report.md](../docs/test-report.md).
+
 This build machine has no hardware virtualisation, so the Android emulator cannot run here. The APK has
 not been opened on a phone or emulator yet. Please try it on a device.

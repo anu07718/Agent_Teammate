@@ -181,7 +181,8 @@ read status, search the graph and memory, or score an action.
 `make test-all` runs everything below, each browser suite on its own fresh server, and writes
 `test-results/web/report.md` (about 75 minutes; `QUICK=1` skips the two slowest). `TARGET=exe` runs the
 same suites against the Windows app's bundled server under wine, and `TARGET=apk` against the web files
-inside the APK. [workflow.md](workflow.md#13-test-everything-automatically) says what each suite covers.
+inside the APK. [workflow.md](workflow.md#13-test-everything-automatically) says what each suite covers;
+[docs/test-report.md](docs/test-report.md) is the last full run of all three (everything passed).
 
 ```bash
 make test-backend   # 77 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,

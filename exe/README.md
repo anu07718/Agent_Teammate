@@ -70,10 +70,13 @@ The build machine is Linux, so the Windows parts were tested with wine 11:
     outright, so there was no undo to press.
   - `fields-flows.mjs` (26)
   - `phone-client.mjs` (5)
-- After the channels were added, the rebuilt app folder's server (the same files the installer packs) ran
-  under wine with its bundled Python and passed `channels.mjs` (21 checks: real email through a local SMTP
-  and IMAP server, WhatsApp and Twilio stand-ins, n8n, a flow on a WhatsApp message, approve by email,
-  the call page) and `workflow.mjs` (15).
+- After the channels were added: `make test-all TARGET=exe` started the rebuilt app folder's server (the
+  same files the installer packs) under wine with its bundled Python, fresh for each suite, and every
+  suite passed against it: `run` (17), `workflow` (15), `fields-office` (19), `fields-workspace` (23),
+  `fields-flows` (26), `flows` (9), `team` (9), `phone-client` (8), `channels` (22: real email through a
+  local SMTP and IMAP server, WhatsApp and Twilio stand-ins, n8n, approve by email, the call page, the
+  access-key lock screen) and the audit (226 clicks, 0 problems). The report is in
+  [docs/test-report.md](../docs/test-report.md).
 - The installer ran silently: files, shortcuts and the uninstall entry were created. The uninstaller
   removed them and kept the user's data.
 - The exact command the window uses (`cmd.exe /c "…"`) worked from a folder with a space in its name. The
