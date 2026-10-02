@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiBase, setApiBase } from "../api";
 import { Avatar, People } from "../components/People";
-import { onEvents, setState, useUI, EMPTY } from "../store";
+import { getState, onEvents, setState, setTheme, useUI, EMPTY } from "../store";
+import { Clock, ThemeToggle } from "../components/TopBar";
 import { me, tellView, type Person } from "../team";
 import type { NEvent } from "../types";
 import { CONN_ICON } from "./bits";
@@ -20,12 +21,6 @@ import "./office.css";
 const PANEL_W = 384 + 18;
 const RAIL_W = 380 + 18;
 const narrow = () => window.innerWidth <= 820;
-
-function Clock() {
-  const [t, setT] = useState(() => new Date());
-  useEffect(() => { const h = setInterval(() => setT(new Date()), 1000); return () => clearInterval(h); }, []);
-  return <span className="o-clock">{t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }).toLowerCase()}</span>;
-}
 
 /** shown while the server is out of reach: the phone and desktop builds point at a server here */
 function ServerConnect() {
@@ -130,7 +125,7 @@ export function OfficePage() {
   const [cal, setCal] = useState(false);
   const [big, setBig] = useState(false);
   const [brainV, setBrainV] = useState(0);
-  const [dark, setDark] = useState(() => { try { return localStorage.getItem("nirnaya.office.dark") === "1"; } catch { return false; } });
+  const dark = useUI((s) => s.theme) === "dark"; // one theme for the office and the workspace
   const [hot, setHot] = useState<Record<string, number>>({});
   const hostRef = useRef<HTMLDivElement>(null);
   const hudRef = useRef<HTMLDivElement>(null);
@@ -210,10 +205,7 @@ export function OfficePage() {
   useEffect(() => {
     sceneRef.current?.setAgents(agents.map((a) => ({ id: a.id, name: a.name, pod: a.department as PodId, lead: !!a.lead })));
   }, [agents]);
-  useEffect(() => {
-    sceneRef.current?.setDark(dark);
-    try { localStorage.setItem("nirnaya.office.dark", dark ? "1" : "0"); } catch { /* storage off */ }
-  }, [dark]);
+  useEffect(() => { sceneRef.current?.setDark(dark); }, [dark]);
   useEffect(() => { if (snap) wiresRef.current?.setConnectors(snap.connectors); }, [snap]);
 
   // who is typing, who is standing and waving for your OK
@@ -379,7 +371,7 @@ export function OfficePage() {
       if (cal) return; // the calendar has its own keys
       if (k === "g") setBrainOpen((b) => !b);
       else if (k === "b") setBoard((b) => !b);
-      else if (k === "d") setDark((d) => !d);
+      else if (k === "d") setTheme(getState().theme === "dark" ? "light" : "dark");
       else if (k === "w") setState({ view: "workspace" });
       else if (k === "f") setState({ view: "flows" });
       else if (k === "m") setState({ view: "channels" });
@@ -455,6 +447,7 @@ export function OfficePage() {
         {waitingAll.length > 0 && (
           <button className="o-btn amber o-caps" onClick={() => zoomToTask(waitingAll[0])} title="go to the first thing waiting for you">⚠ {waitingAll.length}</button>
         )}
+        <ThemeToggle />
         <People className="o-people" size={26} max={4} />
         <Clock />
       </div>

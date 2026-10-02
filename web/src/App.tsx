@@ -1,13 +1,15 @@
-import { Building2, CheckCheck, Cpu, FlaskConical, Gauge, KeyRound, LayoutGrid, MessagesSquare, Moon, ScrollText, Settings, Sheet, Sun, Terminal, Waypoints, Workflow } from "lucide-react";
+import { Building2, CheckCheck, FlaskConical, Gauge, KeyRound, LayoutGrid, MessagesSquare, ScrollText, Settings, Sheet, Terminal, Waypoints, Workflow } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, setAccessKey } from "./api";
 import { ChannelsView } from "./channels/ChannelsView";
 import { People } from "./components/People";
+import { Clock, ConnTiles, ThemeToggle } from "./components/TopBar";
 import { cx } from "./components/ui";
 import { FlowsView } from "./flows/FlowsView";
 import { clock, pct } from "./lib/format";
+import { CONN_ICON } from "./office/bits";
 import { OfficePage } from "./office/OfficePage";
-import { connect, getState, openCase, refresh, setState, setTheme, useUI, type View, EMPTY } from "./store";
+import { connect, getState, openCase, refresh, setState, useUI, type View, EMPTY } from "./store";
 import { tellView } from "./team";
 import { BenchmarkView } from "./views/Benchmark";
 import { BrainView } from "./views/Brain";
@@ -30,29 +32,6 @@ const NAV: { id: View; label: string; icon: any; mobile?: boolean }[] = [
   { id: "trail", label: "Trail", icon: ScrollText },
   { id: "settings", label: "Settings", icon: Settings, mobile: true },
 ];
-
-function Connectors() {
-  const tools = useUI((s) => s.app?.tools ?? EMPTY);
-  const pulses = useUI((s) => s.pulses);
-  const systems = [...new Set(tools.map((t) => t.system))];
-  const now = Date.now();
-  return (
-    <div className="hidden items-center gap-2.5 lg:flex" aria-label="Connected systems">
-      <span className="text-[10.5px] font-medium uppercase tracking-wider text-faint">Connected</span>
-      {systems.map((s) => {
-        const p = pulses[s];
-        const open = tools.some((t) => t.system === s && t.breaker === "open");
-        const hot = p && now - p.ts < 900;
-        return (
-          <span key={s} className="flex items-center gap-1.5 text-[11.5px] text-muted" title={open ? `${s}: circuit open` : s}>
-            <span key={p?.ts} className={cx("h-2 w-2 rounded-full", open ? "bg-escalate" : hot ? (p!.ok ? "bg-act pulse" : "bg-escalate pulse") : "bg-faint/40")} />
-            <span className="hidden whitespace-nowrap 2xl:inline">{s}</span>
-          </span>
-        );
-      })}
-    </div>
-  );
-}
 
 function LogPanel() {
   const events = useUI((s) => s.events);
@@ -109,7 +88,7 @@ function Toasts() {
     <div className="pointer-events-none fixed bottom-16 right-4 z-50 flex w-80 flex-col gap-2 md:bottom-9" aria-live="polite">
       {toasts.map((t) => (
         <button key={t.id} onClick={() => t.caseId && openCase(t.caseId)}
-          className={cx("slide-in pointer-events-auto cursor-pointer rounded-lg border bg-raised px-3 py-2 text-left text-[12.5px] shadow-xl",
+          className={cx("slide-in shadow-card pointer-events-auto cursor-pointer rounded-xl border bg-raised px-3.5 py-2.5 text-left text-[12.5px]",
             { info: "border-line-strong", good: "border-act/40", warn: "border-hedge/40", bad: "border-escalate/40" }[t.tone])}>
           {t.text}
         </button>
@@ -135,7 +114,7 @@ function KeyPrompt() {
         <input autoFocus type="password" aria-label="Access key" value={k} onChange={(e) => { setK(e.target.value); setBad(false); }}
           className="h-9 w-full rounded-md border border-line-strong bg-panel-2 px-2.5 text-[13px]" />
         {bad && <p className="text-[12px] text-escalate">That key is not right.</p>}
-        <button type="submit" className="h-9 w-full cursor-pointer rounded-md bg-accent text-[13px] font-medium text-white">Unlock</button>
+        <button type="submit" className="caps h-9 w-full cursor-pointer rounded-full bg-fg text-bg">Unlock</button>
       </form>
     </div>
   );
@@ -146,7 +125,6 @@ export default function App() {
   const view = useUI((s) => s.view);
   const app = useUI((s) => s.app);
   const connected = useUI((s) => s.connected);
-  const theme = useUI((s) => s.theme);
   const logOpen = useUI((s) => s.logOpen);
   const error = useUI((s) => s.error);
 
@@ -167,33 +145,46 @@ export default function App() {
   useEffect(() => { if (view !== "office") tellView(view); }, [view]);
 
   const pending = app?.waiting ? app.waiting.cases + app.waiting.ops + app.waiting.flows : app?.stats.pending_approvals ?? 0;
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const casesToday = (app?.cases ?? EMPTY).filter((c) => c.created_at * 1000 >= midnight.getTime()).length;
   if (needKey) return <KeyPrompt />;
   if (view === "office") return <><OfficePage /><Toasts /></>;
   return (
     <div className="flex h-full flex-col">
-      <header className="flex h-11 shrink-0 items-center gap-4 border-b border-line bg-panel px-3" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="flex items-center gap-2">
-          <img src="./favicon.svg" alt="" className="h-6 w-6" />
-          <span className="text-[14px] font-semibold tracking-tight">Nirnaya</span>
-          <span className="hidden whitespace-nowrap text-[12px] text-muted xl:inline">the support teammate that knows when to stop</span>
-        </div>
-        <div className="flex-1" />
-        <Connectors />
-        <div className="flex items-center gap-2">
-          <span className={cx("flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium", connected ? "border-act/40 text-act" : "border-escalate/40 text-escalate")}>
-            <span className={cx("h-1.5 w-1.5 rounded-full", connected ? "bg-act blink" : "bg-escalate")} />{connected ? "LIVE" : "OFFLINE"}
+      {/* the office's top bar, in the same type and colours */}
+      <header className="o-top o-top-static max-md:gap-2.5! max-md:px-3!" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <span className="o-brand max-sm:text-[19px]!">NIRNAYA<small className="max-sm:hidden!">WORKSPACE</small></span>
+        <ConnTiles className="max-lg:hidden!" />
+        <span className="o-sp" />
+        {app && <>
+          <span className="o-lab o-caps max-[1400px]:hidden!"><span className="o-dot" style={{ background: app.integrations.llm.enabled ? "var(--o-green)" : "var(--o-faint)" }} />REASONS WITH</span>
+          <span className="o-tile max-[1400px]:hidden!" title={app.integrations.llm.enabled ? "Claude refines understanding and drafts replies" : "Rules only: set ANTHROPIC_API_KEY to add Claude"} style={{ opacity: app.integrations.llm.enabled ? 1 : 0.45 }}>
+            <CONN_ICON.claude.icon color={CONN_ICON.claude.color} strokeWidth={2.2} />
           </span>
-          {app && <span className="hidden items-center gap-1 text-[11px] text-muted sm:flex" title="Language model"><Cpu size={12} />{app.integrations.llm.enabled ? "Claude" : "rules"}</span>}
-          <button aria-label="Toggle the live log" onClick={() => setState((s) => ({ logOpen: !s.logOpen }))} className={cx("rounded p-1.5 cursor-pointer hover:bg-panel-2", logOpen ? "text-accent" : "text-muted")}><Terminal size={15} /></button>
-          <button aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="rounded p-1.5 text-muted cursor-pointer hover:bg-panel-2">{theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}</button>
-          <People size={24} max={4} />
-        </div>
+          <span className="o-gauge o-caps max-lg:hidden!" title="today's cases, how many Nirnaya finished on its own, and the cost per case">
+            TODAY<b>{casesToday}</b>{casesToday === 1 ? "CASE" : "CASES"}<span className="sep">·</span><b>{pct(app.stats.autonomy)}</b>ALONE
+            {app.stats.cost_per_case != null && <><span className="sep max-2xl:hidden!">·</span><b className="max-2xl:hidden!">₹{app.stats.cost_per_case.toFixed(1)}</b><span className="max-2xl:hidden!">PER CASE</span></>}
+          </span>
+        </>}
+        <span className={cx("o-live o-caps", !connected && "off")} title={connected ? "live updates from the server" : "the server is out of reach"}>
+          <span className="o-dot" />{connected ? "LIVE" : "OFFLINE"}
+        </span>
+        <button className="o-btn o-caps max-md:hidden!" onClick={() => setState({ view: "office" })} aria-label="Back to the office" title="the 3D office">
+          <Building2 size={13} /> OFFICE
+        </button>
+        {pending > 0 && (
+          <button className="o-btn amber o-caps max-sm:hidden!" onClick={() => setState({ view: "approvals" })} title="waiting for a person: open Approvals" aria-label={`${pending} waiting for you`}>⚠ {pending}</button>
+        )}
+        <button aria-label="Toggle the live log" title="the live log (`)" onClick={() => setState((s) => ({ logOpen: !s.logOpen }))} className={cx("o-tile o-theme max-sm:hidden!", logOpen && "on")}><Terminal /></button>
+        <ThemeToggle />
+        <People size={26} max={4} />
+        <span className="max-xl:hidden!"><Clock /></span>
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav className="hidden w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-panel py-2 md:flex" aria-label="Views">
+        <nav className="hidden w-14 shrink-0 flex-col items-center gap-1.5 border-r border-line bg-bg py-3 md:flex" aria-label="Views">
           {NAV.map((n, i) => (
             <button key={n.id} onClick={() => setState({ view: n.id })} title={i < 10 ? `${n.label} (${(i + 1) % 10})` : n.label} aria-label={n.label} aria-current={view === n.id}
-              className={cx("relative grid h-9 w-9 cursor-pointer place-items-center rounded-md", view === n.id ? "bg-accent/15 text-accent" : "text-muted hover:bg-panel-2 hover:text-fg")}>
+              className={cx("relative grid h-9 w-9 cursor-pointer place-items-center rounded-full border transition-colors", view === n.id ? "border-fg bg-fg text-bg" : "border-transparent text-muted hover:border-line-strong hover:text-fg")}>
               <n.icon size={17} />
               {n.id === "approvals" && pending > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-escalate px-1 text-[9.5px] font-bold text-white">{pending}</span>}
             </button>
@@ -209,20 +200,20 @@ export default function App() {
           {logOpen && <LogPanel />}
         </main>
       </div>
-      <footer className="hidden h-6 shrink-0 items-center gap-4 border-t border-line bg-panel px-3 text-[11px] text-muted md:flex">
+      <footer className="caps hidden h-7 shrink-0 items-center gap-5 border-t border-line bg-bg px-4 text-muted md:flex">
         {app && <>
           <span>{app.stats.cases} case(s)</span>
           <span>alone <span className="text-act">{pct(app.stats.autonomy)}</span></span>
-          <button className={cx("cursor-pointer", pending ? "text-escalate" : "")} onClick={() => setState({ view: "approvals" })}>{pending} awaiting approval</button>
+          <button className={cx("caps cursor-pointer", pending ? "text-escalate" : "")} onClick={() => setState({ view: "approvals" })}>{pending} awaiting approval</button>
           <span className={app.drift.alarm ? "text-escalate" : ""}>drift PSI {app.drift.psi.toFixed(2)}{app.drift.alarm ? " · failing closed" : ""}</span>
-          <span className="ml-auto">policy <span className="font-mono">{app.policy_hash}</span></span>
-          <span>press 1–9, 0 to switch views · ` for the log</span>
+          <span className="ml-auto">policy <span className="font-mono normal-case tracking-normal">{app.policy_hash}</span></span>
+          <span className="max-lg:hidden">1–9, 0 switch views · ` the log</span>
         </>}
       </footer>
-      <nav className="flex h-14 shrink-0 items-stretch border-t border-line bg-panel md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }} aria-label="Views">
+      <nav className="flex h-14 shrink-0 items-stretch border-t border-line bg-bg md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }} aria-label="Views">
         {NAV.filter((n) => n.mobile).map((n) => (
           <button key={n.id} onClick={() => setState({ view: n.id })} aria-current={view === n.id}
-            className={cx("relative flex min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 text-[10px] tracking-tight max-[359px]:text-[9px]", view === n.id ? "text-accent" : "text-muted")}>
+            className={cx("relative flex min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 text-[10px] tracking-tight max-[359px]:text-[9px]", view === n.id ? "font-semibold text-fg" : "text-muted")}>
             <n.icon size={18} /><span className="max-w-full truncate">{n.label}</span>
             {n.id === "approvals" && pending > 0 && <span className="absolute right-[28%] top-1.5 h-2 w-2 rounded-full bg-escalate" />}
           </button>

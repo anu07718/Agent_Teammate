@@ -92,7 +92,7 @@ export function SupervisorView() {
       <div className="mx-auto max-w-7xl space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold">Supervisor console</h2>
+            <h2 className="page-title">Supervisor console</h2>
             <p className="text-[12.5px] text-muted">Set the error ceiling (α) and the autonomy rung per action. Thresholds are re-certified on every change: with 95% confidence, wrong autonomous actions stay under α. Policy <span className="font-mono">{d.policy_hash}</span>.</p>
           </div>
           <Button disabled={busy} onClick={() => run(api.recalibrate, "Recalibrated with every human decision so far")}><RefreshCw size={13} /> Recalibrate with {st.labels} label(s)</Button>
@@ -109,7 +109,7 @@ export function SupervisorView() {
         <Card title="Autonomy dial" pad={false} actions={<span className="text-[11.5px] text-muted">Bigger amounts get a stricter ceiling: small ×1 · medium ×½ · large ×¼</span>}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-left">
-              <thead className="text-[11px] uppercase tracking-wider text-faint">
+              <thead className="caps text-faint">
                 <tr><th className="py-2 pl-3.5 font-medium">Action</th><th className="px-2 font-medium">α ceiling</th><th className="px-2 font-medium">Autonomy</th><th className="px-2 font-medium">Up to ₹2,000</th><th className="px-2 font-medium">₹2,000–₹20,000</th><th className="px-2 font-medium">Above ₹20,000</th></tr>
               </thead>
               <tbody>{d.actions.map((a: any) => <ActionRow key={a.id} a={a} onChange={(p) => change(a.id, p)} />)}</tbody>

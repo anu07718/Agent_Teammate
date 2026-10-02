@@ -457,16 +457,16 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
               set={(p) => setConfig(selNode.id, p)} onDelete={remove} />
           ) : sel?.kind === "edge" && draft ? (
             <div className="space-y-3">
-              <h3 className="text-[13px] font-semibold">Wire</h3>
+              <h3 className="serif text-[20px] leading-tight">Wire</h3>
               <p className="text-[12px] text-muted">{draft.edges[sel.i]?.from} ({draft.edges[sel.i]?.port}) → {draft.edges[sel.i]?.to}</p>
               <Button size="sm" variant="danger" onClick={remove}><Trash2 size={12} /> Delete wire</Button>
             </div>
           ) : (
             <div className="space-y-3">
-              <h3 className="text-[13px] font-semibold">{draft?.name ?? "No flow"}</h3>
+              <h3 className="serif text-[20px] leading-tight">{draft?.name ?? "No flow"}</h3>
               <p className="text-[12px] text-muted">{draft ? `${draft.nodes.length} node(s), ${draft.edges.length} wire(s). Pick a node to set it up.` : ""} Runs are done by the office’s agents: department tasks land on the office board, customer messages go through the whole case pipeline, and approvals wait for someone on the team.</p>
               <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">Runs of this flow</div>
+                <div className="mb-1.5 caps text-faint">Runs of this flow</div>
                 {mine.length ? (
                   <ul className="space-y-1.5" data-testid="runs">
                     {mine.slice(0, 10).map((r) => (
@@ -495,7 +495,7 @@ export function Builder({ open, setOpen }: { open: string | null; setOpen: (id: 
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-faint">{label}</span>
+      <span className="mb-1 block caps text-faint">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-[11px] text-faint">{hint}</span>}
     </label>
@@ -514,7 +514,7 @@ function Inspector({ n, data, presets, run, set, onDelete }: {
     <div className="space-y-3" onKeyDown={stop}>
       <div className="flex items-center gap-2">
         <span className="fl-ic" style={{ background: GROUP_COLOR[s.group] }}>{s.icon}</span>
-        <div><h3 className="text-[13px] font-semibold">{s.label}</h3><div className="font-mono text-[10.5px] text-faint">{n.id}</div></div>
+        <div><h3 className="serif text-[20px] leading-tight">{s.label}</h3><div className="font-mono text-[10.5px] text-faint">{n.id}</div></div>
       </div>
       <p className="text-[12px] text-muted">{s.help}</p>
       {n.type === "start" && <>
@@ -637,7 +637,7 @@ function Inspector({ n, data, presets, run, set, onDelete }: {
       )}
       {run && run.state !== "pending" && (
         <div className="rounded-md border border-line bg-panel-2 px-2.5 py-2 text-[12px]">
-          <div className="mb-0.5 text-[11px] font-medium uppercase tracking-wider text-faint">Last run · {run.state}</div>
+          <div className="mb-0.5 caps text-faint">Last run · {run.state}</div>
           <div className="whitespace-pre-wrap break-words">{run.text || "—"}</div>
         </div>
       )}

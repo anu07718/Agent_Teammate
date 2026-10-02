@@ -28,11 +28,14 @@ export interface UIState {
   caseOnPhone: boolean;
 }
 
+// light (paper) unless chosen otherwise; one theme for the office and the workspace (the office kept its own
+// "nirnaya.office.dark" before, which still counts the first time)
 const initialTheme = (() => {
   try {
-    return (localStorage.getItem("nirnaya.theme") as "dark" | "light") || "dark";
+    const saved = localStorage.getItem("nirnaya.theme") as "dark" | "light" | null;
+    return saved ?? (localStorage.getItem("nirnaya.office.dark") === "1" ? "dark" : "light");
   } catch {
-    return "dark";
+    return "light";
   }
 })();
 

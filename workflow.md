@@ -169,7 +169,8 @@ department's lead. The rail on the left shows:
   on approval, Done). Click a card to open its desk.
 - **G — the Brain**: what the agents know (customers, accounts, UPI IDs, payments, merchants, cases,
   policies). Search it, or switch groups off and on.
-- **D** dark mode, **+ / −** zoom, **⌂** the whole office again, **F** Flows, **W** the workspace.
+- **D** (or the moon / sun button in the top bar) switches between the light and the dark theme, for the office
+  and the workspace together. **+ / −** zoom, **⌂** the whole office again, **F** Flows, **W** the workspace.
 
 ## 9. Flows: your own workflows, run by the agents
 
@@ -288,8 +289,9 @@ between the first ten; Settings has no key.
 | **Trail** | The hash-chained audit log. **Verify chain** says it is intact; **Tamper test** shows an edit being caught. Case links open the case |
 | **Settings** | The server address (for the phone and the Windows app), how to connect another agent over MCP, evidence parsing (upload a statement: UTRs are found and phone numbers tokenised), and **Simulate a crash and restart** (parked approvals survive) |
 
-The header has the live log (every step, tool call and decision as it happens; the backtick key `` ` `` opens it too) and
-the theme switch. The footer's count takes you to
+The workspace's top bar is the office's own: the systems Nirnaya is connected to, today's cases, **OFFICE** to go
+back, the live log (every step, tool call and decision as it happens; the backtick key `` ` `` opens it too) and
+the theme switch, which changes the office too. The footer's count takes you to
 Approvals. On a phone, the tab bar at the bottom has Office, Cases, Approvals, Channels, Flows,
 Supervisor and Settings. On a phone, Cases shows the list; tap a case to open it and **◂ Cases** to go
 back. A case reached from Channels or Approvals opens straight away.

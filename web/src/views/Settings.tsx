@@ -51,7 +51,7 @@ export function SettingsView() {
         </Card>
         <Card title="Parse an evidence document" className="lg:col-span-2">
           <p className="mb-2 text-[12.5px] text-muted">A bank statement PDF, a merchant email or a screenshot of the failed payment. The text is tokenised before anyone reads it, then mined for UTRs, amounts and dates.</p>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-line-strong px-3 py-1.5 text-[12.5px] hover:bg-panel-2">
+          <label className="caps inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border border-line-strong bg-panel px-3.5 hover:border-fg">
             <Upload size={13} /> Choose a file
             <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.txt,.md,.eml,.csv" onChange={async (e) => {
               const f = e.target.files?.[0];

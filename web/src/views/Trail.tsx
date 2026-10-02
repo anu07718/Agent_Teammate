@@ -20,7 +20,7 @@ export function TrailView() {
       <div className="mx-auto max-w-6xl space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold">Ledger Trail</h2>
+            <h2 className="page-title">Ledger Trail</h2>
             <p className="text-[12.5px] text-muted">Every decision, tool call, approval and policy change, each entry hashed together with the one before it. Changing any past entry breaks every hash after it.</p>
           </div>
           <div className="flex gap-2">
@@ -37,7 +37,7 @@ export function TrailView() {
         <Card title={`${rows.length} most recent entries`} pad={false}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-[12px]">
-              <thead className="text-[11px] uppercase tracking-wider text-faint"><tr><th className="px-3.5 py-2 font-medium">#</th><th className="font-medium">Time</th><th className="font-medium">Case</th><th className="font-medium">Event</th><th className="font-medium">By</th><th className="font-medium">Detail</th><th className="font-medium">Hash</th></tr></thead>
+              <thead className="caps text-faint"><tr><th className="px-3.5 py-2 font-medium">#</th><th className="font-medium">Time</th><th className="font-medium">Case</th><th className="font-medium">Event</th><th className="font-medium">By</th><th className="font-medium">Detail</th><th className="font-medium">Hash</th></tr></thead>
               <tbody>
                 {[...rows].reverse().map((r) => (
                   <tr key={r.seq} className="border-t border-line align-top">

@@ -74,7 +74,7 @@ Reply → Oversight).
 - Case tokens travel between departments as the case moves, desks show their last lines on screen,
   and the Brain glints on the nodes the Evidence desk reads.
 - Keys: **1–6** departments · **B** the company board · **G** the Brain · **P** the calendar (click a day
-  to book a task or start a routine) · **C** chat with the lead · **D** dark mode · **F** flows ·
+  to book a task or start a routine) · **C** chat with the lead · **D** dark or light (for the workspace too) · **F** flows ·
   **M** channels · **W** the workspace.
 
 | ![Approval at the Risk desk](docs/screenshots/office-approval.png) | ![The office in dark mode](docs/screenshots/office-dark.png) |

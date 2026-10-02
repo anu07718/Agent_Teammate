@@ -60,7 +60,7 @@ export function LedgerView() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-4 py-2.5">
-        <h2 className="mr-2 text-[14px] font-semibold">Live systems (simulated)</h2>
+        <h2 className="page-title mr-2 text-[22px]">Live systems (simulated)</h2>
         <Button size="sm" onClick={load}><RefreshCw size={13} /> Refresh</Button>
         <Button size="sm" variant="ghost" onClick={async () => { await api.resetWorld(); toast("World reset to the seeded state", "info"); await load(); }}><RotateCcw size={13} /> Reset world</Button>
         <span className="mx-1 h-5 w-px bg-line" />
@@ -69,7 +69,7 @@ export function LedgerView() {
           const down = data?.down?.includes(s);
           return (
             <button key={s} onClick={() => outage(s, !down)} title={down ? "Restore" : "Simulate an outage"}
-              className={cx("h-6 cursor-pointer rounded-full border px-2 text-[11px]", down ? "border-escalate/40 bg-escalate/15 text-escalate" : "border-line-strong text-muted hover:text-fg")}>
+              className={cx("caps h-7 cursor-pointer rounded-full border px-2.5", down ? "border-escalate/40 bg-escalate/15 text-escalate" : "border-line-strong text-muted hover:border-fg hover:text-fg")}>
               {s}{down ? " · down" : ""}
             </button>
           );

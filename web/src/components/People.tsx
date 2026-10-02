@@ -50,11 +50,11 @@ export function People({ max = 5, size = 24, className = "" }: { max?: number; s
           <div className="flex gap-1.5">
             <input id="my-name" autoFocus value={name} maxLength={32} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.stopPropagation()}
               className="h-8 min-w-0 flex-1 rounded-md border px-2 text-[13px] outline-none" style={{ borderColor: "var(--people-line, #e6e8ee)", background: "transparent", color: "inherit" }} />
-            <button type="submit" className="h-8 cursor-pointer rounded-md px-3 text-[12px] font-semibold text-white" style={{ background: "#5b7cfa" }}>Save</button>
+            <button type="submit" className="h-8 cursor-pointer rounded-full px-3.5 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ background: "var(--o-ink)", color: "var(--o-bg)" }}>Save</button>
           </div>
           {people.length > 0 && (
             <ul className="mt-3 space-y-1.5 border-t pt-2" style={{ borderColor: "var(--people-line, #e6e8ee)" }}>
-              <li className="text-[11px] font-medium uppercase tracking-wider opacity-60">Here now</li>
+              <li className="caps opacity-60">Here now</li>
               {people.map((p) => (
                 <li key={p.client} className="flex items-center gap-2 text-[12px]">
                   <Avatar p={p} size={20} /><span className="font-medium">{p.name}{p.client === me().client ? " (you)" : ""}</span>

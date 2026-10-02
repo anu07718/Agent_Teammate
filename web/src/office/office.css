@@ -1,23 +1,6 @@
 /* The Nirnaya office: a quiet paper palette, serif headings, letter-spaced small caps for labels. */
+/* the palette and fonts (--o-*) are in index.css, shared with the workspace; html.dark switches them */
 .o-root {
-  --o-bg: #fbfcf6;
-  --o-bg-2: #eff0e7;
-  --o-card: #fdfefa;
-  --o-card-2: #f6f7f0;
-  --o-ink: #171614;
-  --o-grey: #5f5e59;
-  --o-faint: #8f8d86;
-  --o-line: rgba(23, 22, 20, 0.12);
-  --o-line-2: rgba(23, 22, 20, 0.22);
-  --o-green: #1f8f6a;
-  --o-amber: #b7791f;
-  --o-amber-bg: #fff4de;
-  --o-red: #d4524d;
-  --o-shadow: 0 1px 2px rgba(23, 22, 20, 0.05), 0 8px 26px rgba(23, 22, 20, 0.07);
-  --o-serif: "Instrument Serif", "Iowan Old Style", Georgia, "Times New Roman", serif;
-  --o-ui: Inter, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --o-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --o-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -27,19 +10,6 @@
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
   user-select: none;
-}
-.o-root.o-dark {
-  --o-bg: #1d1e1c;
-  --o-bg-2: #151614;
-  --o-card: #232422;
-  --o-card-2: #2a2b28;
-  --o-ink: #ecebe4;
-  --o-grey: #b0aea6;
-  --o-faint: #85837c;
-  --o-line: rgba(236, 235, 228, 0.12);
-  --o-line-2: rgba(236, 235, 228, 0.24);
-  --o-amber-bg: #3a2f1c;
-  --o-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 .o-root * { box-sizing: border-box; }
 /* resets without specificity, so every component's own size and colour wins */
@@ -71,7 +41,7 @@
   background: #fff; border: 1px solid var(--o-line); box-shadow: 0 1px 2px rgba(23, 22, 20, 0.06);
   transition: transform 0.2s var(--o-ease), opacity 0.3s; flex: none;
 }
-.o-dark .o-tile { background: #f3f2ec; }
+.dark .o-tile { background: #f3f2ec; }
 .o-tile svg { width: 15px; height: 15px; }
 .o-tile.off { opacity: 0.35; filter: grayscale(1); }
 .o-tile.hot { animation: o-pulse 0.9s var(--o-ease); }

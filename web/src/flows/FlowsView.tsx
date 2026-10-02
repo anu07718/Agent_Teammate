@@ -13,10 +13,10 @@ export function FlowsView() {
   const openFlow = (id: string | null) => { setOpen(id); try { if (id) sessionStorage.setItem("nirnaya.flows.open", id); } catch { /* storage off */ } };
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-10 shrink-0 items-end gap-1 border-b border-line bg-panel px-3" role="tablist" aria-label="Flows">
+      <div className="flex h-11 shrink-0 items-end gap-1 border-b border-line bg-bg px-3" role="tablist" aria-label="Flows">
         {([["live", "Live", Activity], ["builder", "Builder", Workflow]] as const).map(([id, label, Icon]) => (
           <button key={id} role="tab" aria-selected={tab === id} onClick={() => go(id)}
-            className={cx("flex h-9 cursor-pointer items-center gap-1.5 border-b-2 px-3 text-[12.5px]", tab === id ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg")}>
+            className={cx("caps flex h-10 cursor-pointer items-center gap-1.5 border-b-2 px-3", tab === id ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg")}>
             <Icon size={14} /> {label}
           </button>
         ))}

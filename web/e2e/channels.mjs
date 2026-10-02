@@ -189,7 +189,7 @@ await step("Channels is in the nav (4th: key 4 opens it); all four channels star
   await page.getByRole("heading", { name: "Channels", exact: true }).waitFor();
   expect((await nav("Channels").getAttribute("aria-current")) === "true", "Channels is not the current view");
   expect((await nav("Channels").getAttribute("title")) === "Channels (4)", "the nav does not say key 4");
-  for (const ch of ["email", "whatsapp", "voice", "hook"]) expect(/\boff\b/.test(await card(ch).innerText()), `${ch} is not off`);
+  for (const ch of ["email", "whatsapp", "voice", "hook"]) expect(/\boff\b/i.test(await card(ch).innerText()), `${ch} is not off`);
   if (!(await snapshot()).conversations.length) await page.getByText("No conversations yet").waitFor();
 });
 
@@ -260,10 +260,10 @@ await step("Email: set up on a real mail server and saved; the password is kept 
 await step("Email on: the card says on; Check inbox now connects (the first check only remembers where the mailbox is)", async () => {
   await f("Email on").check();
   await toast("Email saved").waitFor();
-  await until(async () => /\b(on|working)\b/.test(await card("email").innerText()));
+  await until(async () => /\b(on|working)\b/i.test(await card("email").innerText()));
   await page.getByRole("button", { name: "Check inbox now" }).click();
   await toast(/Connected: new mail from now on will be answered|new email\(s\) read/).waitFor();
-  await until(async () => /working/.test(await card("email").innerText()), 15000);
+  await until(async () => /working/i.test(await card("email").innerText()), 15000);
 });
 
 await step("Contacts: the demo customers' numbers are known already; a bad address is refused; two people linked, one removed; unknown senders saved", async () => {

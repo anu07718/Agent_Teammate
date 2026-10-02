@@ -50,7 +50,7 @@ export function Live({ onOpenFlow }: { onOpenFlow: (flowId: string) => void }) {
       <div className="mx-auto min-w-0 max-w-[1400px] space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">How the agents are working</h2>
+            <h2 className="page-title">How the agents are working</h2>
             <p className="text-[12.5px] text-muted">Every customer case goes through the same ten steps; each step is a desk in the office. Pick a case to see how far it has come.</p>
           </div>
           <div className="flex flex-wrap gap-2 text-[12px]">
@@ -71,10 +71,10 @@ export function Live({ onOpenFlow }: { onOpenFlow: (flowId: string) => void }) {
                 <div key={s.name} className="fl-pipe-cell">
                   <div className={cx("fl-step", busy && "busy", state && `lit-${state}`)} data-step={s.name}>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10.5px] font-medium uppercase tracking-wider text-faint">{i + 1}</span>
+                      <span className="caps text-faint">{i + 1}</span>
                       {busy && <span className="fl-here" title={s.here.join(", ")}>{s.here.length} here</span>}
                     </div>
-                    <div className="mt-0.5 text-[13px] font-semibold">{STEP_LABEL[s.name] ?? s.name}</div>
+                    <div className="caps mt-1 text-fg">{STEP_LABEL[s.name] ?? s.name}</div>
                     <div className="text-[11px] text-muted">{STEP_WHAT[s.name]}</div>
                     <div className="mt-1.5 truncate text-[11.5px]" title={s.agents.map(name).join(", ")}>{s.agents.map(name).join(" · ")}</div>
                     <div className="mt-1 flex justify-between text-[10.5px] text-faint"><span>{s.done} done</span>{s.avg_ms != null && <span>{s.avg_ms < 1000 ? `${Math.round(s.avg_ms)} ms` : `${(s.avg_ms / 1000).toFixed(1)} s`}</span>}</div>
@@ -115,7 +115,7 @@ export function Live({ onOpenFlow }: { onOpenFlow: (flowId: string) => void }) {
             <Card title="Department tasks">
               <div className="grid grid-cols-3 gap-2 text-center sm:grid-cols-5">
                 {([["scheduled", "booked"], ["next", "next"], ["doing", "doing"], ["waiting", "waiting"], ["done", "done"]] as const).map(([k, l]) => (
-                  <div key={k} className="rounded-md bg-panel-2 px-1 py-2"><div className={cx("text-lg font-semibold tabular", k === "waiting" && p.ops[k] ? "text-hedge" : "")}>{p.ops[k] ?? 0}</div><div className="text-[10.5px] uppercase tracking-wider text-faint">{l}</div></div>
+                  <div key={k} className="rounded-md bg-panel-2 px-1 py-2"><div className={cx("serif text-[22px] leading-tight", k === "waiting" && p.ops[k] ? "text-hedge" : "")}>{p.ops[k] ?? 0}</div><div className="caps text-faint">{l}</div></div>
                 ))}
               </div>
             </Card>

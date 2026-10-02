@@ -152,7 +152,7 @@ await step("Live: a flow run going now is listed; clicking it opens that flow in
   await waitingRun(r.id);
   const row = page.getByRole("button").filter({ hasText: "Live gate" }).filter({ hasText: r.id });
   await row.waitFor();
-  expect((await row.innerText()).includes("waiting"), "the run is not shown as waiting");
+  expect((await row.innerText()).toLowerCase().includes("waiting"), "the run is not shown as waiting");
   await row.click();
   await page.getByRole("tab", { name: "Builder", selected: true }).waitFor();
   expect((await flowSel().inputValue()) === gate.id, "the Builder opened another flow");

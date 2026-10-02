@@ -129,27 +129,27 @@ export function CallPage() {
     <div className="min-h-dvh bg-bg text-fg">
       <div className="mx-auto flex min-h-dvh max-w-xl flex-col px-4 py-6">
         <header className="mb-4 flex items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-[18px] font-bold text-white">N</span>
+          <span className="serif grid h-10 w-10 shrink-0 place-items-center rounded-full bg-fg text-[22px] text-bg">N</span>
           <div>
-            <h1 className="text-[18px] font-semibold">Talk to Nirnaya</h1>
+            <h1 className="page-title text-[26px]">Talk to Nirnaya</h1>
             <p className="text-[12.5px] text-muted">Payment support: failed UPI debits, refunds, duplicate charges, unauthorised payments.</p>
           </div>
         </header>
 
         {!inCall && (
-          <div className="space-y-3 rounded-xl border border-line bg-panel p-4" data-testid="call-setup">
-            <label className="block text-[12.5px]"><span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-faint">Who is calling (a demo customer)</span>
+          <div className="shadow-card space-y-3 rounded-xl border border-line bg-panel p-4" data-testid="call-setup">
+            <label className="block text-[12.5px]"><span className="mb-1 block caps text-faint">Who is calling (a demo customer)</span>
               <select aria-label="Who is calling" value={who} onChange={(e) => setWho(e.target.value)} className="h-10 w-full rounded-md border border-line-strong bg-panel-2 px-2.5">
                 {(customers ?? []).map((c) => <option key={c.id} value={c.id}>{c.name} · {c.id}</option>)}
                 <option value="">Someone new (the agent asks who you are)</option>
               </select>
             </label>
-            <label className="block text-[12.5px]"><span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-faint">Language</span>
+            <label className="block text-[12.5px]"><span className="mb-1 block caps text-faint">Language</span>
               <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)} className="h-10 w-full rounded-md border border-line-strong bg-panel-2 px-2.5">
                 {LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </label>
-            <button onClick={() => void start()} disabled={customers === null} className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-act text-[15px] font-semibold text-white hover:opacity-90 disabled:cursor-wait disabled:opacity-50">
+            <button onClick={() => void start()} disabled={customers === null} className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-act text-[12px] font-semibold uppercase tracking-[0.16em] text-white hover:opacity-90 disabled:cursor-wait disabled:opacity-50">
               <PhoneCall size={18} /> {SR ? "Start the call" : "Start the chat"}
             </button>
             {!SR && <p className="text-[12px] text-muted">This browser can't listen (try Chrome or Edge to talk), so you can type instead.</p>}
@@ -164,12 +164,12 @@ export function CallPage() {
             {lines.map((l, i) => l.who === "note" ? (
               <div key={i} className="text-center text-[11.5px] text-faint">{l.text}</div>
             ) : (
-              <div key={i} className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-[14px] leading-relaxed ${l.who === "you" ? "ml-auto bg-accent text-white" : "bg-panel-2"}`} data-who={l.who}>
+              <div key={i} className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-[14px] leading-relaxed ${l.who === "you" ? "ml-auto bg-fg text-bg" : "bg-panel-2"}`} data-who={l.who}>
                 {l.text}
                 {l.case_id && <div className="mt-0.5 text-[10.5px] opacity-70">case {l.case_id}</div>}
               </div>
             ))}
-            {heard && <div className="ml-auto max-w-[85%] rounded-2xl bg-accent/30 px-3.5 py-2 text-[14px] italic">{heard}…</div>}
+            {heard && <div className="ml-auto max-w-[85%] rounded-2xl bg-fg/15 px-3.5 py-2 text-[14px] italic">{heard}…</div>}
           </div>
         )}
 
@@ -180,7 +180,7 @@ export function CallPage() {
             </div>
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (typed.trim() && phase !== "thinking") { try { rec.current?.abort(); } catch { /* */ } const t = typed.trim(); setTyped(""); void turn(t, "text"); } }}>
               <input aria-label="Type a message" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Or type here…" className="h-11 flex-1 rounded-full border border-line-strong bg-panel-2 px-4 text-[14px]" />
-              <button type="submit" aria-label="Send" disabled={!typed.trim() || phase === "thinking"} className="grid h-11 w-11 cursor-pointer place-items-center rounded-full bg-accent text-white disabled:opacity-40"><Send size={16} /></button>
+              <button type="submit" aria-label="Send" disabled={!typed.trim() || phase === "thinking"} className="grid h-11 w-11 cursor-pointer place-items-center rounded-full bg-fg text-bg disabled:opacity-40"><Send size={16} /></button>
             </form>
             <div className="flex justify-center gap-3">
               {canTalk && (

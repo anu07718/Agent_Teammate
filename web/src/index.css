@@ -24,55 +24,80 @@
   --color-grid: var(--grid);
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --font-serif: "Instrument Serif", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --color-info: var(--info);
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
 }
 
-/* light */
+/* One look for the office and the workspace: a paper palette in light and near-black in dark, Inter for
+   text, Instrument Serif for headings and numbers, letter-spaced small caps for labels. html.dark switches
+   both (setTheme in store.ts); the office's own classes read the same --o-* variables. */
 :root {
-  --bg: #fafafa;
-  --panel: #ffffff;
-  --panel-2: #f5f5f5;
-  --raised: #ffffff;
-  --fg: #0a0a0a;
-  --muted: #525252;
-  --faint: #8a8a8a;
-  --line: #e5e5e5;
-  --line-strong: #d4d4d4;
-  --accent: #3b5bdb;
-  --accent-fg: #ffffff;
+  --o-bg: #fbfcf6;
+  --o-bg-2: #eff0e7;
+  --o-card: #fdfefa;
+  --o-card-2: #f4f5ee;
+  --o-ink: #171614;
+  --o-grey: #5f5e59;
+  --o-faint: #8f8d86;
+  --o-line: rgba(23, 22, 20, 0.12);
+  --o-line-2: rgba(23, 22, 20, 0.22);
+  --o-green: #1f8f6a;
+  --o-amber: #b7791f;
+  --o-amber-bg: #fff4de;
+  --o-red: #d4524d;
+  --o-shadow: 0 1px 2px rgba(23, 22, 20, 0.05), 0 8px 26px rgba(23, 22, 20, 0.07);
+  --o-serif: "Instrument Serif", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --o-ui: Inter, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --o-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --o-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --bg: var(--o-bg);
+  --panel: var(--o-card);
+  --panel-2: var(--o-card-2);
+  --raised: var(--o-card);
+  --fg: var(--o-ink);
+  --muted: var(--o-grey);
+  --faint: var(--o-faint);
+  --line: var(--o-line);
+  --line-strong: var(--o-line-2);
+  --accent: var(--o-ink);
+  --accent-fg: var(--o-bg);
   --gold: #b7791f;
-  --act: #15803d;
-  --hedge: #b45309;
-  --escalate: #c81e1e;
-  --refuse: #525a66;
+  --act: var(--o-green);
+  --hedge: var(--o-amber);
+  --escalate: var(--o-red);
+  --refuse: #6b6a65;
+  --info: #3b6fd8;
   --series-1: #2a78d6;
   --series-2: #eb6834;
-  --grid: #ececea;
+  --grid: rgba(23, 22, 20, 0.08);
   color-scheme: light;
 }
 
-/* dark (default) */
 .dark {
-  --bg: #0a0a0a;
-  --panel: #121212;
-  --panel-2: #171717;
-  --raised: #1c1c1c;
-  --fg: #f5f5f5;
-  --muted: #a3a3a3;
-  --faint: #737373;
-  --line: rgb(255 255 255 / 0.07);
-  --line-strong: rgb(255 255 255 / 0.14);
-  --accent: #6d8bff;
-  --accent-fg: #0a0a0a;
+  --o-bg: #0d0d0c;
+  --o-bg-2: #070706;
+  --o-card: #161615;
+  --o-card-2: #1d1d1b;
+  --o-ink: #ecebe4;
+  --o-grey: #b0aea6;
+  --o-faint: #85837c;
+  --o-line: rgba(236, 235, 228, 0.12);
+  --o-line-2: rgba(236, 235, 228, 0.24);
+  --o-green: #3fbf8f;
+  --o-amber: #e3a545;
+  --o-amber-bg: #3a2f1c;
+  --o-red: #ec7570;
+  --o-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.45);
   --gold: #e8b339;
-  --act: #4ade80;
-  --hedge: #fbbf24;
-  --escalate: #f87171;
-  --refuse: #a3aab5;
+  --refuse: #a3a29b;
+  --info: #7aa2ff;
   --series-1: #3987e5;
   --series-2: #d95926;
-  --grid: #262625;
+  --grid: rgba(236, 235, 228, 0.08);
   color-scheme: dark;
 }
 
@@ -101,3 +126,22 @@ body {
 
 /* the team's avatars and name popover follow the workspace theme */
 :root, .dark { --people-ring: var(--panel); --people-bg: var(--raised); --people-fg: var(--fg); --people-line: var(--line-strong); }
+
+/* the office's type, for the workspace too */
+.caps { font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+.serif { font-family: var(--o-serif); font-weight: 400; }
+/* a page's title, like the office's TASK STATUS */
+.page-title { font-family: var(--o-serif); font-weight: 400; font-size: 28px; line-height: 1.1; letter-spacing: 0.02em; text-transform: uppercase; }
+.shadow-card { box-shadow: var(--o-shadow); }
+/* the workspace bar uses the office's top bar, in the page's flow instead of over the 3D office */
+.o-top.o-top-static { position: relative; flex: none; height: auto; min-height: 52px; }
+.o-theme svg { width: 15px; height: 15px; color: var(--o-ink); }
+.dark .o-tile.o-theme { background: var(--o-card); }
+/* LIVE / OFFLINE, as a quiet pill like the office's */
+.o-live { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid color-mix(in srgb, var(--o-green) 45%, transparent); color: var(--o-green); }
+.o-live .o-dot { width: 7px; height: 7px; background: var(--o-green); animation: blink 1.2s ease-in-out infinite; }
+.o-live.off { border-color: color-mix(in srgb, var(--o-red) 45%, transparent); color: var(--o-red); }
+.o-live.off .o-dot { background: var(--o-red); animation: none; }
+.o-tile.o-theme.on { border-color: var(--o-ink); }
+

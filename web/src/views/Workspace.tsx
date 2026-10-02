@@ -34,7 +34,7 @@ function CaseList({ className }: { className?: string }) {
           if (!items.length) return null;
           return (
             <div key={g.id} className="mb-1">
-              <div className="flex items-center justify-between px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">
+              <div className="flex items-center justify-between px-3 py-1.5 caps text-faint">
                 {g.label}<span>{items.length}</span>
               </div>
               {items.map((c) => (
@@ -86,8 +86,8 @@ function DecisionTab({ c }: { c: CaseDetail }) {
         return (
           <Card key={i} title={<span className="flex items-center gap-2">{ACTION_LABEL[s.action] ?? s.action} {d && <RouteBadge route={d.route} />}{d?.committed && <Badge tone="good">committed</Badge>}{d?.undone && <Badge tone="warn">undone</Badge>}</span>}>
             <div className="flex items-baseline gap-4">
-              <div><div className="text-[11px] text-faint">Calibrated</div><div className="text-xl font-semibold tabular">{s.calibrated.toFixed(4)}</div></div>
-              <div><div className="text-[11px] text-faint">Model stated</div><div className="text-xl font-semibold tabular text-muted line-through decoration-escalate/60">{s.stated.toFixed(2)}</div></div>
+              <div><div className="caps text-faint">Calibrated</div><div className="serif text-[28px] leading-tight">{s.calibrated.toFixed(4)}</div></div>
+              <div><div className="caps text-faint">Model stated</div><div className="serif text-[28px] leading-tight text-muted line-through decoration-escalate/60">{s.stated.toFixed(2)}</div></div>
               <div className="ml-auto text-right text-[11.5px] text-muted">α {pct(s.threshold.alpha, 2)} · {s.threshold.band} band<br />act λ {s.threshold.act.lambda?.toFixed(4) ?? "∞"} · hedge λ {s.threshold.hedge.lambda?.toFixed(4) ?? "∞"}</div>
             </div>
             <ScoreBar s={s} />
@@ -217,7 +217,7 @@ function CaseView({ id }: { id: string }) {
               <div className="space-y-2.5">
                 {c.conversation.map((m, i) => (
                   <div key={i} className={cx("max-w-[90%] rounded-lg px-3 py-2 text-[12.5px] leading-relaxed", m.role === "customer" ? "bg-panel-2" : "ml-auto bg-accent/14")}>
-                    <div className="mb-0.5 text-[10.5px] uppercase tracking-wider text-faint">{m.role === "customer" ? c.customer_name : "Nirnaya"} · {clock(m.ts)}</div>
+                    <div className="mb-0.5 caps text-faint">{m.role === "customer" ? c.customer_name : "Nirnaya"} · {clock(m.ts)}</div>
                     {m.text}
                   </div>
                 ))}
@@ -259,7 +259,7 @@ function CaseView({ id }: { id: string }) {
             <Card title="Live systems (read-only)">
               <div className="space-y-2 text-[12px]">
                 {(["upi", "debit", "refund", "profile"] as const).map((k) => c.evidence?.[k] ? (
-                  <div key={k}><div className="text-[11px] uppercase tracking-wider text-faint">{k}</div><Mono className="break-all text-muted">{JSON.stringify(c.evidence[k])}</Mono></div>
+                  <div key={k}><div className="caps text-faint">{k}</div><Mono className="break-all text-muted">{JSON.stringify(c.evidence[k])}</Mono></div>
                 ) : null)}
                 {c.evidence?.errors?.map((e, i) => <div key={i} className="text-escalate">{e}</div>)}
               </div>
@@ -421,7 +421,7 @@ export function ApprovalsView() {
     <div className="h-full overflow-y-auto p-4">
       <div className="mx-auto max-w-4xl space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">Approvals</h2>
+          <h2 className="page-title">Approvals</h2>
           <p className="text-[12.5px] text-muted">Each item is sealed to the exact ledger state it was prepared on. If anything moves before you approve, the seal no longer matches and the case is re-checked; your approval never lands on a different state.</p>
         </div>
         {!items.length && !ops.length && !flows.length && <Card><Empty icon={<CheckCheck size={24} />} title="Nothing is waiting">Cases Nirnaya is not certified to finish alone appear here with their evidence, with department tasks and flows that need a person's OK.</Empty></Card>}
@@ -431,9 +431,9 @@ export function ApprovalsView() {
             <ApprovalCard item={it} onDone={load} />
           </Card>
         ))}
-        {ops.length > 0 && <h3 className="pt-2 text-[12px] font-medium uppercase tracking-wider text-faint">Department tasks waiting for an OK</h3>}
+        {ops.length > 0 && <h3 className="caps pt-2 text-faint">Department tasks waiting for an OK</h3>}
         {ops.map((op) => <OpItem key={op.id} op={op} onDone={load} />)}
-        {flows.length > 0 && <h3 className="pt-2 text-[12px] font-medium uppercase tracking-wider text-faint">Flows asking a person</h3>}
+        {flows.length > 0 && <h3 className="caps pt-2 text-faint">Flows asking a person</h3>}
         {flows.map((w) => <FlowItem key={w.run_id + w.node} w={w} onDone={load} />)}
       </div>
     </div>

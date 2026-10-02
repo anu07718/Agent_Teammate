@@ -94,7 +94,7 @@ export function ChannelsView() {
     <div className="h-full overflow-y-auto p-4">
       <div className="mx-auto max-w-6xl space-y-4">
         <div>
-          <h2 className="text-lg font-semibold">Channels</h2>
+          <h2 className="page-title">Channels</h2>
           <p className="text-[12.5px] text-muted">The agents answer real email, WhatsApp and phone calls, and talk on the call page. Every message becomes a case in the same ten steps; replies go back the way they came.</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
@@ -103,8 +103,8 @@ export function ChannelsView() {
             const on = !!snap.config[c.ch]?.enabled;
             return (
               <button key={c.id} onClick={() => go(c.id)} data-channel={c.ch}
-                className={cx("min-w-0 cursor-pointer rounded-lg border bg-panel px-3 py-2.5 text-left hover:border-accent/60 sm:px-3.5 sm:py-3", tab === c.id ? "border-accent/70" : "border-line")}>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-semibold"><span className="flex min-w-0 items-center gap-2">{c.icon}<span className="truncate">{c.label}</span></span>
+                className={cx("shadow-card min-w-0 cursor-pointer rounded-xl border bg-panel px-3 py-2.5 text-left hover:border-fg/50 sm:px-4 sm:py-3", tab === c.id ? "border-fg/70" : "border-line")}>
+                <div className="caps flex flex-wrap items-center gap-x-2 gap-y-1 text-fg"><span className="flex min-w-0 items-center gap-2">{c.icon}<span className="truncate">{c.label}</span></span>
                   <Badge tone={!on ? "muted" : st?.ok === false ? "bad" : st?.ok ? "good" : "accent"} className="ml-auto">{!on ? "off" : st?.ok === false ? "error" : st?.ok ? "working" : "on"}</Badge>
                 </div>
                 <div className="mt-1 text-[11.5px] text-muted">{c.provider}</div>
@@ -165,7 +165,7 @@ function Field({ s, d, set, cfg, locked }: { s: Spec; d: any; set: (k: string, v
   const id = `f-${s.k}`;
   return (
     <label className="block" htmlFor={id}>
-      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-faint">{s.label}</span>
+      <span className="mb-1 block caps text-faint">{s.label}</span>
       {s.options ? (
         <select id={id} aria-label={s.label} className={inputCls} value={d[s.k] ?? ""} disabled={locked} onChange={(e) => set(s.k, e.target.value)}>
           {s.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -249,7 +249,7 @@ function ChannelForm({ ch, specs, snap, onSaved, extra, presets, testTo = "", te
       <div className="space-y-4">
         {typeof extra === "function" ? extra(d) : extra}
         <div className="rounded-md border border-line bg-panel-2 p-3">
-          <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-faint">Try it</div>
+          <div className="mb-2 caps text-faint">Try it</div>
           {ch !== "hook" && <input aria-label="Test recipient" value={to} onChange={(e) => setTo(e.target.value)} className={cx(inputCls, "mb-2")} placeholder={testTo} />}
           {ch !== "hook" && <textarea aria-label="Test message" value={text} onChange={(e) => setText(e.target.value)} className={cx(inputCls, "mb-2 h-16 resize-none py-1.5")} />}
           <Button size="sm" disabled={busy || !d.enabled || (ch !== "hook" && !to.trim())} onClick={() => void test()}><Send size={12} /> {testLabel}</Button>
@@ -264,7 +264,7 @@ function ChannelForm({ ch, specs, snap, onSaved, extra, presets, testTo = "", te
 function Hooks({ rows }: { rows: [string, string][] }) {
   return (
     <div className="rounded-md border border-line bg-panel-2 p-3">
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-faint">Paste into the provider</div>
+      <div className="mb-2 caps text-faint">Paste into the provider</div>
       <div className="space-y-2">
         {rows.map(([l, v]) => (
           <div key={l}>
@@ -286,7 +286,7 @@ function EmailExtras({ snap, d, reload }: { snap: Snapshot; d: Record<string, an
     <div className="space-y-3">
       {d.receive === "imap" ? (
         <div className="rounded-md border border-line bg-panel-2 p-3 text-[12px]">
-          <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-faint">Inbox</div>
+          <div className="mb-1 caps text-faint">Inbox</div>
           <p className="text-muted">Checked every {e.poll_seconds} s{snap.status.email?.last_poll ? `, last ${ago(snap.status.email.last_poll)}` : ""}. The first check only remembers where your mailbox is, so old mail gets no replies.</p>
           <Button size="sm" className="mt-2" disabled={busy || !e.enabled || e.receive !== "imap"} onClick={async () => {
             setBusy(true);
@@ -317,7 +317,7 @@ function HookHelp({ snap }: { snap: Snapshot }) {
     <div className="space-y-3">
       <Hooks rows={[["Send customer messages here (POST, JSON)", snap.webhooks.hook]]} />
       <div className="rounded-md border border-line bg-panel-2 p-3 text-[12px]">
-        <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-faint">From n8n, Make or a script</div>
+        <div className="mb-1 caps text-faint">From n8n, Make or a script</div>
         <p className="text-muted">Any channel n8n can read (Telegram, Instagram DMs, Slack, a form) can reach the agents: an HTTP Request node POSTs <Mono>{"{channel, from, name, text}"}</Mono> with the token, and gets the agent's reply back in the answer. With <Mono>"wait": false</Mono> the reply is POSTed to your URL instead.</p>
         <pre className="mt-2 overflow-x-auto rounded bg-panel p-2 text-[11px]">{curl}</pre>
       </div>
@@ -366,7 +366,7 @@ function InboxPane({ snap }: { snap: Snapshot }) {
           <div ref={box} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3" data-testid="thread">
             {conv.messages.map((m, i) => (
               <div key={i} className={cx("max-w-[85%] rounded-lg px-3 py-2 text-[12.5px] leading-relaxed", m.dir === "in" ? "bg-panel-2" : "ml-auto bg-accent/14", m.status === "failed" && "border border-escalate/50")}>
-                <div className="mb-0.5 flex flex-wrap gap-x-2 text-[10.5px] uppercase tracking-wider text-faint">
+                <div className="mb-0.5 flex flex-wrap gap-x-2 caps text-faint">
                   <span>{m.dir === "in" ? conv.name : m.by ? m.by : "Nirnaya"} · {clock(m.ts)}</span>
                   {m.case_id && <span>{m.case_id}</span>}
                   {m.status && <span className={m.status === "failed" ? "text-escalate" : ""}>{m.status}</span>}
@@ -424,7 +424,7 @@ function ContactsPane({ snap, onSaved, reload }: { snap: Snapshot; onSaved: (s: 
         </ul>
       </div>
       <div className="rounded-md border border-line bg-panel-2 p-3">
-        <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-faint">Someone who is not a contact</div>
+        <div className="mb-1 caps text-faint">Someone who is not a contact</div>
         <p className="mb-2 text-[12px] text-muted">On channels that answer anyone: ask them for their registered mobile number or customer ID (and remember it), or treat them as one demo customer so anyone can try the agents.</p>
         <select aria-label="Unknown senders" value={snap.config.unknown} disabled={unknownLocked} className={inputCls}
           onChange={(e) => capi.save({ unknown: e.target.value }).then((s) => { onSaved(s); toast("Saved", "good"); }).catch((x) => toast(x.message, "bad"))}>

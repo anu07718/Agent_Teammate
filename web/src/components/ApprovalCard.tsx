@@ -64,13 +64,13 @@ export function ApprovalCard({ item, onDone }: { item: { case: any; pending: any
     <div className="space-y-3">
       {item.text && <div className="rounded-md bg-panel-2 px-3 py-2 text-[12.5px] text-muted">“{item.text}”</div>}
       <div>
-        <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-faint">Evidence</div>
+        <div className="mb-1 caps text-faint">Evidence</div>
         <ul className="space-y-1 text-[12.5px]">
           {item.facts.map((f, i) => <li key={i} className="flex gap-2"><Check size={13} className="mt-0.5 shrink-0 text-act" />{f}</li>)}
         </ul>
       </div>
       <div>
-        <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-faint">Sealed for your decision</div>
+        <div className="mb-1 caps text-faint">Sealed for your decision</div>
         <ul className="space-y-1.5">
           {pending.actions.map((a: any, i: number) => {
             const d = esc.find((x: any) => x.action.type === a.type);
@@ -90,7 +90,7 @@ export function ApprovalCard({ item, onDone }: { item: { case: any; pending: any
       </div>
       {pending.shadow?.diff && (
         <div>
-          <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-faint">Shadow run (nothing live has changed)</div>
+          <div className="mb-1 caps text-faint">Shadow run (nothing live has changed)</div>
           <DiffTable diff={pending.shadow.diff} />
         </div>
       )}
