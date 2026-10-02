@@ -10,6 +10,19 @@ The cases are failed UPI debits, refunds, duplicate charges and unauthorised pay
 through ten steps. At the end, the agents either act on their own, act with an undo, or stop and ask
 you. Departments also take tasks you give them in plain words, now or on a schedule.
 
+**Where to find what you need**
+
+| You want to | Go to |
+|---|---|
+| Run the project (website, Windows app, Android app) | [1. Start it](#1-start-it), and [run.md](run.md) for installing from source |
+| Give the agents work and watch them do it | [3. Your first case](#3-your-first-case-watch-the-agents-work), [4. Approvals](#4-when-the-agents-need-you-approvals), [5. Department tasks](#5-give-a-department-a-task) |
+| Schedule tasks so the agents do them by themselves | [6. Make it repeat, or book it for later](#6-make-it-repeat-or-book-it-for-later) |
+| Automate a chain of steps (with checks and approvals) | [9. Flows](#9-flows-your-own-workflows-run-by-the-agents) |
+| Let real customers reach the agents (email, WhatsApp, calls) | [10. Real customers](#10-real-customers-the-call-page-email-whatsapp-and-calls), and [channels.md](channels.md) for the setup |
+| Know for sure that the agents work and finish their tasks | [The checklist](#checklist-are-my-agents-working-and-finishing-their-tasks) (five minutes, by hand) |
+| Test every button and option automatically | [13. Test everything automatically](#13-test-everything-automatically) (one command) |
+| Fix something that looks wrong | [12. Troubleshooting](#12-troubleshooting) |
+
 ---
 
 ## 1. Start it
@@ -20,7 +33,7 @@ you. Departments also take tasks you give them in plain words, now or on a sched
 | **Windows** | Run `Nirnaya-Setup-0.1.0-x64.exe` from `exe/dist/`. If SmartScreen appears, choose **More info → Run anyway**. Then open **Nirnaya** from the Start menu or the desktop | the window says *Starting the Nirnaya server…* for a few seconds (longest the first time), then shows the office with **LIVE · NIRNAYA** |
 | **An Android phone** | First start a server on a computer on the same Wi-Fi: `python -m nirnaya --host 0.0.0.0 --port 8000`. Install `Nirnaya-0.1.0.apk` from `apk/dist/` and open it. Type the computer's address, for example `192.168.1.20:8000`, and press **CONNECT** | the office appears; on a phone, the Task Status panel is a sheet at the bottom |
 
-If the panel says **OFFLINE**, the app cannot reach its server. See [Troubleshooting](#11-troubleshooting).
+If the panel says **OFFLINE**, the app cannot reach its server. See [Troubleshooting](#12-troubleshooting).
 
 ## 2. Tell it who you are
 
@@ -315,9 +328,9 @@ Five minutes, in this order. Each line says what you should see.
    - Workspace → Supervisor: Drift (PSI) says *within range* and the drift monitor says **stable**.
    - Workspace → Trail → **Verify chain** says "Chain intact".
 
-If all nine pass, the agents are working. To check everything automatically, run the end-to-end tests
-(`make e2e`, or the scripts in `web/e2e/`; see the README). `web/e2e/workflow.mjs` does exactly this
-checklist in a real browser.
+If all nine pass, the agents are working. To check everything automatically, run `make test-all`
+([section 13](#13-test-everything-automatically)). Its `workflow` suite does exactly this checklist in a
+real browser.
 
 ## 12. Troubleshooting
 
@@ -333,3 +346,38 @@ checklist in a real browser.
 | A flow will not save | the red line names the node and the problem | Fix that node, then Save |
 | An email, WhatsApp message or call gets no answer | the sender is not a contact, or the channel is off | Channels → Contacts: link them (or set the channel to answer anyone). More in [channels.md](channels.md#troubleshooting) |
 | You want a clean start | — | Ledger → **Reset world** resets the bank. Starting the server with `--reset` clears all cases |
+
+## 13. Test everything automatically
+
+One command checks every part of Nirnaya the way a person would use it, in a real browser, and writes a
+report. You need Python, Node and, for the email checks, Java 17 or newer (it starts a local mail server
+for them by itself).
+
+```bash
+make test-all                 # the website: about 75 minutes
+make test-all QUICK=1         # without the two slowest suites: about 30 minutes
+make test-all TARGET=exe      # the Windows app's own server, under wine (after make exe)
+make test-all TARGET=apk      # the web files inside the APK (after make apk)
+```
+
+Each browser suite gets its own fresh server, so one cannot spoil another. At the end it prints a table
+and writes `test-results/<target>/report.md`. Each failure has a screenshot in `test-results/<target>/shots/`,
+and the full output is in `log.txt`. "Everything passed" means every check below passed.
+
+| Suite | Checks | What it does |
+|---|---|---|
+| backend (pytest) | 77 | the engine's guarantees: the error ceiling, stale approvals refused, exactly-once commits, restarts, the audit chain, drift, MCP, office tasks, schedules, flows, the team, and the channels against stand-in providers and a real mail server |
+| `run` | 17 | the main path through the office and the workspace, approvals in the office chat, a phone layout |
+| `workflow` | 15 | this guide followed step by step, sections 1 to 10 and the checklist |
+| `fields-office` | 19 | every office control: the six departments, all 11 samples and their outcomes, 4 customers × 5 channels, every department's example tasks, approve and reject in the rail, 11 repeat cadences, routine controls, filters, the calendar, the board, the Brain, all 19 agents' chats |
+| `fields-workspace` | 23 | every workspace view by button and key, cases, approvals of every kind, every α and autonomy setting, the ledger's outages and events, the benchmark, the trail, settings, the phone tab bar |
+| `fields-flows` | 26 | every Flows node, field and option, every reason a save is refused, 23 Check conditions on a real case, approvals, Stop, Copy, Delete, the examples, every placeholder, the canvas controls, a scheduled run |
+| `flows` | 9 | a flow built by drag and drop, wired, run, and answered on its node |
+| `team` | 9 | two people on one server: who is online, the shared chat, names on actions, a flow one saves and the other runs |
+| `phone-client` | 8 | the Android app's flow: asks for the server, connects, works, Cases and Channels on the phone, a server with an access key |
+| `channels` | 22 | every Channels field; real email through the mail server; WhatsApp and Twilio stand-ins; n8n; a flow on a WhatsApp message; forward and call from a case; APPROVE by email; the call page by voice and by typing; the lock screen |
+| `audit` | every button | a supervisor's walk: every view and button in dark and light, on a computer and a phone, looking for errors, failed requests, clipped text and sideways scrolling |
+
+To run one suite against a server you already started: `make run` in one terminal, then for example
+`cd web && node e2e/workflow.mjs`. Some suites need a fresh server (start it with `--reset`).
+

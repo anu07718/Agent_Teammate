@@ -31,6 +31,8 @@ interface AgentRT {
 interface Opts {
   panelWidth: () => number;
   railWidth: () => number;
+  /** fixed controls over the office (the zoom buttons) that cards keep clear of, in the host's pixels */
+  obstacles?: () => { l: number; t: number; w: number; h: number }[];
   onAgent: (id: string) => void;
   onPod: (id: PodId) => void;
   onBrain: () => void;
@@ -676,7 +678,11 @@ export class OfficeScene {
     const W = this.host.clientWidth, H = this.host.clientHeight;
     const rightEdge = W - this.opts.panelWidth() - 30;
     const z = this.view.zoom;
-    const cardScale = 1 - 0.28 * smooth(1.1, 2.6, z);
+    // the six cards need about 1150 × 880 px of office to sit apart; on a smaller screen they shrink to fit
+    const room = clamp(Math.min((rightEdge - 8) / 1150, (H - TOP_BAR) / 830), 0.7, 1);
+    const cardScale = (1 - 0.28 * smooth(1.1, 2.6, z)) * room;
+    const bottom = W > 1180 ? 30 : 8; // clear of the key hints along the bottom (office.css hides them below 1180 px)
+    const cards: { el: HTMLElement; l: number; t: number; w: number; h: number; hang: string }[] = [];
     const pillScale = 0.66 + 0.34 * smooth(0.9, 2.2, z);
     const pills: { el: HTMLElement; x: number; y: number; w: number; h: number }[] = [];
     for (const [key, el] of this.binds) {
@@ -696,8 +702,8 @@ export class OfficeScene {
         // keep every card on screen, clear of the bar and the panel
         const left = x - (tx === "-100%" ? w : tx === "-50%" ? w / 2 : 0);
         const top = y - (ty === "-100%" ? h : ty === "-50%" ? h / 2 : 0);
-        const cl = clamp(left, 8, rightEdge - w), ct = clamp(top, TOP_BAR + 10, H - h - 8);
-        el.style.transform = `translate(${cl}px,${ct}px) scale(${cardScale})`;
+        const cl = clamp(left, 8, rightEdge - w), ct = clamp(top, TOP_BAR + 10, H - h - bottom);
+        cards.push({ el, l: cl, t: ct, w, h, hang: cfg.hang });
         const dimmed = this.focused && this.focused !== "brain";
         const underRail = dimmed && cl < this.opts.railWidth() + 20; // a card the rail would half cover
         el.style.opacity = dimmed ? (pod === this.focused || underRail ? "0" : String(1 - 0.8 * this.dimK)) : "1";
@@ -714,6 +720,27 @@ export class OfficeScene {
         el.style.transform = `translate(${x}px,${y - 10}px) translate(-50%,-100%)`;
         el.style.opacity = this.focused && this.focused !== "brain" ? String(1 - 0.8 * this.dimK) : "1";
       }
+    }
+    // Cards that still cover each other (a short or narrow window): the one that hangs down moves below
+    // the other and the one that hangs up moves above it, or the other way, or sideways, whichever is on
+    // the screen and clear of the cards already placed. With no free place at all it stays where it is.
+    type Box = { l: number; t: number; w: number; h: number };
+    const covers = (a: Box, b: Box) => a.l < b.l + b.w + 6 && a.l + a.w + 6 > b.l && a.t < b.t + b.h + 6 && a.t + a.h + 6 > b.t;
+    const fixed: Box[] = this.opts.obstacles?.() ?? [];
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i], before = [...fixed, ...cards.slice(0, i)];
+      for (let tries = 0; tries < 4; tries++) {
+        const o = before.find((x) => covers(c, x));
+        if (!o) break;
+        const up = { l: c.l, t: o.t - c.h - 6 }, down = { l: c.l, t: o.t + o.h + 6 };
+        const side = [{ l: o.l - c.w - 6, t: c.t }, { l: o.l + o.w + 6, t: c.t }];
+        const free = (p: { l: number; t: number }) => p.t >= TOP_BAR + 10 && p.t <= H - c.h - bottom && p.l >= 8 && p.l <= rightEdge - c.w
+          && !before.some((x) => covers({ ...c, ...p }, x));
+        const to = [...(c.hang === "up" || c.t < o.t ? [up, down] : [down, up]), ...side].find(free);
+        if (!to) break;
+        c.l = to.l; c.t = to.t;
+      }
+      c.el.style.transform = `translate(${c.l}px,${c.t}px) scale(${cardScale})`;
     }
     // Desks sit close together when the whole office is in view, so name tags would cover each other.
     // Lowest tag first; any tag that would overlap one already placed moves up above it.

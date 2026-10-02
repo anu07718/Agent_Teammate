@@ -2,7 +2,7 @@
 PY ?= python3
 PORT ?= 8000
 
-.PHONY: install build run dev test test-backend test-web test-mail mail-server e2e e2e-phone e2e-flows e2e-team e2e-workflow e2e-fields e2e-channels audit exe apk icons clean
+.PHONY: install build run dev test test-all test-backend test-web test-mail mail-server e2e e2e-phone e2e-flows e2e-team e2e-workflow e2e-fields e2e-channels audit exe apk icons clean
 
 install:
 	$(PY) -m pip install -e "backend[dev,llm,docs,monitoring]"
@@ -20,6 +20,12 @@ dev:
 	(cd web && npm run dev)
 
 test: test-backend test-web
+
+# everything automated, each browser suite on its own fresh server, then test-results/<target>/report.md
+# (about 75 minutes; QUICK=1 skips the two slowest suites). TARGET=exe tests the Windows app's own server
+# under wine, TARGET=apk the web files inside the APK.
+test-all:
+	TARGET=$(or $(TARGET),web) bash tools/test-all.sh
 
 test-backend:
 	cd backend && $(PY) -m pytest -q

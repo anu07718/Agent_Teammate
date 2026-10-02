@@ -9,12 +9,13 @@
 ## Commands
 ```bash
 make install                      # pip install -e backend[...] + npm ci in web/
+make test-all                     # tools/test-all.sh: pytest, build, every e2e suite on its own fresh server (+ keyed one on PORT+1), GreenMail started if needed → test-results/<target>/report.md; TARGET=exe|apk, QUICK=1, SUITES="run workflow"
 make run                          # build web, serve API + web on :8000
 make dev                          # API :8000 (reload) + Vite :5173 (proxies /api and /mcp)
 cd backend && python -m pytest -q # 77 tests, about 60 s (19 in tests/test_channels.py; the GreenMail one skips without a mail server)
 cd web && npx tsc -b --noEmit && npm run build
 cd web && npm run e2e             # needs a server on :8000; 17 browser checks (software WebGL flags are in the script)
-cd web && node e2e/phone-client.mjs  # the APK's flow at phone size, 5 checks (needs a server and web/dist)
+cd web && node e2e/phone-client.mjs  # the APK's flow at phone size, 8 checks (needs a server and web/dist; APP_DIST= the APK's assets/public, KEYED_URL= a keyed server)
 cd web && node e2e/flows.mjs      # Flows: drag and drop, wire, save, run, approve on the node; 9 checks
 cd web && node e2e/team.mjs       # two people (?as=Asha, ?as=Ravi): presence, shared chat, names, shared flows; 9 checks
 cd web && node e2e/audit.mjs      # every view and button in dark/light, desktop/phone: errors, failed requests, clipped text, fonts (~10 min; OFFICE=0 skips the office click pass, which run.mjs and team.mjs cover)
@@ -113,6 +114,7 @@ Use the Sentry SDKs only. Do not use pixel-agents' image assets. The MIT and Apa
 - The office chat is server-side now: never add user or agent messages with `say()` (that is for this-browser-only prompts and errors). Approval notes come from `team._on_event`, not from the button handlers.
 - `Panel.tsx` renders its hint and row meta with `dangerouslySetInnerHTML`: anything a person typed or named (task text, names, server error text) goes through `esc()` from `office/data.ts`.
 - Under swiftshader every click in the 3D office takes about 2 s (Playwright waits for stable frames). Give office clicks 6 s or more in scripts.
+- Office department cards (`scene.placeBinds`): they scale with the room (`room`, down to 0.7 of full size below about 1150 × 830 px of office), stay clear of the bar, the panel, the key hints (shown above 1180 px wide) and the zoom buttons (`opts.obstacles`), and a card that would cover one already placed moves up, down or sideways to a free spot. Check new office chrome against cards at 1024–1920 px widths: nothing should overlap.
 - Office name tags are anchored on the head *without* the breathing bob (`r.pin`), rounded to whole pixels, and pushed apart when they would overlap (`placeBinds`). A tag that moves every frame never counts as stable, and Playwright's click waits for it forever.
 - Office status chips and their meta line both contain words like DONE/WAITING/REFUSED: in tests select `.o-row[data-id=…] .o-st`, not `getByText("DONE")`. Filter tabs are named "All 12" (with a space): match `/^All\s*\d+$/`.
 - Flows canvas: `overflow: clip`, not just hidden. Focus and Playwright's scroll-into-view can scroll an `overflow: hidden` box, which shifts the world under the pointer maths. Pointer capture on the canvas swallows clicks on the zoom buttons, so `onBgDown` ignores `.fl-zoom`. SVG `<text>` (wire labels) has no `innerText`: read `textContent`.

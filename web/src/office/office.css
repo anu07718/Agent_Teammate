@@ -143,6 +143,7 @@
 .o-overview { position: absolute; top: 66px; z-index: 22; padding: 9px 16px; border-radius: 999px; background: var(--o-ink); color: var(--o-bg); border: 0; letter-spacing: 0.14em; font-size: 11px; font-weight: 600; }
 .o-keys { position: absolute; bottom: 10px; left: 20px; color: var(--o-faint); font-size: 10px; letter-spacing: 0.12em; white-space: nowrap; pointer-events: none; z-index: 5; }
 .o-keys b { font-weight: 700; color: var(--o-grey); }
+@media (max-width: 1180px) { .o-keys { display: none; } } /* it would run under the zoom buttons and the panel */
 
 /* ── the Task Status panel ── */
 .o-panel {

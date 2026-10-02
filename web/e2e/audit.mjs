@@ -124,6 +124,33 @@ for (const k of ["1", "2", "3", "4", "5", "6", "b", "g", "p", "c", "d", "d"]) {
   await d.page.keyboard.press("Escape");
 }
 
+// the office at common screen sizes: no department card covers another card, the panel, the top bar, the
+// zoom buttons or the key hints
+for (const [w, h] of [[1024, 768], [1280, 800], [1366, 768], [1440, 900], [1920, 1080]]) {
+  const s = await session(`office ${w}×${h}`, { viewport: { width: w, height: h } });
+  await s.page.goto(URL);
+  await s.page.locator(".o-card").first().waitFor({ timeout: 20000 });
+  await s.page.waitForTimeout(2500);
+  const hits = await s.page.evaluate(() => {
+    const r = (e) => e.getBoundingClientRect();
+    const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    const cards = [...document.querySelectorAll(".o-card")].filter((c) => !c.closest(".o-rail") && r(c).width);
+    const other = [...document.querySelectorAll(".o-panel, .o-top, .o-zoom, .o-keys")].filter((e) => getComputedStyle(e).display !== "none");
+    const out = [];
+    cards.forEach((c, i) => {
+      cards.slice(i + 1).forEach((o) => { if (hit(r(c), r(o))) out.push(`${c.dataset.pod} covers ${o.dataset.pod}`); });
+      other.forEach((o) => { if (hit(r(c), r(o))) out.push(`${c.dataset.pod} covers ${o.className.split(" ")[0]}`); });
+    });
+    const keys = document.querySelector(".o-keys");
+    if (keys && getComputedStyle(keys).display !== "none")
+      document.querySelectorAll(".o-panel, .o-zoom").forEach((o) => { if (hit(r(keys), r(o))) out.push(`the key hints run under ${o.className.split(" ")[0]}`); });
+    return out;
+  });
+  for (const x of hits) problem(`office ${w}×${h}`, x);
+  for (const e of take(s)) problem(`office ${w}×${h}`, e);
+  await s.ctx.close();
+}
+
 // the workspace views
 await d.page.keyboard.press("w");
 await d.page.waitForTimeout(800);

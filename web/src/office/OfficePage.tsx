@@ -134,6 +134,7 @@ export function OfficePage() {
   const [hot, setHot] = useState<Record<string, number>>({});
   const hostRef = useRef<HTMLDivElement>(null);
   const hudRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef<HTMLDivElement>(null); // the zoom buttons: cards keep clear of them
   const svgRef = useRef<SVGSVGElement>(null);
   const sceneRef = useRef<OfficeScene | null>(null);
   const wiresRef = useRef<Wires | null>(null);
@@ -183,6 +184,12 @@ export function OfficePage() {
     const s = new OfficeScene(hostRef.current!, hudRef.current!, {
       panelWidth: () => (narrow() ? 0 : PANEL_W),
       railWidth: () => (narrow() ? 0 : RAIL_W),
+      obstacles: () => {
+        const z = zoomRef.current, h = hostRef.current;
+        if (!z || !h || !z.offsetWidth) return [];
+        const r = z.getBoundingClientRect(), o = h.getBoundingClientRect();
+        return [{ l: r.left - o.left, t: r.top - o.top, w: r.width, h: r.height }];
+      },
       onAgent: (id) => openAgentRef.current(id),
       onPod: (id) => focusPodRef.current(id),
       onBrain: () => setBrainOpen(true),
@@ -462,7 +469,7 @@ export function OfficePage() {
         focused={focused} nameOf={nameOf} podOf={podOf} openBig={() => setBig(true)} submitRef={submitRef}
         onRow={(t) => (t.state === "scheduled" ? setCal(true) : zoomToTask(t))} onCalendar={() => setCal(true)} width={PANEL_W} />
 
-      <div className="o-zoom" style={{ right: narrow() ? 12 : PANEL_W + 22 }}>
+      <div className="o-zoom" ref={zoomRef} style={{ right: narrow() ? 12 : PANEL_W + 22 }}>
         <button onClick={() => sceneRef.current?.zoomBy(1.4)} title="zoom in (+)" aria-label="Zoom in">+</button>
         <button onClick={() => sceneRef.current?.zoomBy(1 / 1.4)} title="zoom out (−)" aria-label="Zoom out">−</button>
         <button onClick={overview} title="overview (0)" aria-label="Overview">⌂</button>

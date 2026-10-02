@@ -111,6 +111,15 @@ http://127.0.0.1:8000/?as=Asha
 http://<LAN-IP>:8000/?as=Ravi      # a teammate on the same network (server started with --host 0.0.0.0)
 ```
 
+### Test everything
+
+```bash
+make test-all              # every automated check, each browser suite on a fresh server (~75 min)
+make test-all QUICK=1      # skip the two slowest suites (~30 min)
+make test-all TARGET=exe   # the Windows app's own server under wine;  TARGET=apk: the APK's web files
+```
+The report is `test-results/<target>/report.md`. What each suite checks: [workflow.md](workflow.md#13-test-everything-automatically).
+
 ### Health check
 
 ```bash

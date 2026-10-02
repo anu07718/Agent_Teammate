@@ -178,6 +178,11 @@ read status, search the graph and memory, or score an action.
 
 ## Tests
 
+`make test-all` runs everything below, each browser suite on its own fresh server, and writes
+`test-results/web/report.md` (about 75 minutes; `QUICK=1` skips the two slowest). `TARGET=exe` runs the
+same suites against the Windows app's bundled server under wine, and `TARGET=apk` against the web files
+inside the APK. [workflow.md](workflow.md#13-test-everything-automatically) says what each suite covers.
+
 ```bash
 make test-backend   # 77 tests: the α ceiling on fresh data, stale approvals refused, exactly-once commits,
                     # restart durability, checkpoint chaining, tamper detection, drift fail-closed, MCP, HTTP,
@@ -193,7 +198,8 @@ make test-mail      # email through it: threaded replies, robots ignored, forwar
 make test-web       # typecheck + production build
 make run & make e2e # drives the real UI in Chromium: 17 end-to-end checks through the office and the
                     # workspace, including approvals in the office chat and a phone layout
-make e2e-phone      # the Android app's flow at phone size: asks for the server, connects, works (5 checks)
+make e2e-phone      # the Android app's flow at phone size: asks for the server, connects, works, Cases and
+                    # Channels on a phone, a server with an access key (8 checks)
 make e2e-flows      # builds a flow by drag and drop, wires it, runs it, answers its approval (9 checks)
 make e2e-team       # two people on one server: presence, shared chat, names, a flow one saves and the other runs (9 checks)
 make e2e-workflow   # workflow.md followed step by step by a new user in a real browser (15 checks)
