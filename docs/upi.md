@@ -142,6 +142,12 @@ old approval is not used. This is tested.
 The Sentry blocks injected instructions before any agent reads them. Even past that, an agent can only
 propose: the Tool Gateway applies policy caps, and every gateway refund needs a person.
 
+**"Can someone use it as a free chatbot?"**
+No. Every way in (customer messages on every channel, questions to an agent, department tasks) passes a
+finance-only gate first: code, general knowledge and random questions get a short refusal, and the case is
+marked refused. Every prompt tells the model the same, and an answer that holds code or the model's own
+off-topic signal is replaced before anyone sees it.
+
 **"What about failed UPI debits, the most common complaint?"**
 The agents check whether money was taken. If not, the customer is told plainly. If it was, the policy
 follows RBI's T+1 reversal rule and the ₹100-a-day compensation.

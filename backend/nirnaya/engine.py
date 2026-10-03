@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 
-from . import replies, specialists
+from . import replies, scope, specialists
 from . import guard as promise_guard
 from .agents import STEP_AGENTS, Roster
 from .calibration import Calibrator, log_amount
@@ -273,6 +273,15 @@ class Engine:
         if s["verdict"] == "block" or any(r["rule"] == "credential" for r in s["reasons"]):
             case["route"] = "REFUSE"
             case["skip_to"] = "respond"
+        else:
+            # finance only: code, general knowledge and random questions are answered with what the desk does
+            sc = await asyncio.to_thread(scope.check, text, scope.CUSTOMER, self.llm if self.llm.enabled else None)
+            case["scope"] = sc
+            if not sc["in_scope"]:
+                case["route"] = "REFUSE"
+                case["skip_to"] = "respond"
+                rec["note"] += f" · off-topic ({sc['category']}, {sc['by']})"
+                self.trail.append(case["id"], "scope.refused", "sentry", {"category": sc["category"], "by": sc["by"]})
         await self._pause(0.5)
 
     async def _s_understand(self, case: dict, rec: dict):

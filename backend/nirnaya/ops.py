@@ -15,7 +15,7 @@ import re
 import time
 from typing import Callable
 
-from . import benchmark, schedule, specialists
+from . import benchmark, schedule, scope, specialists
 from . import guard as promise_guard
 from .agents import DEPARTMENTS, Roster
 from .gateway import GatewayError
@@ -94,6 +94,10 @@ def interpret(dept: str, text: str, when: dict | None = None) -> dict:
     text = (text or "").strip()
     if dept not in DEPT_NAME:
         return {"kind": "error", "problem": f"unknown department {dept}"}
+    sc = scope.check(text, scope.CUSTOMER if dept in CASE_PODS else scope.STAFF)   # words only: this is the live hint
+    if not sc["in_scope"]:
+        return {"kind": "off_topic", "dept": dept, "category": sc["category"],
+                "problem": "Finance only: " + scope.refusal(scope.STAFF, sc["category"])}
     parsed = {"when": when, "text": text, "needs_time": False, "needs_day": False, "guessed": None} if when \
         else schedule.parse(text)
     if parsed and dept in CASE_PODS and not when and kind_for(parsed["text"], dept, routine=True) != "sample":
@@ -399,10 +403,16 @@ async def run_kind(e, op: dict) -> tuple[bool, str, dict]:
                              else f"Nothing past its TAT · {waiting} waiting on you"), {}
     if k == "digest":
         s = e.stats()
-        return True, (f"{s['cases']} case(s), {s['done']} finished · {PCT(s['autonomy'])} handled alone · "
-                      f"{s['pending_approvals']} waiting on you · "
-                      + (f"first reply {s['avg_first_reply_s']} s on average · " if s["avg_first_reply_s"] else "")
-                      + (f"{rs(s['cost_per_case'])} per case vs {rs(s['human_only_cost_per_case'])} for a human" if s["cost_per_case"] else "no cost yet")), {}
+        facts = (f"{s['cases']} case(s), {s['done']} finished · {PCT(s['autonomy'])} handled alone · "
+                 f"{s['pending_approvals']} waiting on you · "
+                 + (f"first reply {s['avg_first_reply_s']} s on average · " if s["avg_first_reply_s"] else "")
+                 + (f"{rs(s['cost_per_case'])} per case vs {rs(s['human_only_cost_per_case'])} for a human" if s["cost_per_case"] else "no cost yet"))
+        if e.llm.enabled:                       # Oversight words it with the free model; the numbers are checked
+            info: dict = {}
+            worded = await asyncio.to_thread(e.llm.word_digest, facts, info)
+            if worded and info:
+                return True, f"{worded} (via {info['label']} · {info['model']})", {"facts": facts}
+        return True, facts, {}
     if k == "help":
         dept = op["dept"]
         return True, f"{DEPT_NAME[dept]} can: " + "; ".join(can_do(dept)) + ".", {}

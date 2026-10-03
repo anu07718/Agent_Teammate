@@ -305,6 +305,8 @@ class Flows:
                     raise ValueError(f"{label}: write the {'task' if t == 'task' else 'message'}.")
             if t == "task":
                 it = ops_mod.interpret(cfg["dept"], str(cfg["text"]))
+                if it["kind"] == "off_topic":
+                    raise ValueError(f"{label}: {it['problem']}")
                 if it["kind"] == "routine":
                     raise ValueError(f"{label}: “{cfg['text']}” has a schedule in it. Put the schedule on Start.")
                 if it.get("op_kind") == "help":

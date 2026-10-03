@@ -269,3 +269,16 @@ def test_a_real_local_model_classifies_and_drafts(store, calibrator):
     c = asyncio.run(e.run(c["id"]))
     assert c["status"] == "resolved" and "llm" in c["understanding"] and m.last["provider"] == "custom"
     print("reply:", c["conversation"][-1]["text"])
+
+
+def test_oversight_words_the_digest_with_the_model_and_its_numbers_are_checked(fake, store, calibrator):
+    from nirnaya.ops import run_kind
+    fake.models["groq"] = [{"id": "openai/gpt-oss-20b"}]
+    e = Engine(store, step_delay=0, llm=model_on(fake, "groq", store=store), calibrator=calibrator)
+    fake.behaviour["groq"] = [("ok", "A quiet start: 0 cases so far and 0 waiting on you.")]
+    ok, text, extra = asyncio.run(run_kind(e, {"id": "-", "kind": "digest", "text": "", "by": "you"}))
+    assert ok and text.startswith("A quiet start") and "(via Groq · openai/gpt-oss-20b)" in text
+    assert extra["facts"].startswith("0 case(s)")
+    fake.behaviour["groq"] = [("ok", "Great day: 42 cases closed.")]          # a number it made up
+    ok, text, _ = asyncio.run(run_kind(e, {"id": "-", "kind": "digest", "text": "", "by": "you"}))
+    assert text.startswith("0 case(s)") and "via" not in text                 # the plain line instead

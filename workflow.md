@@ -323,8 +323,9 @@ The demo bank's payments are made up, and say so. For real ones (all free, see [
 
 ### A free language model
 
-The agents work without one. With one, a model refines what a customer means, drafts the reply and lets
-an agent answer your questions in its own words. The rules still decide, and the Promise Guard still
+The agents work without one. With one, every agent's language work runs on it: reading what a customer
+means, the finance-only check (when the words alone cannot tell), wording the reply, answering your questions
+in its own words and Oversight's digest. The rules still decide, and the Promise Guard still
 checks every word. Only free tiers are used. Set it up in **Settings → Language model · free tiers only**:
 
 1. Get a free key: **Groq** ([console.groq.com/keys](https://console.groq.com/keys)) is the quickest.
@@ -345,6 +346,12 @@ unreachable). Set commands are always handled by the rules, so they never show t
 ("NR-1001 status"), "routines", "move the ground", and schedules ("every day at 9am …"). A customer
 message (Intake's box, the call page, email, WhatsApp) uses the model too, about twice: once to read what
 the customer means, once to word the reply (which the Promise Guard still checks).
+
+**Finance only.** Agents and customers get answers about banking and payments only. Ask an agent "who is the
+president of India" or "write Python code" and it says it only works on banking and payments; the line under it
+says **via finance-only guard**. A customer who asks the same on any channel gets "I can only help with banking
+and payments here…", and the case shows as refused. A department task like that is refused in the bar before it
+is added. Questions about payments, cases, approvals, routines and the agent's own work are always fine.
 
 On **Automatic**, each Groq model has its own daily allowance: when one is used up, the next free Groq
 model answers, and Groq rests only when all of them are out.

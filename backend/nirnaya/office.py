@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from . import ops as ops_mod
-from . import schedule
+from . import schedule, scope
 from .agents import DEPARTMENTS
 from .ops import KINDS, Ops
 from .team import Team, clean_name
@@ -153,9 +153,15 @@ def _agent_name(e, aid: str) -> str:
     return a["name"] if a else aid
 
 
-async def answer(e, agent_id: str, question: str) -> dict:
-    """An agent answers in its role, grounded in what it actually did (a free language model when one is set up, rules otherwise)."""
+async def answer(e, agent_id: str, question: str, *, checked: bool = False) -> dict:
+    """An agent answers in its role, grounded in what it actually did (a free language model when one is set up,
+    rules otherwise), and only about banking, payments and its own work."""
     a = e.roster.agents[agent_id]
+    if not checked:
+        sc = await asyncio.to_thread(scope.check, question, scope.STAFF, e.llm if e.llm.enabled else None)
+        if not sc["in_scope"]:
+            return {"agent": agent_id, "answer": scope.refusal(scope.STAFF, sc["category"]), "grounded_in": 0,
+                    "llm": e.llm.enabled, "via": "finance-only guard", "refused": sc["category"]}
     recent = [ev for ev in e.bus.recent(400) if ev.get("agent") == agent_id or agent_id in (ev.get("agents") or [])][-25:]
     lines = [f"{time.strftime('%H:%M:%S', time.localtime(ev['ts']))} {ev['kind']} "
              f"{ev.get('case_id') or ''} {ev.get('doing') or ev.get('step') or ev.get('tool') or ''}" for ev in recent]
@@ -163,6 +169,9 @@ async def answer(e, agent_id: str, question: str) -> dict:
     if e.llm.enabled:
         reply = await asyncio.to_thread(e.llm.ask_agent, a["persona"], "\n".join(lines) or "(no activity)", question, info)
     via = f"{info['label']} · {info['model']}" if reply and info else None
+    if reply == scope.OFF:                     # the model kept to finance and said no, or wrote code: refused
+        return {"agent": agent_id, "answer": scope.refusal(scope.STAFF), "grounded_in": len(lines),
+                "llm": e.llm.enabled, "via": "finance-only guard", "refused": "model"}
     if not reply:
         q = question.lower()
         last = a["log"][-4:]
@@ -216,7 +225,7 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
         if due and due < time.time() - 60:
             raise HTTPException(400, "that time has passed; pick one that is still ahead")
         it = ops_mod.interpret(body.dept, body.text, when=body.when)
-        if it.get("problem") and it["kind"] == "routine":
+        if it.get("problem") and it["kind"] in ("routine", "off_topic"):
             raise HTTPException(400, it["problem"])
         if it["kind"] == "routine":
             r = R().add(it["op_kind"], it["when"], text=it["text"], title=it["title"], needs_ok=body.needs_ok, by=by)
@@ -332,6 +341,10 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
         e = E()
         a = e.roster.agents[body.agent]
         text, low = body.text.strip(), body.text.strip().lower()
+        sc = await asyncio.to_thread(scope.check, text, scope.STAFF, e.llm if e.llm.enabled else None)
+        if not sc["in_scope"]:                 # finance only, before any rule or model sees it
+            return {"reply": scope.refusal(scope.STAFF, sc["category"]), "via": "finance-only guard",
+                    "refused": sc["category"]}
         ref = re.search(r"\bNR-\d+\b", text, re.I)
         if re.search(r"\bmove the ground\b", low):
             waiting = [c for c in e.store.list_cases(500) if c.get("pending") and (c.get("plan") or {}).get("txn_id")]
@@ -375,5 +388,5 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
                 return {"reply": f"Done: {r['title']}, {r['desc']}. {_agent_name(e, r['agent'])} has it"
                                  f"{', and it waits for your OK before it runs' if r['needs_ok'] else ''}. Next run {nxt}.",
                         "routine": r}
-        out = await answer(e, body.agent, text)
-        return {"reply": out["answer"], "llm": out["llm"], "via": out["via"]}
+        out = await answer(e, body.agent, text, checked=True)
+        return {"reply": out["answer"], "llm": out["llm"], "via": out["via"], "refused": out.get("refused")}

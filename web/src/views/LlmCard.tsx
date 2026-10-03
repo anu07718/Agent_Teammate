@@ -142,10 +142,16 @@ export function LlmCard() {
         {llm.last && <span className="text-faint">· last answer from {llm.last.label} ({llm.last.model}, {llm.last.ms} ms)</span>}
       </div>
       <p className="mb-3 text-[12px] text-muted">
-        Optional. It refines understanding, drafts replies and lets agents answer in their own words, from tokenised text
-        only; the Promise Guard still checks every word and the rules decide. Providers are tried top to bottom: when one
-        runs out of its free quota it rests and the next answers, and with none the rules carry on. Only free tiers are used:
-        never add a card or buy credits.
+        Optional. Every agent's language work runs on it: reading what a customer means, the finance-only check, wording
+        replies, answering you in chat and Oversight's digest. It sees tokenised text only; the Promise Guard still checks
+        every word, and the rules and the calibrated scores decide anything that moves money. Providers are tried top to
+        bottom: when one runs out of its free quota it rests and the next answers, and with none the rules carry on. Only
+        free tiers are used: never add a card or buy credits.
+      </p>
+      <p className="mb-3 text-[12px] text-muted" data-testid="llm-scope">
+        <b className="text-fg">Finance only.</b> Customers and staff get answers about banking and payments only. Code,
+        general knowledge (“who is the president”) and random questions are refused before the model sees them, and an
+        answer with code in it never goes out.
       </p>
       <div className="grid gap-2.5">
         {llm.providers.map((p, i) => <Row key={p.id} p={p} i={i} n={ids.length} onChange={setLlm} move={(d) => void move(i, d)} />)}

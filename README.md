@@ -182,7 +182,9 @@ workflow and policy hashes.
 
 1. **Intake.** The PII tokeniser swaps phone, card, account, UPI ID, PAN and Aadhaar for format-preserving
    tokens. **Sentry** screens for injection, credential sharing, velocity and outsized amounts in under
-   200 ms, with no model on the path.
+   200 ms, with no model on the path. **Finance only:** code, general knowledge ("who is the president")
+   and random questions are refused here with a short answer about what the desk does. The words decide
+   most messages; the free model is asked only when they cannot tell (`backend/nirnaya/scope.py`).
 2. **Understand.** Intent and details in English and Hinglish; a free language model refines them when one is set up.
 3. **Evidence.** Parallel read-only calls through the Tool Gateway to the UPI switch, core banking, the
    refund engine and the CRM, plus similar past cases and the context graph.

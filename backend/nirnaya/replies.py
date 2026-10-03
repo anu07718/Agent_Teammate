@@ -1,6 +1,9 @@
 """Customer replies built only from case facts, in English or Hinglish. The Promise Guard checks each one."""
 from __future__ import annotations
 
+from . import scope
+from .understand import extract_entities
+
 
 def rs(v: float) -> str:
     """Indian digit grouping: ₹1,25,000 and ₹2,450.50."""
@@ -89,6 +92,9 @@ def _t(lang: str, key: str) -> str:
 def compose(case: dict) -> str:
     lang = case.get("understanding", {}).get("entities", {}).get("language", "en")
     sentry = case.get("sentry", {})
+    if case.get("route") == "REFUSE" and (case.get("scope") or {}).get("in_scope") is False:
+        lang = extract_entities(case.get("text", "")).get("language", "en")
+        return scope.refusal(scope.CUSTOMER, case["scope"].get("category", ""), lang)
     if case.get("route") == "REFUSE":
         rules = {r["rule"] for r in sentry.get("reasons", [])}
         return _t(lang, "refuse_injection" if "prompt_injection" in rules else "refuse_credential")
