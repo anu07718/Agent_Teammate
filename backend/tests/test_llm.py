@@ -117,6 +117,21 @@ def test_a_429_moves_on_to_the_next_free_provider_and_rests_the_first(fake):
     assert len(fake.posts("groq")) == n and len(fake.posts("gemini")) == 2
 
 
+def test_each_model_has_its_own_quota_so_the_next_free_model_answers_before_the_provider_rests(fake):
+    fake.models["groq"] = [{"id": "openai/gpt-oss-20b"}, {"id": "llama-3.1-8b-instant"}]
+    fake.behaviour["groq"] = [("429", None), ("ok", EXTRACT)]
+    m = model_on(fake, "groq")
+    assert m.extract("I was charged twice ₹349 at CafeBrew yesterday")["intent"] == "duplicate_charge"
+    assert [b["model"] for b in fake.posts("groq")] == ["openai/gpt-oss-20b", "llama-3.1-8b-instant"]
+    assert m.last["model"] == "llama-3.1-8b-instant"
+    assert {r["id"]: r for r in m.describe()["providers"]}["groq"]["resting"] == 0   # Groq itself carries on
+    m.extract("again")                                     # the tired model is not asked until its quota is back
+    assert fake.posts("groq")[-1]["model"] == "llama-3.1-8b-instant"
+    fake.behaviour["groq"] = [("429", None)]               # now that one is out too: Groq rests, the rules carry on
+    assert m.extract("and again") is None
+    assert {r["id"]: r for r in m.describe()["providers"]}["groq"]["resting"] >= 100
+
+
 def test_all_providers_out_of_quota_falls_back_to_the_rules(fake, store, calibrator):
     fake.behaviour["groq"] = [("429", None)]
     fake.behaviour["mistral"] = [("401", None)]
@@ -199,6 +214,18 @@ def test_the_engine_uses_a_free_model_and_the_guard_still_checks_its_reply(fake,
     assert c["understanding"]["llm"]["intent"] == "duplicate_charge"
     assert c["guard"]["llm_draft"] is not None                      # the draft went through the Promise Guard
     assert "9876543210" not in json.dumps(fake.posts("groq"))       # the model only saw tokenised text
+
+
+def test_an_agent_answer_says_which_free_model_wrote_it(fake, store, calibrator):
+    from nirnaya import office
+    fake.models["groq"] = [{"id": "openai/gpt-oss-20b"}]
+    fake.behaviour["groq"] = [("ok", "Nothing on my desk yet: no cases have reached me today.")]
+    e = Engine(store, step_delay=0, llm=model_on(fake, "groq", store=store), calibrator=calibrator)
+    agent = next(iter(e.roster.agents))
+    out = asyncio.run(office.answer(e, agent, "what have you done today?"))
+    assert out["answer"].startswith("Nothing on my desk") and out["via"] == "Groq · openai/gpt-oss-20b"
+    e.llm = LLM(store, off=True)                                     # no model: the rules answer, with no "via"
+    assert asyncio.run(office.answer(e, agent, "what have you done today?"))["via"] is None
 
 
 def test_api_settings_round_trip(fake, monkeypatch, tmp_path, calibrator):

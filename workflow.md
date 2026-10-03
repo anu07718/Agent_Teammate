@@ -338,6 +338,17 @@ checks every word. Only free tiers are used. Set it up in **Settings → Languag
 The top bars then say **REASONS WITH GROQ** (or whichever answered last); with none, **RULES ONLY**.
 Every limit and every sign-up step is in [free.md](free.md#a-free-language-model).
 
+**Is it answering?** In the office, click an agent (or press **C** for the lead) and ask something in your own
+words, such as "what have you done today?". An answer the model wrote has a small **via Groq · <model>**
+line under it; an answer without that line came from the built-in rules (the model was off, out of quota or
+unreachable). Set commands are always handled by the rules, so they never show the line: a case's status
+("NR-1001 status"), "routines", "move the ground", and schedules ("every day at 9am …"). A customer
+message (Intake's box, the call page, email, WhatsApp) uses the model too, about twice: once to read what
+the customer means, once to word the reply (which the Promise Guard still checks).
+
+On **Automatic**, each Groq model has its own daily allowance: when one is used up, the next free Groq
+model answers, and Groq rests only when all of them are out.
+
 ### Working as a team
 
 Everyone who opens the same server address works in the same office, and so does everyone who joined it

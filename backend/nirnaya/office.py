@@ -159,9 +159,10 @@ async def answer(e, agent_id: str, question: str) -> dict:
     recent = [ev for ev in e.bus.recent(400) if ev.get("agent") == agent_id or agent_id in (ev.get("agents") or [])][-25:]
     lines = [f"{time.strftime('%H:%M:%S', time.localtime(ev['ts']))} {ev['kind']} "
              f"{ev.get('case_id') or ''} {ev.get('doing') or ev.get('step') or ev.get('tool') or ''}" for ev in recent]
-    reply = None
+    reply, info = None, {}
     if e.llm.enabled:
-        reply = await asyncio.to_thread(e.llm.ask_agent, a["persona"], "\n".join(lines) or "(no activity)", question)
+        reply = await asyncio.to_thread(e.llm.ask_agent, a["persona"], "\n".join(lines) or "(no activity)", question, info)
+    via = f"{info['label']} · {info['model']}" if reply and info else None
     if not reply:
         q = question.lower()
         last = a["log"][-4:]
@@ -182,7 +183,7 @@ async def answer(e, agent_id: str, question: str) -> dict:
         else:
             done = "; ".join(f"{x['case_id']} ({x['doing']})" for x in last)
             reply = f"I'm {a['name']}. {doing} " + (f"Recently: {done}. " if done else "") + f"I've handled {a['handled']} step(s) since the office opened."
-    return {"agent": agent_id, "answer": reply, "grounded_in": len(lines), "llm": e.llm.enabled}
+    return {"agent": agent_id, "answer": reply, "grounded_in": len(lines), "llm": e.llm.enabled, "via": via}
 
 
 def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Callable[[], Team],
@@ -324,7 +325,7 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
         by = clean_name(body.by, "you")
         asked = T().post(body.agent, "user", body.text.strip(), by=by)
         out = await _chat(body, by)
-        answered = T().post(body.agent, "agent", out["reply"])
+        answered = T().post(body.agent, "agent", out["reply"], via=out.get("via"))
         return {**out, "asked": asked, "answered": answered}
 
     async def _chat(body: ChatIn, by: str) -> dict:
@@ -375,4 +376,4 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
                                  f"{', and it waits for your OK before it runs' if r['needs_ok'] else ''}. Next run {nxt}.",
                         "routine": r}
         out = await answer(e, body.agent, text)
-        return {"reply": out["answer"], "llm": out["llm"]}
+        return {"reply": out["answer"], "llm": out["llm"], "via": out["via"]}

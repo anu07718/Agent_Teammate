@@ -46,7 +46,7 @@ PROVIDERS: dict[str, dict] = {
     "groq": {
         "short": "Groq", "label": "Groq", "base": "https://api.groq.com/openai/v1", "env": ["GROQ_API_KEY"],
         "signup": "https://console.groq.com/keys",
-        "free": "Free plan, no card: about 30 requests a minute and 1,000 a day per model. Do not upgrade the plan.",
+        "free": "Free plan, no card: about 30 requests a minute and 1,000 a day per model; on Automatic the next model takes over. Do not upgrade the plan.",
         "prefer": ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "llama-3.3-70b-versatile",
                    "llama-3.1-8b-instant"],
         "skip": r"whisper|guard|orpheus|tts|safeguard|playai|distil",
@@ -184,9 +184,9 @@ def normalise_extract(d: dict | None) -> dict | None:
 
 
 class ProviderError(Exception):
-    def __init__(self, msg: str, rest: float = 0.0, retry_plain: bool = False):
+    def __init__(self, msg: str, rest: float = 0.0, retry_plain: bool = False, quota: bool = False):
         super().__init__(msg)
-        self.rest, self.retry_plain = rest, retry_plain
+        self.rest, self.retry_plain, self.quota = rest, retry_plain, quota
 
 
 class LLM:
@@ -198,6 +198,7 @@ class LLM:
         self._mem: dict = {}                     # settings when there is no store (tests, the benchmark)
         self._models: dict[str, tuple[float, list[str]]] = {}
         self._rest: dict[str, float] = {}        # provider → when it may be asked again
+        self._model_rest: dict[tuple[str, str], float] = {}   # (provider, model) → when: quotas are per model
         self._stats: dict[str, dict] = {pid: {"calls": 0, "ok": 0, "fails": 0, "error": None, "ms": None}
                                         for pid in PROVIDERS}
         self._probe: dict[str, tuple[float, bool]] = {}
@@ -259,6 +260,7 @@ class LLM:
             self._models.pop(pid, None)
             self._rest.pop(pid, None)
             self._probe.pop(pid, None)
+            self._model_rest = {k: v for k, v in self._model_rest.items() if k[0] != pid}
             self._stats[pid]["error"] = None
         if self.store is not None:
             self.store.kv_set(KEY, saved)
@@ -334,7 +336,8 @@ class LLM:
                     rest = float(ra) if ra else 60.0
                 except ValueError:
                     rest = 60.0
-                raise ProviderError(f"free quota used up for now (429): {msg[:160]}", rest=min(max(rest, 5.0), 3600.0))
+                raise ProviderError(f"free quota used up for now (429): {msg[:160]}", rest=min(max(rest, 5.0), 3600.0),
+                                    quota=True)
             if e.code in (401, 403):
                 raise ProviderError(f"the key was refused ({e.code}): {msg[:160]}", rest=600.0)
             if e.code == 402:
@@ -372,25 +375,56 @@ class LLM:
         self._models[pid] = (time.time(), out)
         return out
 
-    def _model(self, pid: str, p: dict) -> str:
-        if p.get("model"):
-            return p["model"]
+    def _candidates(self, pid: str) -> list[str]:
+        """The provider's free models, best first: its preferred ones, then the rest it lists."""
         try:
             listed = self.models(pid)
         except ProviderError:
             listed = []
+        out: list[str] = []
         for want in PROVIDERS[pid]["prefer"]:
             for m in listed:
-                if m == want or (want.startswith(":") and m.endswith(want)) or m.startswith(want):
-                    return m
-        if listed:
-            return listed[0]
+                if m not in out and (m == want or (want.startswith(":") and m.endswith(want)) or m.startswith(want)):
+                    out.append(m)
+        return out + [m for m in listed if m not in out]
+
+    def _model(self, pid: str, p: dict) -> str:
+        if p.get("model"):
+            return p["model"]
+        listed = self._candidates(pid)
+        now = time.time()
+        for m in listed:
+            if now >= self._model_rest.get((pid, m), 0):
+                return m
+        if listed:   # every model has used its free quota for now
+            wait = min(self._model_rest.get((pid, m), now) for m in listed) - now
+            raise ProviderError(f"every free model's quota is used up for now (next one back in {round(wait)} s)",
+                                rest=max(wait, 5.0), quota=True)
         raise ProviderError("no model to use: pick one in Settings" + (" (ollama pull qwen3:4b)" if pid == "ollama" else ""),
                             rest=60.0)
 
     def _chat(self, pid: str, p: dict, system: str, user: str, *, json_mode: bool, max_tokens: int,
               temperature: float) -> tuple[str, str]:
-        model = self._model(pid, p)
+        """Each model has its own free quota: on Automatic, a model out of quota rests and the next one answers;
+        only when all of them are out does the provider rest."""
+        for _ in range(6):
+            model = self._model(pid, p)
+            try:
+                return self._chat_once(pid, p, model, system, user, json_mode=json_mode, max_tokens=max_tokens,
+                                       temperature=temperature)
+            except ProviderError as e:
+                if not (e.quota and not p.get("model")):
+                    raise
+                self._model_rest[(pid, model)] = time.time() + (e.rest or 60.0)
+                log.info("llm %s: %s is out of quota, trying its next free model", pid, model)
+                now, names = time.time(), self._candidates(pid)
+                if all(now < self._model_rest.get((pid, m), 0) for m in names):
+                    e.rest = max(min(self._model_rest.get((pid, m), now) for m in names) - now, 5.0)
+                    raise
+        raise ProviderError("too many models out of quota at once", rest=60.0, quota=True)
+
+    def _chat_once(self, pid: str, p: dict, model: str, system: str, user: str, *, json_mode: bool, max_tokens: int,
+                   temperature: float) -> tuple[str, str]:
         body: dict = {"model": model, "max_tokens": max_tokens, "temperature": temperature,
                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
         if pid == "groq" and "gpt-oss" in model:
@@ -415,7 +449,7 @@ class LLM:
         return text, model
 
     def _call(self, system: str, user: str, *, json_mode: bool = False, max_tokens: int = 700,
-              temperature: float = 0.3) -> str | None:
+              temperature: float = 0.3, info: dict | None = None) -> str | None:
         """Ask each ready provider in turn; None when none answered (the rules carry on)."""
         if self.off:
             return None
@@ -449,6 +483,8 @@ class LLM:
                 st["error"] = None
                 st["ms"] = ms
             self.last = {"provider": pid, "label": PROVIDERS[pid]["label"], "model": model, "ts": time.time(), "ms": ms}
+            if info is not None:                 # who answered this call (self.last can move on in another thread)
+                info.update(provider=pid, label=PROVIDERS[pid]["short"], model=model)
             self.error = None
             return text
         if errors:
@@ -479,9 +515,10 @@ class LLM:
             "Facts:\n- " + "\n- ".join(facts) + f"\n\nA correct but plain version:\n{template}", max_tokens=400)
         return out.strip().strip('"') if out else None
 
-    def ask_agent(self, persona: str, context: str, question: str) -> str | None:
+    def ask_agent(self, persona: str, context: str, question: str, info: dict | None = None) -> str | None:
         return self._call(persona + "\n\nAnswer from the activity log below only. If it is not there, say so. "
-                          "Keep it short.", f"Activity log:\n{context}\n\nQuestion: {question}", max_tokens=400)
+                          "Keep it short.", f"Activity log:\n{context}\n\nQuestion: {question}", max_tokens=400,
+                          info=info)
 
     # ── for Settings and the top bars ───────────────────────────────────────
     def test(self, pid: str) -> dict:

@@ -101,14 +101,14 @@ class Team:
         return self.E().store.kv_get(CHAT_KEY, {}) or {}
 
     def post(self, agent: str, who: str, text: str, *, by: str | None = None, icon: str | None = None,
-             ref: str | None = None) -> dict:
+             ref: str | None = None, via: str | None = None) -> dict:
         """who: "user" (a person wrote it), "agent" (the agent answered), "work" (a note of what happened)."""
         e = self.E()
         all_ = self.chats()
         seq = e.store.kv_get("office_chat_seq", 0) + 1
         e.store.kv_set("office_chat_seq", seq)
         msg = {"id": seq, "agent": agent, "who": who, "text": text[:4000], "by": clean_name(by) if by else None,
-               "icon": icon, "ref": ref, "ts": time.time()}
+               "icon": icon, "ref": ref, "ts": time.time(), **({"via": via[:80]} if via else {})}
         all_[agent] = (all_.get(agent) or [])[-(PER_AGENT - 1):] + [msg]
         e.store.kv_set(CHAT_KEY, all_)
         e.bus.publish("chat.message", message=msg)

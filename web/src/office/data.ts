@@ -68,10 +68,10 @@ export const oapi = {
 };
 
 /** a message in the shared office chat, as the server keeps it */
-export interface ServerMsg { id: number; agent: string; who: "user" | "agent" | "work"; text: string; by: string | null; icon: string | null; ref: string | null; ts: number }
+export interface ServerMsg { id: number; agent: string; who: "user" | "agent" | "work"; text: string; by: string | null; icon: string | null; ref: string | null; ts: number; via?: string }
 
 // ── the office store ─────────────────────────────────────────────────────────
-export interface ChatMsg { who: "agent" | "user" | "work"; text: string; ts: number; icon?: string; id?: number; by?: string | null; local?: boolean }
+export interface ChatMsg { who: "agent" | "user" | "work"; text: string; ts: number; icon?: string; id?: number; by?: string | null; local?: boolean; via?: string }
 export interface FeedLine { icon: string; text: string; ts: number }
 interface OState {
   snap: OfficeSnap | null;
@@ -109,7 +109,7 @@ export function say(agent: string, msg: Omit<ChatMsg, "ts">) {
   setOffice((s) => ({ chats: { ...s.chats, [agent]: [...(s.chats[agent] || []).slice(-120), { ...msg, ts: Date.now(), local: true }] } }));
 }
 
-const fromServer = (m: ServerMsg): ChatMsg => ({ id: m.id, who: m.who, text: m.text, ts: m.ts * 1000, by: m.by, icon: m.icon ?? undefined });
+const fromServer = (m: ServerMsg): ChatMsg => ({ id: m.id, who: m.who, text: m.text, ts: m.ts * 1000, by: m.by, icon: m.icon ?? undefined, via: m.via });
 
 /** the shared chat for every agent (on opening the office) */
 export async function loadChats() {

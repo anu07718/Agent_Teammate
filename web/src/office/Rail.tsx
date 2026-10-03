@@ -181,7 +181,7 @@ export function Rail({ pod, agentId, setAgent, tasks, card, lead, open }: Props)
       out.push({
         ts: m.ts, key: "c" + (m.id ?? `l${i}`),
         node: m.who === "user" ? <div className={`o-m-user${theirs ? " theirs" : ""}`}>{theirs && <span className="by o-caps">{m.by}</span>}{m.text}</div>
-          : m.who === "agent" ? <div className="o-m-agent">{m.by && <span className="by o-caps">{m.by}</span>}{m.text}</div>
+          : m.who === "agent" ? <div className="o-m-agent">{m.by && <span className="by o-caps">{m.by}</span>}{m.text}{m.via && <span className="o-via" title="Written by this free model">via {m.via}</span>}</div>
           : <div className="o-m-work"><span className="i">{m.icon ?? "▸"}</span>{m.text}</div>,
       });
     }

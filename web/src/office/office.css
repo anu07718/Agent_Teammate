@@ -391,3 +391,6 @@ select.o-mini { appearance: auto; padding-right: 2px; max-width: 92px; }
 @media (max-width: 1560px) { .o-top .o-btn .lbl { display: none; } .o-top .o-btn { padding: 0 11px; } }
 @media (max-width: 1440px) { .o-top .o-runs { display: none; } .o-clock { min-width: 96px; font-size: 19px; } .o-top { gap: 12px; } }
 @media (max-width: 1260px) { .o-top .o-gauge { display: none; } }
+
+/* which free model wrote an agent's answer (none: the built-in rules answered) */
+.o-m-agent .o-via { display: block; margin-top: 4px; font-size: 10px; letter-spacing: 0.06em; color: var(--o-faint, #8a8a8a); }

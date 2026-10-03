@@ -46,7 +46,10 @@ On a server without the app open, use the environment instead: `GROQ_API_KEY`, `
 Fast and the most generous. Sign up at [console.groq.com](https://console.groq.com/keys) with Google or
 GitHub; no card. The free plan allows about 30 requests a minute and 1,000 a day per model (the limits are
 per organisation, so a second key does not add more). Nirnaya picks `openai/gpt-oss-20b` when it is offered,
-with low reasoning effort, so answers come quickly. Leave the plan on Free.
+with low reasoning effort, so answers come quickly. Each model has its own allowance: on **Automatic**, when
+one model has used its day, Nirnaya moves to the next free Groq model (gpt-oss-120b, Qwen, Llama) and Groq
+rests only when all of them are out. A customer message takes about two calls (understand, then draft the
+reply) and a question to an agent takes one. Leave the plan on Free.
 Source: [Groq rate limits](https://console.groq.com/docs/rate-limits).
 
 ### Google Gemini
