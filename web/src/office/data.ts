@@ -16,6 +16,7 @@ export interface Op {
   approved_by?: string; rejected_by?: string;
   // outreach (pay / ask / message / call someone): the desks it went through, and the one working now
   doing?: string | null; steps?: { agent: string; name: string; doing: string; ok: boolean | null; note: string }[]; plan_steps?: number;
+  tokens?: number;   // what the language model used on it
 }
 export interface Routine {
   id: string; kind: string; title: string; text: string; dept: PodId; agent: string; when: any; desc: string;
@@ -35,6 +36,7 @@ export interface Interpretation {
   task?: { money: string | null; amount: number | null; name: string | null; email: string | null; phone: string | null; channels: string[] };
   when?: any; when_desc?: string; next_at?: number | null; needs_ok?: boolean; problem?: string | null; guessed?: string | null;
   intent?: string; confidence?: number; can?: string[];
+  tokens?: number;   // ≈ tokens in the sentence as typed (a Qwen-style count)
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -55,7 +57,7 @@ export const oapi = {
   snap: () => req<OfficeSnap>("/api/office"),
   interpret: (dept: string, text: string) => req<Interpretation>(`/api/office/interpret?dept=${dept}&text=${encodeURIComponent(text)}`),
   addTask: (b: { dept: string; text: string; customer_id?: string; channel?: string; at?: number; when?: any; needs_ok?: boolean }) =>
-    post<{ kind: "case" | "op" | "routine"; case?: CaseSummary; op?: Op; routine?: Routine; guessed?: string }>("/api/office/tasks", { ...b, by: by() }),
+    post<{ kind: "case" | "op" | "routine"; case?: CaseSummary; op?: Op; routine?: Routine; guessed?: string; tokens?: { prompt: number; read: number } }>("/api/office/tasks", { ...b, by: by() }),
   approveOp: (id: string) => post<Op>(`/api/office/ops/${id}/approve`, { by: by() }),
   rejectOp: (id: string, note: string) => post<Op>(`/api/office/ops/${id}/reject`, { note, by: by() }),
   decideFlow: (run: string, node: string, approve: boolean, note = "") =>

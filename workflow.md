@@ -55,15 +55,17 @@ The **Task Status** panel on the right is where you give work to the office.
    You can also type your own message and pick the customer and the channel (chat, whatsapp, email,
    voice, app) from the two small menus.
 3. The line under the box tells you who will take it, for example *Probably UPI Disputes · triage
-   confirms when you press Add · Aarav (C-1001) over chat*. Read it before you press anything.
-4. Press **ADD**, or press Enter.
+   confirms when you press Add · Aarav (C-1001) over chat*. Read it before you press anything. Beside
+   **ADD**, a small chip such as **≈ 24 TOKENS** counts the tokens in what you typed.
+4. Press **ADD**, or press Enter. The line under the box says how many tokens went in.
 
 What you should see:
 - A new card at the top of the list. Its chip shows how far it has got (for example **30%**), with
   "step 3 of 10 · evidence" and a progress bar.
 - A token travelling from department to department in the office, and desks working.
 - After a few seconds the card says **DONE · resolved alone**. The failed debit was reversed, and ₹100 a
-  day was paid for the delay.
+  day was paid for the delay. With a language model on, the card also says how many **tokens** the case
+  used (with none, the rules do the work and use no tokens). **Workspace → Dashboard** adds them up.
 
 Click the card to fly to the desk that handled it: the rail on the left shows that agent, its chat and
 its activity. To read the whole case (each step, the evidence, the score, the reply), press **WORKSPACE**
@@ -288,6 +290,7 @@ between the first ten; Settings has no key.
 | **Brain** | The context graph: highlight, click a node, follow its links. Case memory: search past cases and what held |
 | **Ledger** | Every payment as a spreadsheet; the **Source** column says Demo bank, Razorpay test or Imported. **Real UPI payments** and **Feed your own data** are on the right (below). Switch a system's outage on and off to see the agents cope. Land an outside event on a demo bank payment (an auto-reversal or a merchant refund; each lands once). **Reset world** puts the demo bank back; what you fed in stays |
 | **Benchmark** | Choose **k** (1, 2 or 3) and **Run benchmark**: simulated customers, each asked k ways. Wrong autonomous actions should be 0 |
+| **Dashboard** | The numbers at a glance: cases **accepted** (by the agents alone, or approved by a person), **rejected** (refused by the agents, or by a person) and **waiting for a person**; cases per day; **tokens used** per day and per job, and the **estimated cost**. **Last 7 / 14 / 30 days** changes the range; **Table** shows a chart's numbers. Click any case or task in the list to see **every agent that worked on it**, step by step, who decided, and its tokens. **Model → Edit** sets the model's name and the ₹ per million tokens used for the cost |
 | **Trail** | The hash-chained audit log. **Verify chain** says it is intact; **Tamper test** shows an edit being caught. Case links open the case |
 | **Settings** | The server address (for the phone and the Windows app), the free **language model** (below), how to connect another agent over MCP, evidence parsing (upload a statement: UTRs are found and phone numbers tokenised), and **Simulate a crash and restart** (parked approvals survive) |
 
@@ -295,7 +298,7 @@ The workspace's top bar is the office's own: the systems Nirnaya is connected to
 back, the live log (every step, tool call and decision as it happens; the backtick key `` ` `` opens it too) and
 the theme switch, which changes the office too. The footer's count takes you to
 Approvals. On a phone, the tab bar at the bottom has Office, Cases, Approvals, Channels, Flows,
-Supervisor and Settings. On a phone, Cases shows the list; tap a case to open it and **◂ Cases** to go
+Dashboard and Settings (the Supervisor is on a computer). On a phone, Cases shows the list; tap a case to open it and **◂ Cases** to go
 back. A case reached from Channels or Approvals opens straight away.
 
 ### Tell the agents to pay, ask, message or call someone

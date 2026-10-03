@@ -105,10 +105,22 @@ Reply → Oversight).
 | **Ledger** | Every payment as a spreadsheet, labelled Demo bank, Razorpay test or Imported. Connect Razorpay's free test mode for real gateway payments and refunds, feed your own customers and payments from a CSV, switch the demo bank off; outages and outside events to test resilience |
 | **Benchmark** | Simulated customers, pass^k over paraphrases, experiment history |
 | **Trail** | Hash-chained audit log with verification and a tamper test |
+| **Dashboard** | How many cases the agents accepted, rejected or left waiting for a person (per day, and how each ended), the tokens the language model used per day and per job with the estimated cost, and every case and task in a list: click one to see each agent that worked on it, step by step, the people who decided and its tokens |
 | **Settings** | Server address (for the phone and desktop builds), integrations, MCP config, evidence parsing, crash-and-restart |
 
 | ![Cases](docs/screenshots/workspace.png) | ![Supervisor](docs/screenshots/supervisor.png) |
 |---|---|
+
+![The dashboard with one case open](docs/screenshots/dashboard.png)
+
+**Tokens.** Every answered model call is counted: the model's own count when it sends one (Ollama and the
+free clouds do), otherwise an estimate from the text. Each call is credited to the case or task it was for,
+to the day and to its job (reading a message, wording a reply, the finance-only check, an agent's chat…).
+Intake reads back the tokens in a sentence as you type it (≈, counted the way Qwen splits text), and a
+finished card says how many tokens its case used (0 when the rules handled it alone). The dashboard names
+the model and prices tokens from its own settings (default: **qwen3.6 on Ollama**, ₹15 per million tokens
+in and ₹60 out, which is what a hosted model would charge; Ollama itself bills nothing). Edit both under
+Dashboard → Model.
 
 ### Flows: workflows the agents run
 

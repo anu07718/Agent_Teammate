@@ -25,6 +25,7 @@ class Fake:
         self.calls: list[tuple[str, dict, dict]] = []
         self.behaviour: dict[str, list] = {}     # provider → answers to give, in turn (the last one repeats)
         self.models: dict[str, list[dict]] = {}
+        self.usage: dict | None = None            # {"prompt_tokens", "completion_tokens"} when set, like Ollama's
         fake = self
 
         class H(BaseHTTPRequestHandler):
@@ -62,7 +63,8 @@ class Fake:
                     kind, value = "ok", value
                 self._send(200, {"id": "x", "object": "chat.completion", "model": body.get("model"),
                                  "choices": [{"index": 0, "finish_reason": "stop",
-                                              "message": {"role": "assistant", "content": value}}]})
+                                              "message": {"role": "assistant", "content": value}}],
+                                 **({"usage": fake.usage} if fake.usage else {})})
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), H)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()

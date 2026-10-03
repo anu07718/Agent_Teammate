@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, benchmark, channels, docparse, feed, flows, office, outreach, pg, relay, reports
+from . import __version__, benchmark, channels, dashboard, docparse, feed, flows, office, outreach, pg, relay, reports, usage
 from .agents import DEPARTMENTS
 from .engine import Engine
 from .policy import GRAPH_HASH, SUPERSTEPS
@@ -606,7 +606,8 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
     async def ask_agent(agent_id: str, body: Ask):
         if agent_id not in E().roster.agents:
             raise HTTPException(404, "unknown agent")
-        return await office.answer(E(), agent_id, body.question)
+        with usage.working_on(f"chat:{agent_id}"):
+            return await office.answer(E(), agent_id, body.question)
 
     @app.post("/api/evidence/parse")
     async def parse_evidence(file: UploadFile = File(...)):
@@ -719,6 +720,7 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
     flows.register(app, E, lambda: state["flows"])
     channels.register(app, E, lambda: state["channels"])
     pg.register(app, E)
+    dashboard.register(app, E, lambda: state["ops"])
 
     # ── the web app ──────────────────────────────────────────────────────────
     if WEB_DIST.exists():

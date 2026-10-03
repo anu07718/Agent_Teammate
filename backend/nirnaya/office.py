@@ -14,13 +14,14 @@ import asyncio
 import datetime as dt
 import re
 import time
+import uuid
 from typing import Callable
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from . import ops as ops_mod
-from . import outreach, schedule, scope
+from . import outreach, schedule, scope, usage
 from .agents import DEPARTMENTS
 from .ops import KINDS, Ops
 from .team import Team, clean_name
@@ -214,11 +215,21 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
     @app.get("/api/office/interpret")
     def interpret(dept: str, text: str = ""):
         dept_ok(dept)
-        return ops_mod.interpret(dept, text, ctx=O().ctx())
+        return {**ops_mod.interpret(dept, text, ctx=O().ctx()), "tokens": usage.estimate(text.strip())}
 
     @app.post("/api/office/tasks")
     async def add_task(body: OfficeTask):
+        """Whatever the model spends reading the sentence belongs to the case or task it becomes."""
         dept_ok(body.dept)
+        tmp = f"intake:{uuid.uuid4().hex[:10]}"
+        with usage.working_on(tmp) as used:
+            out = await _add_task(body)
+        made = next((x["id"] for x in (out.get("case"), out.get("op"), out.get("routine")) if x), None)
+        if made:
+            E().llm.meter.move(tmp, made)
+        return {**out, "tokens": {"prompt": usage.estimate(body.text.strip()), "read": used["in"] + used["out"]}}
+
+    async def _add_task(body: OfficeTask) -> dict:
         e = E()
         by = clean_name(body.by, "you")
         due = _seconds(body.at) if body.at else None
@@ -339,9 +350,10 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
             raise HTTPException(404, "unknown agent")
         by = clean_name(body.by, "you")
         asked = T().post(body.agent, "user", body.text.strip(), by=by)
-        out = await _chat(body, by)
+        with usage.working_on(f"chat:{body.agent}") as used:
+            out = await _chat(body, by)
         answered = T().post(body.agent, "agent", out["reply"], via=out.get("via"))
-        return {**out, "asked": asked, "answered": answered}
+        return {**out, "asked": asked, "answered": answered, "tokens": used["in"] + used["out"]}
 
     async def _chat(body: ChatIn, by: str) -> dict:
         e = E()

@@ -15,7 +15,7 @@ import re
 import time
 from typing import Callable
 
-from . import benchmark, outreach, schedule, scope, specialists
+from . import benchmark, outreach, schedule, scope, specialists, usage
 from . import guard as promise_guard
 from .agents import DEPARTMENTS, Roster
 from .gateway import GatewayError
@@ -219,6 +219,17 @@ class Ops:
         t.add_done_callback(self._running.discard)
 
     async def _run(self, op_id: str, approved: bool) -> dict | None:
+        with usage.working_on(op_id):          # every model call this task makes is its own
+            op = await self._run_op(op_id, approved)
+        cur = self.get(op_id)                  # gone if it was cancelled meanwhile: never put it back
+        if op and cur:
+            t = self.E().llm.meter.of(op_id)
+            if cur.get("tokens") != t["total"]:
+                cur["tokens"] = t["total"]
+                op = self._put(cur)
+        return op
+
+    async def _run_op(self, op_id: str, approved: bool) -> dict | None:
         op = self.get(op_id)
         if not op:
             return None

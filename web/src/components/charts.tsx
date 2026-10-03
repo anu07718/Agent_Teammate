@@ -101,3 +101,124 @@ export function LineChart({ series, xLabel, yLabel, xDomain = [0, 1], yDomain = 
     </div>
   );
 }
+
+/** Clean axis steps: 0, 1, 2, 5 × 10ⁿ, about four of them. */
+export function niceTicks(max: number, n = 4): number[] {
+  if (max <= 0) return [0, 1];
+  const raw = max / n, p = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * p).find((s) => s >= raw) ?? 10 * p;
+  const top = Math.ceil(max / step) * step;
+  return Array.from({ length: Math.round(top / step) + 1 }, (_, i) => +(i * step).toFixed(6));
+}
+
+export interface ColSeries { key: string; label: string; color: string }
+
+function useWidth(min = 220) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(min);
+  useEffect(() => {
+    if (!ref.current) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(min, e.contentRect.width)));
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, [min]);
+  return [ref, w] as const;
+}
+
+/** A column per x (a day), stacked when there is more than one series: ≤24px columns, 4px rounded top on the
+ *  column's top segment only, a 2px surface gap between segments, hairline grid, and a per-column readout on
+ *  hover or keyboard focus that lists every series. */
+export function ColumnChart({ rows, xKey, series, xFmt, yFmt = (v) => v.toLocaleString("en-IN"), extra, height = 210, ariaLabel, testId }: {
+  rows: Record<string, any>[]; xKey: string; series: ColSeries[]; xFmt: (x: any) => string; yFmt?: (v: number) => string;
+  extra?: (row: Record<string, any>) => string | null; height?: number; ariaLabel: string; testId?: string;
+}) {
+  const [ref, w] = useWidth();
+  const [hover, setHover] = useState<number | null>(null);
+  const totals = rows.map((r) => series.reduce((a, s) => a + (Number(r[s.key]) || 0), 0));
+  const ticks = niceTicks(Math.max(...totals, 0));
+  const top = ticks[ticks.length - 1] || 1;
+  const longest = Math.max(...ticks.map((t) => yFmt(t).length));
+  const M = { l: 14 + longest * 6.4, r: 8, t: 10, b: 24 };
+  const iw = w - M.l - M.r, ih = height - M.t - M.b;
+  const band = iw / Math.max(rows.length, 1);
+  const bw = Math.min(24, band * 0.62);
+  const sy = (v: number) => M.t + ih - (v / top) * ih;
+  const every = Math.ceil(rows.length / Math.max(2, Math.floor(iw / 64)));
+  const topPath = (x: number, y: number, bwid: number, h: number) => {
+    const r = Math.min(4, h, bwid / 2);
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + bwid - r}Q${x + bwid},${y} ${x + bwid},${y + r}V${y + h}Z`;
+  };
+  return (
+    <div ref={ref} className="relative w-full" data-testid={testId}>
+      {series.length > 1 && (
+        <div className="mb-1.5 flex flex-wrap gap-3 text-[11.5px] text-muted">
+          {series.map((s) => <span key={s.key} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />{s.label}</span>)}
+        </div>
+      )}
+      <svg width={w} height={height} role="img" aria-label={ariaLabel} onMouseLeave={() => setHover(null)}>
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={M.l} x2={M.l + iw} y1={sy(t)} y2={sy(t)} stroke="var(--grid)" strokeWidth={1} />
+            <text x={M.l - 6} y={sy(t)} textAnchor="end" dominantBaseline="middle" fontSize={10.5} fill="var(--faint)" className="tabular">{yFmt(t)}</text>
+          </g>
+        ))}
+        {rows.map((r, i) => {
+          const x = M.l + band * i + (band - bw) / 2;
+          let acc = 0;
+          const segs = series.map((s) => ({ s, v: Number(r[s.key]) || 0 })).filter((g) => g.v > 0);
+          return (
+            <g key={i} opacity={hover === null || hover === i ? 1 : 0.55}>
+              {segs.map((g, j) => {
+                const y0 = sy(acc), y1 = sy(acc + g.v);
+                acc += g.v;
+                const h = Math.max(1, y0 - y1 - (j < segs.length - 1 ? 2 : 0));   // the 2px surface gap
+                const y = y0 - h;
+                return j === segs.length - 1
+                  ? <path key={g.s.key} d={topPath(x, y, bw, h)} fill={g.s.color} />
+                  : <rect key={g.s.key} x={x} y={y} width={bw} height={h} fill={g.s.color} />;
+              })}
+              {i % every === 0 && <text x={x + bw / 2} y={height - 8} textAnchor="middle" fontSize={10.5} fill="var(--faint)">{xFmt(r[xKey])}</text>}
+              <rect x={M.l + band * i} y={M.t} width={band} height={ih} fill="transparent" tabIndex={0}
+                aria-label={`${xFmt(r[xKey])}: ${series.map((s) => `${s.label} ${yFmt(Number(r[s.key]) || 0)}`).join(", ")}`}
+                onMouseEnter={() => setHover(i)} onFocus={() => setHover(i)} onBlur={() => setHover(null)} />
+            </g>
+          );
+        })}
+        <line x1={M.l} x2={M.l + iw} y1={sy(0)} y2={sy(0)} stroke="var(--line-strong)" strokeWidth={1} />
+      </svg>
+      {hover !== null && rows[hover] && (
+        <div className="pointer-events-none absolute top-6 z-10 min-w-36 rounded-md border border-line bg-raised px-2.5 py-1.5 text-[11.5px] shadow-lg"
+          style={{ left: Math.min(w - 180, Math.max(0, M.l + band * hover + band / 2 + 12)) }}>
+          <div className="mb-0.5 text-muted">{xFmt(rows[hover][xKey])}</div>
+          {series.map((s) => (
+            <div key={s.key} className="flex items-center gap-2">
+              <span className="h-0.5 w-3 rounded" style={{ background: s.color }} />
+              <b className="tabular">{yFmt(Number(rows[hover][s.key]) || 0)}</b><span className="text-muted">{s.label}</span>
+            </div>
+          ))}
+          {extra?.(rows[hover]) && <div className="mt-0.5 text-muted">{extra(rows[hover])}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Horizontal bars for a ranked list: label, bar (≤16px, 4px rounded end), value at the tip. */
+export function BarList({ rows, color, fmt = (v) => v.toLocaleString("en-IN"), sub, ariaLabel }: {
+  rows: { label: string; value: number; title?: string }[]; color: string; fmt?: (v: number) => string; sub?: (i: number) => string | null; ariaLabel: string;
+}) {
+  const max = Math.max(...rows.map((r) => r.value), 1);
+  return (
+    <ul className="space-y-2" aria-label={ariaLabel}>
+      {rows.map((r, i) => (
+        <li key={r.label} title={r.title} className="grid grid-cols-[minmax(96px,34%)_1fr] items-center gap-2 text-[12px]">
+          <span className="leading-tight text-muted">{r.label}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="h-3.5 rounded-r" style={{ width: `${Math.max(1.5, (r.value / max) * 78)}%`, background: color }} />
+            <span className="shrink-0 tabular">{fmt(r.value)}{sub?.(i) ? <span className="text-faint"> · {sub(i)}</span> : null}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}

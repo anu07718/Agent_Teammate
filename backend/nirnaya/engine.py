@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 
-from . import replies, scope, specialists
+from . import replies, scope, specialists, usage
 from . import guard as promise_guard
 from .agents import STEP_AGENTS, Roster
 from .calibration import Calibrator, log_amount
@@ -169,6 +169,7 @@ class Engine:
                 or specialists.SPECIALIST.get(case.get("intent") or "", "triage"),
                 "pending": bool(case.get("pending")), "seal_broken": bool(case.get("seal_broken")),
                 "first_reply_s": case.get("first_reply_s"), "opened_by": case.get("opened_by"),
+                "tokens": case.get("tokens") or 0,
                 "approved_by": next((c["by"] for c in reversed(case.get("commits") or []) if c.get("by") not in (None, "autonomous")), None)}
 
     # ── public API ───────────────────────────────────────────────────────────
@@ -195,6 +196,15 @@ class Engine:
             return await self._run(case_id, from_step)
 
     async def _run(self, case_id: str, from_step: str | None = None) -> dict:
+        with usage.working_on(case_id):        # every model call in these steps is this case's
+            case = await self._steps(case_id, from_step)
+        t = self.llm.meter.of(case_id)
+        if case.get("tokens") != t["total"]:
+            case["tokens"] = t["total"]
+            self._save(case)
+        return case
+
+    async def _steps(self, case_id: str, from_step: str | None = None) -> dict:
         case = self.store.get_case(case_id)
         if case is None:
             raise KeyError(case_id)

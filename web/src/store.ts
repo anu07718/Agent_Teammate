@@ -4,7 +4,7 @@ import { joined, relayEvents, relayPresence } from "./relay";
 import { me, streamParams, type Person } from "./team";
 import type { Agent, AppState, CaseSummary, NEvent } from "./types";
 
-export type View = "office" | "workspace" | "approvals" | "channels" | "flows" | "supervisor" | "brain" | "ledger" | "benchmark" | "trail" | "settings";
+export type View = "office" | "workspace" | "approvals" | "channels" | "flows" | "supervisor" | "brain" | "ledger" | "benchmark" | "trail" | "dashboard" | "settings";
 
 export interface Toast { id: number; text: string; tone: "info" | "good" | "warn" | "bad"; caseId?: string }
 

@@ -134,6 +134,8 @@ html.dark .o-tile { background: #f3f2ec; }
 }
 select.o-mini { appearance: auto; padding-right: 2px; max-width: 92px; }
 .o-mini.on { background: var(--o-ink); color: var(--o-bg); border-color: var(--o-ink); }
+.o-tok { height: 24px; display: inline-flex; align-items: center; padding: 0 9px; border-radius: 999px; background: var(--o-bg-2); color: var(--o-grey);
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .o-add { margin-left: auto; height: 28px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--o-ink); color: var(--o-bg); font-size: 10px; font-weight: 700; letter-spacing: 0.16em; }
 .o-add:disabled { opacity: 0.35; }
 .o-menu { position: absolute; z-index: 40; min-width: 200px; background: var(--o-card); border: 1px solid var(--o-line); border-radius: 12px; box-shadow: var(--o-shadow); padding: 6px; }

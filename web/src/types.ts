@@ -52,6 +52,7 @@ export interface CaseSummary {
   first_reply_s?: number | null;
   opened_by?: string | null;
   approved_by?: string | null;
+  tokens?: number;   // what the language model used on it (0 when the rules alone handled it)
 }
 
 export interface Action {

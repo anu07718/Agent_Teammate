@@ -487,8 +487,8 @@ await step("on a phone: the tab bar's seven tabs each open their view, with noth
   await phone.getByRole("button", { name: "Workspace", exact: true }).click();
   const bar = phone.getByRole("navigation", { name: "Views" }).last();
   const tabs = await bar.getByRole("button").allInnerTexts();
-  expect(tabs.map((t) => t.trim()).join() === "Office,Cases,Approvals,Channels,Flows,Supervisor,Settings", `tabs ${tabs}`);
-  for (const t of ["Cases", "Approvals", "Channels", "Flows", "Supervisor", "Settings"]) {
+  expect(tabs.map((t) => t.trim()).join() === "Office,Cases,Approvals,Channels,Flows,Dashboard,Settings", `tabs ${tabs}`);
+  for (const t of ["Cases", "Approvals", "Channels", "Flows", "Dashboard", "Settings"]) {
     await bar.getByRole("button", { name: t }).click();
     await phone.waitForTimeout(600);
     expect(!(await phone.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${t} scrolls sideways`);

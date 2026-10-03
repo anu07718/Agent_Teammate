@@ -1,4 +1,4 @@
-import { Building2, CheckCheck, FlaskConical, Gauge, KeyRound, LayoutGrid, MessagesSquare, ScrollText, Settings, Sheet, Terminal, Waypoints, Workflow } from "lucide-react";
+import { BarChart3, Building2, CheckCheck, FlaskConical, Gauge, KeyRound, LayoutGrid, MessagesSquare, ScrollText, Settings, Sheet, Terminal, Waypoints, Workflow } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, setAccessKey } from "./api";
 import { ChannelsView } from "./channels/ChannelsView";
@@ -13,6 +13,7 @@ import { connect, getState, openCase, refresh, setState, useUI, type View, EMPTY
 import { tellView } from "./team";
 import { BenchmarkView } from "./views/Benchmark";
 import { BrainView } from "./views/Brain";
+import { DashboardView } from "./views/Dashboard";
 import { LedgerView } from "./views/Ledger";
 import { SettingsView } from "./views/Settings";
 import { SupervisorView } from "./views/Supervisor";
@@ -25,11 +26,12 @@ const NAV: { id: View; label: string; icon: any; mobile?: boolean }[] = [
   { id: "approvals", label: "Approvals", icon: CheckCheck, mobile: true },
   { id: "channels", label: "Channels", icon: MessagesSquare, mobile: true },
   { id: "flows", label: "Flows", icon: Workflow, mobile: true },
-  { id: "supervisor", label: "Supervisor", icon: Gauge, mobile: true },
+  { id: "supervisor", label: "Supervisor", icon: Gauge },
   { id: "brain", label: "Brain", icon: Waypoints },
   { id: "ledger", label: "Ledger", icon: Sheet },
   { id: "benchmark", label: "Benchmark", icon: FlaskConical },
   { id: "trail", label: "Trail", icon: ScrollText },
+  { id: "dashboard", label: "Dashboard", icon: BarChart3, mobile: true },
   { id: "settings", label: "Settings", icon: Settings, mobile: true },
 ];
 
@@ -194,7 +196,7 @@ export default function App() {
           <div className="min-h-0 flex-1">
             {!app ? null : view === "workspace" ? <WorkspaceView /> : view === "approvals" ? <ApprovalsView /> : view === "channels" ? <ChannelsView /> :
               view === "flows" ? <FlowsView /> : view === "supervisor" ? <SupervisorView /> : view === "brain" ? <BrainView /> : view === "ledger" ? <LedgerView /> :
-              view === "benchmark" ? <BenchmarkView /> : view === "trail" ? <TrailView /> : <SettingsView />}
+              view === "benchmark" ? <BenchmarkView /> : view === "trail" ? <TrailView /> : view === "dashboard" ? <DashboardView /> : <SettingsView />}
           </div>
           {logOpen && <LogPanel />}
         </main>

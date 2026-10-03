@@ -74,6 +74,11 @@
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --grid: rgba(23, 22, 20, 0.08);
+  /* the dashboard's outcomes: validated together (colour-blind and normal vision) on both surfaces */
+  --out-ok: #2a7ab8;
+  --out-wait: #d9a514;
+  --out-no: #c4314b;
+  --out-run: #a9a7a0;
   color-scheme: light;
 }
 
@@ -98,6 +103,10 @@ html.dark {
   --series-1: #3987e5;
   --series-2: #d95926;
   --grid: rgba(236, 235, 228, 0.08);
+  --out-ok: #3f86c4;
+  --out-wait: #b98a1a;
+  --out-no: #d9525a;
+  --out-run: #6f6d67;
   color-scheme: dark;
 }
 

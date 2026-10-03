@@ -105,11 +105,12 @@ export function Panel(p: Props) {
       if (isCase) Object.assign(body, { customer_id: customer, channel });
       if (repeat) Object.assign(body, { when: pickerWhen(cad, at), needs_ok: needsOk });
       const r = await oapi.addTask(body);
+      const tok = r.tokens ? ` · ${r.tokens.prompt} token${r.tokens.prompt === 1 ? "" : "s"} in${r.tokens.read ? `, ${r.tokens.read} to read it` : ""}` : "";
       p.setText("");
       setRepeat(false);
-      if (r.kind === "case" && r.case) setSaid({ html: `Added — <b>${r.case.id}</b> is with <b>Sentry</b>; triage names the desk in a moment.` });
+      if (r.kind === "case" && r.case) setSaid({ html: `Added — <b>${r.case.id}</b> is with <b>Sentry</b>; triage names the desk in a moment${tok}.` });
       else if (r.kind === "routine" && r.routine) setSaid({ html: `Routine set — <b>${p.nameOf(r.routine.agent)}</b> · ${r.routine.desc} · next ${until(r.routine.next_at)}${r.routine.needs_ok ? " · waits for your OK" : ""}` });
-      else if (r.op && r.op.kind === "outreach") setSaid({ html: r.op.state === "scheduled" ? `Booked — <b>${r.op.id}</b> runs ${dayTime(r.op.due_at! * 1000)}` : `On it as <b>${r.op.id}</b>${r.op.needs_ok ? " — it will wait for your OK before any money moves" : ""}.` });
+      else if (r.op && r.op.kind === "outreach") setSaid({ html: r.op.state === "scheduled" ? `Booked — <b>${r.op.id}</b> runs ${dayTime(r.op.due_at! * 1000)}${tok}` : `On it as <b>${r.op.id}</b>${r.op.needs_ok ? " — it will wait for your OK before any money moves" : ""}${tok}.` });
       else if (r.op) setSaid({ html: r.op.state === "scheduled" ? `Booked — <b>${p.nameOf(r.op.agent)}</b> runs it ${dayTime(r.op.due_at! * 1000)}` : `Added — <b>${p.nameOf(r.op.agent)}</b> has it${r.op.needs_ok ? " and will ask for your OK" : ""}.` });
       if (r.kind === "routine") setFilter("sched");
       void refreshOffice();
@@ -187,6 +188,7 @@ export function Panel(p: Props) {
           <button className={`o-mini${repeat ? " on" : ""}`} title="repeat on a schedule (or just say when: every weekday at 8am, …)" onClick={() => setRepeat(!repeat)}>Repeat</button>
           <button className={`o-mini${samples ? " on" : ""}`} title={isCase ? "sample customer messages" : "things this department can do"}
             onClick={(e) => { e.stopPropagation(); setSamples(!samples); setMenu(false); }}>Samples</button>
+          {p.text.trim() && hint?.tokens !== undefined && <span className="o-tok" data-testid="intake-tokens" title="Tokens in what you typed (≈, counted the way Qwen splits text); the case's own model use shows on its card and on the Dashboard">≈ {hint.tokens} token{hint.tokens === 1 ? "" : "s"}</span>}
           <button className="o-add" disabled={busy || !p.text.trim()} onClick={() => void submit()}>ADD</button>
         </div>
       </div>
@@ -281,7 +283,9 @@ function Row({ t, isNew, scoped, nameOf, onRow, onCalendar }: { t: OTask; isNew:
       ? (refused ? "refused" : t.c?.status === "resolved" && (t.route === "ACT" || t.route === "HEDGE") ? (t.route === "HEDGE" ? "done alone, with an undo" : "resolved alone") : t.c?.approved_by ? `resolved after ${esc(t.c.approved_by)}’s OK` : "resolved after a person’s OK")
       : t.op?.rejected ? `${t.op.rejected_by && t.op.rejected_by !== "you" ? esc(t.op.rejected_by) : "you"} said no`
       : t.approved ? `ran after ${t.op?.approved_by && t.op.approved_by !== "you" ? esc(t.op.approved_by) + "’s" : "your"} OK` : t.op?.routine ? "routine" : "done";
-    meta += ` · ${how} · ${timeStr(t.doneAt ?? t.changedAt)}` + (failed || refused ? "" : ` · <span class="res">result →</span>`);
+    const tokens = t.kind === "case" ? t.c?.tokens : t.op?.tokens;
+    meta += ` · ${how} · ${timeStr(t.doneAt ?? t.changedAt)}` + (tokens ? ` · <span class="tok">${tokens.toLocaleString("en-IN")} tokens</span>` : "")
+      + (failed || refused ? "" : ` · <span class="res">result →</span>`);
   }
   if (t.late) meta += " · ran late";
   return (
