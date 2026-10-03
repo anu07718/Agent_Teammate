@@ -1,7 +1,9 @@
 // The call page (/call): a customer talks to Nirnaya from Chrome or Edge, on a phone or a computer, with no
 // phone line and no account. The browser turns speech into text and reads the answer aloud (the Web Speech
 // API, free in these browsers); Nirnaya sees text, so a call here is handled exactly like a phone call.
-// Where the browser cannot listen, the same page is a chat.
+// Where the browser cannot listen, the same page is a chat. With "Record this call" on, the page records the
+// microphone (echo cancellation off, so on a loudspeaker it hears the agent too) and sends it when the call ends,
+// to keep with the call's report.
 import { Mic, MicOff, PhoneCall, PhoneOff, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { capi } from "./api";
@@ -23,7 +25,10 @@ export function CallPage() {
   const [typed, setTyped] = useState("");
   const [muted, setMuted] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [record, setRecord] = useState(true);
+  const [recording, setRecording] = useState(false);
   const rec = useRef<any>(null);
+  const tape = useRef<{ mr: MediaRecorder; chunks: Blob[]; stream: MediaStream; t0: number } | null>(null);
   const live = useRef({ session: null as string | null, phase: "idle" as Phase, muted: false, voice: !!SR });
   const box = useRef<HTMLDivElement>(null);
   live.current.session = session;
@@ -32,7 +37,35 @@ export function CallPage() {
 
   useEffect(() => { document.title = "Talk to Nirnaya"; capi.webCustomers().then((c) => { setCustomers(c); setWho(c[0]?.id ?? ""); }).catch((e) => { setCustomers([]); setErr(e.message); }); }, []);
   useEffect(() => { box.current?.scrollTo({ top: box.current.scrollHeight, behavior: "smooth" }); }, [lines.length, heard]);
-  useEffect(() => () => { try { rec.current?.abort(); } catch { /* not listening */ } window.speechSynthesis?.cancel(); }, []);
+  useEffect(() => () => { try { rec.current?.abort(); } catch { /* not listening */ } window.speechSynthesis?.cancel(); tape.current?.stream.getTracks().forEach((t) => t.stop()); }, []);
+
+  // the call's recording: one MediaRecorder for the whole call, sent when it ends
+  const startTape = async () => {
+    if (!record || typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+      const type = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported?.(t));
+      const mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+      const chunks: Blob[] = [];
+      mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      mr.start(1000);
+      tape.current = { mr, chunks, stream, t0: Date.now() };
+      setRecording(true);
+    } catch { setRecording(false); /* no microphone or not allowed: the call goes on unrecorded */ }
+  };
+  const stopTape = (s: string | null) => new Promise<void>((done) => {
+    const t = tape.current;
+    tape.current = null;
+    setRecording(false);
+    if (!t) { done(); return; }
+    t.mr.onstop = async () => {
+      t.stream.getTracks().forEach((x) => x.stop());
+      const blob = new Blob(t.chunks, { type: t.mr.mimeType || "audio/webm" });
+      if (s && blob.size) await capi.webRecording(s, blob, (Date.now() - t.t0) / 1000).catch(() => {});
+      done();
+    };
+    try { t.mr.stop(); } catch { done(); }
+  });
 
   const say = (text: string, then: () => void) => {
     const synth = window.speechSynthesis;
@@ -106,6 +139,7 @@ export function CallPage() {
       setSession(r.session);
       live.current.session = r.session;
       setLines([{ who: "nirnaya", text: r.greeting }]);
+      await startTape();
       say(r.greeting, listen);
     } catch (e) { setErr((e as Error).message); }
   };
@@ -116,6 +150,7 @@ export function CallPage() {
     window.speechSynthesis?.cancel();
     setPhase("ended");
     live.current.phase = "ended";
+    await stopTape(s);
     if (s) await capi.webEnd(s).catch(() => {});
     setSession(null);
     live.current.session = null;
@@ -149,6 +184,10 @@ export function CallPage() {
                 {LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </label>
+            <label className="flex items-center gap-2 text-[12.5px]">
+              <input type="checkbox" checked={record} onChange={(e) => setRecord(e.target.checked)} aria-label="Record this call" />
+              Record this call (kept with the call's report; use the loudspeaker so the agent's voice is on it too)
+            </label>
             <button onClick={() => void start()} disabled={customers === null} className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-act text-[12px] font-semibold uppercase tracking-[0.16em] text-white hover:opacity-90 disabled:cursor-wait disabled:opacity-50">
               <PhoneCall size={18} /> {SR ? "Start the call" : "Start the chat"}
             </button>
@@ -177,6 +216,7 @@ export function CallPage() {
           <div className="sticky bottom-0 mt-3 space-y-2 bg-bg pb-1 pt-2">
             <div className="flex items-center justify-center gap-2 text-[12.5px] text-muted" data-testid="call-status">
               {phase === "listening" && <span className="h-2 w-2 animate-pulse rounded-full bg-escalate" />}{status}
+              {recording && <span className="ml-2 rounded-full border border-escalate/40 px-2 text-[11px] text-escalate" data-testid="call-recording">● REC</span>}
             </div>
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (typed.trim() && phase !== "thinking") { try { rec.current?.abort(); } catch { /* */ } const t = typed.trim(); setTyped(""); void turn(t, "text"); } }}>
               <input aria-label="Type a message" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Or type here…" className="h-11 flex-1 rounded-full border border-line-strong bg-panel-2 px-4 text-[14px]" />

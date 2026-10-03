@@ -156,6 +156,13 @@ HMAC key, Nirnaya accepts WAHA's calls only from your own machine or local netwo
 The agent answers your Twilio number, talks in **English or Hindi**, opens cases, and calls customers back.
 Every call can be **recorded** and gets a **report** (what was said both ways, the cases, the recording).
 
+> **Twilio's free trial is not enough for this any more (checked 3 October 2026).** A trial account now runs
+> only Twilio's own four sample call scripts: it refuses any webhook of ours ("trial accounts have limited
+> parameter access"), blocks recording, and asks for an upgrade before it will give you a number to call in
+> on. Nirnaya's phone calls therefore need an **upgraded** Twilio account (a paid top-up). The free way to
+> get the same thing, Hindi and English, recording and a report, is the **call page** (section 4): open it on
+> your phone. The steps below are for an upgraded account.
+
 **A. Twilio (free trial)**
 1. Sign up at [twilio.com/try-twilio](https://www.twilio.com/try-twilio) and verify your email and mobile.
    The trial includes 75 call minutes; trial calls last at most 10 minutes.
@@ -196,9 +203,8 @@ Every call can be **recorded** and gets a **report** (what was said both ways, t
     **Download report** (a page to keep or print). A recording arrives a few seconds after the call ends.
 
 **What to know**
-- **Recording on a trial:** Twilio records calls *you place* (step 8), but a trial cannot record *incoming*
-  calls; the report says "Not recorded" with Twilio's reason. Upgrading the account lifts this (about
-  $0.0025 a minute to record, plus storage). Recordings are downloaded into `data/recordings/` next to the
+- **Recording:** on an upgraded account both incoming and outgoing calls are recorded (about $0.0025 a
+  minute to record, plus storage); if Twilio refuses, the report says "Not recorded" with Twilio's reason. Recordings are downloaded into `data/recordings/` next to the
   database and are kept there; delete them in the Twilio Console if you do not want Twilio's copy.
 - **Hindi:** Twilio's Hindi recogniser writes Devanagari. With a free model on (Settings), it is translated
   into English for the agents and their answer back into Hindi, with every number checked; without one, a
@@ -217,7 +223,13 @@ answers out loud and opens cases like a call would. **Mute** lets you type inste
 It works on a phone or a computer, in Chrome, Edge or Safari. Chrome's speech recognition uses Google's
 speech service, so it needs the internet. In Firefox, or with the microphone blocked, the page is a chat.
 Send the link to customers: they need no account and no phone line. Each call-page call gets a report
-under **Channels → Call reports** too (the transcript and its cases; the browser does not record audio).
+under **Channels → Call reports** too: the transcript and its cases, and, with **Record this call** ticked (it
+is by default), the recording. The page records the microphone with echo cancellation off, so on a
+loudspeaker the agent's voice is on the recording as well; with headphones only the caller is.
+
+**On your phone, for free:** start Nirnaya and the tunnel (section 7), then open
+`https://<your-tunnel>.trycloudflare.com/call` in Chrome on the phone. Pick **हिन्दी / Hinglish** to talk in
+Hindi. It works like a phone call: the agent listens, answers out loud and opens cases.
 
 ## 5. n8n, Telegram, Instagram and anything else (webhooks)
 

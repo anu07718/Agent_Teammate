@@ -644,6 +644,31 @@ await step("Call page with the microphone blocked: it says so and carries on as 
   await call.context().close();
 });
 
+await step("Call page recording: with a microphone it records the call (● REC), sends it when the call ends, and the report plays it", async () => {
+  const b2 = await chromium.launch({ channel: "chromium", args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+  try {
+    const c = await b2.newContext({ viewport: { width: 420, height: 860 }, permissions: ["microphone"] });
+    await c.addInitScript(NO_SPEECH);
+    const p = await c.newPage();
+    watch(p);
+    await p.goto(`${URL}/call`);
+    await p.getByTestId("call-setup").waitFor();
+    await p.getByLabel("Who is calling").selectOption("C-1002");
+    expect(await p.getByLabel("Record this call").isChecked(), "recording is not on by default");
+    await p.getByRole("button", { name: "Start the chat" }).click();
+    await p.getByTestId("call-recording").waitFor({ timeout: 15000 });
+    await p.getByLabel("Type a message").fill(DUPLICATE);
+    await p.getByRole("button", { name: "Send", exact: true }).click();
+    await line(p, "nirnaya", "349").waitFor({ timeout: 30000 });
+    await p.waitForTimeout(1500);                                  // a little audio on the tape
+    await p.getByRole("button", { name: "End call" }).click();
+    await p.getByText("You ended the call.").waitFor();
+    const rep = await until(async () => (await api("/api/channels/call-reports")).find((r) => r.channel === "call page" && r.recording === "kept" && r.customer?.id === "C-1002"), 15000);
+    const audio = await fetch(`${URL}/api/channels/call-reports/${encodeURIComponent(rep.id)}/audio`);
+    expect(audio.status === 200 && /audio\//.test(audio.headers.get("content-type")) && (await audio.arrayBuffer()).byteLength > 500, `audio ${audio.status}`);
+  } finally { await b2.close(); }
+});
+
 await step("Call reports: the Hindi call is there with what was said both ways, its case, and a report to download", async () => {
   page = ws;
   await page.bringToFront();

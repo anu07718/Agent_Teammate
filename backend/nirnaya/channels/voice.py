@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import re
 from xml.sax.saxutils import escape, quoteattr
 
 from .http import ChannelError, fetch_bytes, request
@@ -29,6 +30,11 @@ def signature_ok(auth_token: str, url: str, params: dict, header: str | None) ->
     return hmac.compare_digest(signature(auth_token, url, params), header)
 
 
+# Twilio's free trial (since 2026) runs only Twilio's own sample call scripts: no webhook of ours, no recording
+TRIAL_ONLY = re.compile(r"trial accounts have limited parameter access|Record verb is not available on trial", re.I)
+TRIAL_EXPLAINED = ("Twilio's free trial only runs Twilio's own sample calls, not Nirnaya's (no webhook of ours and "
+                   "no recording on a trial). Upgrade the Twilio account to use it here, or use the free call page "
+                   "(/call), which listens in Hindi and English and records the call too.")
 RECORD_DELAY = 1.5          # seconds after answering before an incoming call can be recorded (tests set 0)
 LANG_CODE = {"en": "en-IN", "hi": "hi-IN"}
 # what helps the recogniser on a payments line (Twilio's speech hints)
@@ -103,7 +109,12 @@ def call(cfg: dict, to: str, url: str, status_url: str | None = None, recording_
     if recording_url:
         form.update({"Record": "true", "RecordingChannels": "dual", "RecordingStatusCallback": recording_url,
                      "RecordingStatusCallbackMethod": "POST", "RecordingStatusCallbackEvent": "completed absent"})
-    r = request("POST", _api(cfg, "Calls.json"), form=form, basic=(cfg["account_sid"], cfg["auth_token"]))
+    try:
+        r = request("POST", _api(cfg, "Calls.json"), form=form, basic=(cfg["account_sid"], cfg["auth_token"]))
+    except ChannelError as e:
+        if TRIAL_ONLY.search(str(e)):
+            raise ChannelError(TRIAL_EXPLAINED) from None
+        raise
     return r.get("sid") or ""
 
 

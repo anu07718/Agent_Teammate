@@ -571,7 +571,8 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         path = calls.recordings_dir(E()) / f if f else None
         if not path or not path.is_file():
             raise HTTPException(404, "no recording kept for that call")
-        return FileResponse(path, media_type="audio/mpeg", filename=f)
+        kind = {".mp3": "audio/mpeg", ".webm": "audio/webm", ".ogg": "audio/ogg", ".m4a": "audio/mp4", ".wav": "audio/wav"}
+        return FileResponse(path, media_type=kind.get(path.suffix, "application/octet-stream"), filename=f)
 
     # ── the browser call page (talk to the agent from any Chrome or Edge) ───
     @app.get("/api/channels/web/customers")
@@ -629,6 +630,33 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         return {"reply": _speak(cid, english, lang), "english": english,
                 "end": bool(o and o.get("end")), "case_id": r["case_id"],
                 "status": (c or {}).get("status"), "route": (c or {}).get("route")}
+
+    @app.post("/api/channels/web/recording")
+    async def web_recording(session: str, request: Request, seconds: int | None = None):
+        """The call page's own recording (the caller's microphone, which also hears the agent on a loudspeaker),
+        sent once when the call ends. Only for a call that exists and has none yet; at most 25 MB."""
+        hub = C()
+        cid = f"web:{session}"
+        conv = hub.conversation(cid)
+        if not conv or not re.fullmatch(r"[0-9a-f]{16}", session):
+            raise HTTPException(404, "no such call")
+        if (conv.get("recording") or {}).get("status") == "kept":
+            raise HTTPException(409, "this call already has its recording")
+        ctype = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+        ext = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/mpeg": "mp3", "audio/wav": "wav"}.get(ctype)
+        if not ext:
+            raise HTTPException(415, "send the recording as audio/webm, audio/ogg, audio/mp4, audio/mpeg or audio/wav")
+        data = await request.body()
+        if not data or len(data) > 25 * 1024 * 1024:
+            raise HTTPException(413, "the recording is empty or larger than 25 MB")
+        path = calls.recording_file(E(), cid, "call-page").with_suffix("." + ext)
+        await asyncio.to_thread(path.write_bytes, data)
+        conv = hub.conversation(cid) or conv
+        conv["recording"] = {"status": "kept", "file": path.name, "bytes": len(data), "at": time.time(),
+                             **({"duration": int(seconds)} if seconds and 0 < seconds < 24 * 3600 else {})}
+        hub._put(conv)
+        calls.save(hub, cid)
+        return {"ok": True, "bytes": len(data)}
 
     @app.post("/api/channels/web/end")
     def web_end(body: WebEnd):

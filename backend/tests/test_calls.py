@@ -260,3 +260,38 @@ def test_the_call_page_speaks_hindi_and_leaves_a_report(client, engine):
     rep = client.get(end["report"]).json()
     assert rep["channel"] == "call page" and rep["langs"] == ["hi"] and [c["id"] for c in rep["cases"]] == [case_id]
     assert rep["recording"]["status"] == "off" and len(rep["turns"]) >= 5
+
+
+def test_the_call_page_keeps_its_own_recording_with_the_report(client):
+    s = client.post("/api/channels/web/start", json={"customer_id": "C-1002", "lang": "en"}).json()
+    client.post("/api/channels/web/turn", json={"session": s["session"], "text": "I was charged twice for ₹349 at CafeBrew yesterday"})
+    webm = b"\x1aE\xdf\xa3" + b"\x00" * 2048
+    url = f"/api/channels/web/recording?session={s['session']}&seconds=42"
+    assert client.post(url, content=webm, headers={"Content-Type": "text/plain"}).status_code == 415
+    assert client.post("/api/channels/web/recording?session=0123456789abcdef", content=webm,
+                       headers={"Content-Type": "audio/webm"}).status_code == 404
+    r = client.post(url, content=webm, headers={"Content-Type": "audio/webm;codecs=opus"})
+    assert r.status_code == 200 and r.json()["bytes"] == len(webm)
+    assert client.post(url, content=webm, headers={"Content-Type": "audio/webm"}).status_code == 409   # once per call
+    end = client.post("/api/channels/web/end", json={"session": s["session"]}).json()
+    rep = client.get(end["report"]).json()
+    assert rep["recording"]["status"] == "kept" and rep["recording"]["duration"] == 42 and "Recording kept (42s)" in rep["summary"]
+    audio = client.get(end["report"] + "/audio")
+    assert audio.status_code == 200 and audio.content == webm and audio.headers["content-type"] == "audio/webm"
+
+
+def test_twilios_trial_refusal_is_explained(client, engine, twilio):
+    class Refuse(H):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            self._send(400, json.dumps({"code": 400, "message": "Invalid or disallowed parameters provided - trial accounts "
+                                        "have limited parameter access, upgrade your account to unlock full functionality"}).encode())
+    t = Twilio()
+    t.RequestHandlerClass = Refuse
+    try:
+        client.put("/api/channels", json={"voice": {"api_url": t.url}})
+        c = engine.create_case("C-1002", "I was charged twice for ₹349 at CafeBrew yesterday", "chat")
+        r = client.post(f"/api/cases/{c['id']}/call", json={"to": "+919930021383"})
+        assert r.status_code >= 400 and "free trial only runs Twilio's own sample calls" in r.text and "/call" in r.text
+    finally:
+        t.shutdown()

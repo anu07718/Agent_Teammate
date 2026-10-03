@@ -96,7 +96,7 @@ def build(hub, conv: dict) -> dict:
         parts.append(f"{c['id']}: {(c['intent'] or 'a question').replace('_', ' ')}{amt}, {c['how']}.")
     if not cases:
         parts.append("No case was opened.")
-    parts.append({"kept": f"Recording kept ({_dur(rec.get('duration'))}).", "off": "Not recorded (recording is off).",
+    parts.append({"kept": f"Recording kept ({_dur(rec.get('duration'))})." if rec.get("duration") else "Recording kept.", "off": "Not recorded (recording is off).",
                   "failed": f"Not recorded: {rec.get('error') or 'Twilio refused'}.",
                   "absent": "Twilio made no recording (no audio).", "recording": "Recording in progress.",
                   "downloading": "Recording is being saved."}.get(rec.get("status"), f"Recording: {rec.get('status')}."))

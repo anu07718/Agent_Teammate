@@ -63,7 +63,7 @@ const VOICE: Spec[] = [
   { k: "voice", label: "English voice", options: [["Polly.Raveena", "Raveena (en-IN)"], ["Polly.Kajal-Neural", "Kajal, neural (en-IN)"], ["Polly.Aditi", "Aditi (en-IN, hi-IN)"], ["Polly.Joanna", "Joanna (en-US)"], ["alice", "Alice (basic)"]] },
   { k: "hindi_voice", label: "Hindi voice", options: [["Polly.Aditi", "Aditi (hi-IN, speaks Hinglish too)"], ["Polly.Kajal-Neural", "Kajal, neural (hi-IN)"]] },
   { k: "record", label: "Record calls", options: [["true", "Record every call and keep it (the caller is told)"], ["false", "Do not record"]],
-    hint: "Both sides, kept in Nirnaya with a report (Call reports). A Twilio trial records calls you place, not incoming ones; upgrading lifts that." },
+    hint: "Both sides, kept in Nirnaya with a report (Call reports). Twilio's free trial runs only Twilio's own sample calls (no webhooks, no recording), so phone calls here need an upgraded Twilio account. Free instead: the call page, which records too." },
   { k: "accept", label: "Answer calls from", options: [["anyone", "Anyone (asks who they are)"], ["contacts", "Only contacts"]] },
 ];
 const HOOK: Spec[] = [
@@ -143,7 +143,7 @@ export function ChannelsView() {
             {tab === "voice" && <ChannelForm ch="voice" specs={VOICE} snap={snap} onSaved={setSnap}
               extra={<><Hooks rows={[["A call comes in (Twilio → Phone Numbers → your number → Voice)", snap.webhooks.voice],
                 ["Call status changes (same page; ends the call's report)", snap.webhooks.voice_status]]} /><CallPageCard url={snap.webhooks.call_page} /></>}
-              testTo="+919876543210" testLabel="Call this number" testHint="A trial account calls only numbers you verified in Twilio (Verified Caller IDs)." />}
+              testTo="+919876543210" testLabel="Call this number" testHint="Needs an upgraded Twilio account: a trial runs only Twilio's own sample calls. Then it calls only numbers verified in Twilio." />}
             {tab === "calls" && <CallReportsPane snap={snap} />}
             {tab === "hook" && <ChannelForm ch="hook" specs={HOOK} snap={snap} onSaved={setSnap} extra={<HookHelp snap={snap} />} testLabel="Send a test event" />}
             {tab === "contacts" && <ContactsPane snap={snap} onSaved={setSnap} reload={load} />}
@@ -316,7 +316,7 @@ function CallPageCard({ url }: { url: string }) {
   return (
     <div className="rounded-md border border-act/30 bg-act/8 p-3 text-[12px]">
       <div className="mb-1 font-medium">Free: the call page</div>
-      <p className="text-muted">Customers talk to the agent from Chrome or Edge, on a phone or a computer, with no phone line and no account. It listens, answers out loud, and opens cases like a call would.</p>
+      <p className="text-muted">Customers talk to the agent from Chrome or Edge, on a phone or a computer, with no phone line and no account. It listens in English or Hindi, answers out loud, opens cases like a call would, records the call and leaves a report.</p>
       <a href="/call" target="_blank" rel="noreferrer"><Button size="sm" className="mt-2"><ExternalLink size={12} /> Open the call page</Button></a>
       <div className="mt-1 truncate text-[11px] text-faint">{url}</div>
     </div>

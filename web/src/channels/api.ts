@@ -56,6 +56,9 @@ export const capi = {
   callReports: () => apiReq<CallReportSummary[]>("/api/channels/call-reports"),
   callReport: (id: string) => apiReq<CallReport>(`/api/channels/call-reports/${encodeURIComponent(id)}`),
   webEnd: (session: string) => send<{ ok: boolean }>("POST", "/api/channels/web/end", { session }),
+  webRecording: (session: string, audio: Blob, seconds: number) =>
+    apiReq<{ ok: boolean; bytes: number }>(`/api/channels/web/recording?session=${session}&seconds=${Math.round(seconds)}`,
+      { method: "POST", body: audio, headers: { "Content-Type": audio.type.split(";")[0] || "audio/webm" } }),
 };
 
 export const CHANNEL_LABEL: Record<string, string> = { email: "Email", whatsapp: "WhatsApp", voice: "Phone", web: "Call page", hook: "Webhook" };
