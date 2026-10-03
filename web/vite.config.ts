@@ -9,6 +9,7 @@ export default defineConfig({
   base: "./",
   server: {
     port: 5173,
+    fs: { allow: [".", "../firebase"] },   // the relay rules are imported from the repo for the dialog's copy button
     proxy: { "/api": { target: api, changeOrigin: true }, "/mcp": { target: api, changeOrigin: true } },
   },
   build: { outDir: "dist", chunkSizeWarningLimit: 4000 },

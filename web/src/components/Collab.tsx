@@ -10,6 +10,8 @@ import { codeOk, join, joined, leave, learnServerRelay, normCode, relayUrl, setR
 import { toast, useUI } from "../store";
 import { initials, me } from "../team";
 import { cx } from "./ui";
+// the relay database's rules, built in so they can be copied from the dialog (no need to find the file)
+import RULES from "../../../firebase/database.rules.json?raw";
 
 interface Member { client: string; name: string; view: string; focus: string | null; via: string }
 interface Hosting { code: string; display: string; name: string; since: number; connected: boolean; error: string | null; served: number; members: Member[] }
@@ -51,13 +53,27 @@ function useWS(poll: number) {
 const VIA: Record<string, string> = { web: "website", apk: "phone app", exe: "Windows app" };
 const VIEW: Record<string, string> = { office: "Office", workspace: "Cases", approvals: "Approvals", channels: "Channels", flows: "Flows", supervisor: "Supervisor", settings: "Settings" };
 
-function CopyBtn({ text, label }: { text: string; label: string }) {
+/** copy text; on a plain-http page (a server on the LAN, the phone app) the clipboard API is often blocked */
+async function copyText(text: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* try the old way */ }
+  const t = document.createElement("textarea");
+  t.value = text;
+  t.style.position = "fixed"; t.style.opacity = "0";
+  document.body.appendChild(t);
+  t.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { ok = false; }
+  t.remove();
+  return ok;
+}
+
+function CopyBtn({ text, label, caption = "COPY" }: { text: string; label: string; caption?: string }) {
   const [done, setDone] = useState(false);
   return (
     <button className="o-btn o-caps" aria-label={label} onClick={async () => {
-      try { await navigator.clipboard.writeText(text); } catch { /* the code is on screen anyway */ }
+      if (!(await copyText(text))) { toast("This browser blocked copying: select the text and copy it yourself", "warn"); return; }
       setDone(true); setTimeout(() => setDone(false), 1500);
-    }}>{done ? <Check size={13} /> : <Copy size={13} />} {done ? "COPIED" : "COPY"}</button>
+    }}>{done ? <Check size={13} /> : <Copy size={13} />} {done ? "COPIED" : caption}</button>
   );
 }
 
@@ -72,7 +88,10 @@ function Setup({ value, onChange, locked }: { value: string; onChange: (v: strin
         <ol className="ml-4 mt-1 list-decimal space-y-0.5">
           <li>Open console.firebase.google.com and add a project (the free Spark plan; no card).</li>
           <li>Build → Realtime Database → Create database (any location, start in locked mode).</li>
-          <li>Rules: paste the rules from <b>firebase/database.rules.json</b> and publish.</li>
+          <li>Rules tab: delete everything there (Firebase's default <code>".read": false</code> rules are not enough), paste Nirnaya's rules and press <b>Publish</b>. <CopyBtn text={RULES} label="Copy the rules" caption="COPY THE RULES" />
+            <details className="mt-1"><summary className="cursor-pointer">Show the rules</summary>
+              <pre className="mt-1 max-h-40 overflow-auto rounded border border-line p-2 text-[10.5px] select-all" data-testid="cw-rules">{RULES}</pre>
+            </details></li>
           <li>Copy the address at the top of the Data tab and paste it here. Everyone uses the same one.</li>
         </ol>
       </details>
@@ -190,6 +209,12 @@ export function CollabDialog({ onClose, start = "create" }: { onClose: () => voi
           </div>
         ))}
         {err && <p className="mt-3 text-[12.5px] text-escalate" role="alert" data-testid="collab-error">{err}</p>}
+        {err && /refused|open to everyone/.test(err) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-muted">
+            <CopyBtn text={RULES} label="Copy the rules" caption="COPY THE RULES" />
+            <span>then Firebase → Realtime Database → Rules: replace everything with them, Publish, and try again.</span>
+          </div>
+        )}
       </div>
     </div>,
     document.body,

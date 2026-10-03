@@ -108,8 +108,11 @@ hosts the same workspace again, with the same code.
 1. Go to [console.firebase.google.com](https://console.firebase.google.com), **Add project** (any name;
    Analytics off). The project starts on the free Spark plan; there is nothing to add.
 2. **Build → Realtime Database → Create database**. Pick a location and **Start in locked mode**.
-3. **Rules**: replace them with the contents of [firebase/database.rules.json](firebase/database.rules.json)
-   and **Publish**. They let nobody list workspaces. They only let someone read or write a workspace whose
+3. **Rules**: delete everything there and paste Nirnaya's rules instead: **COPY THE RULES** in the Work
+   together dialog (under "How to get one"), or the contents of
+   [firebase/database.rules.json](firebase/database.rules.json). Then **Publish**. Firebase's default
+   locked rules (just `".read": false, ".write": false`) refuse Nirnaya too: the dialog then says "the
+   database refused it". They let nobody list workspaces. They only let someone read or write a workspace whose
    code they know, and only in its expected shape. Nirnaya refuses a database left open in "test mode",
    because there anyone could read every workspace.
 4. Copy the database address at the top of the **Data** tab, for example

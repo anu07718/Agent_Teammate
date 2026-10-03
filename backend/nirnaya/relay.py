@@ -152,8 +152,9 @@ class Firebase:
                     raise RelayError(f"cannot reach the database: {e}")
                 continue
             if r.status in (401, 403):
-                raise RelayError("the database refused it: paste the rules from firebase/database.rules.json "
-                                 "into Realtime Database → Rules, and check the address")
+                raise RelayError("the database refused it: its rules are still Firebase's locked default. Copy "
+                                 "Nirnaya's rules (the button below, or firebase/database.rules.json), then in "
+                                 "Realtime Database → Rules replace everything with them and press Publish")
             if r.status == 404:
                 raise RelayError("no database at that address: copy it from Realtime Database → Data in Firebase")
             if r.status >= 400:
