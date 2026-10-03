@@ -170,6 +170,7 @@ const watch = (p) => {
   p.on("response", (r) => { if (r.status() >= 500) errors.push(`HTTP ${r.status()} ${r.url()}`); });
 };
 watch(page);
+const ws = page;   // the workspace tab (the call-page steps open their own)
 const nav = (label) => page.getByRole("navigation", { name: "Views" }).first().getByRole("button", { name: label, exact: true });
 const tab = (name) => page.getByRole("tab", { name, exact: true });
 const f = (label) => page.getByLabel(label, { exact: true });
@@ -370,8 +371,10 @@ await step("Calls: Twilio's fields, every language, voice and choice; the addres
   await f("Account SID").fill("ACe2e");
   await f("Auth token").fill("authtok-e2e");
   await f("Twilio phone number").fill("+15550001111");
-  for (const v of ["hi-IN", "en-US", "en-GB", "en-IN"]) { await f("Language").selectOption(v); expect(await f("Language").inputValue() === v, v); }
-  for (const v of ["Polly.Aditi", "Polly.Joanna", "alice", "Polly.Raveena"]) await f("Voice").selectOption(v);
+  for (const v of ["hi-IN", "en-IN", "both"]) { await f("Languages").selectOption(v); expect(await f("Languages").inputValue() === v, v); }
+  for (const v of ["Polly.Aditi", "Polly.Kajal-Neural", "Polly.Joanna", "alice", "Polly.Raveena"]) await f("English voice").selectOption(v);
+  for (const v of ["Polly.Kajal-Neural", "Polly.Aditi"]) await f("Hindi voice").selectOption(v);
+  for (const v of ["false", "true"]) { await f("Record calls").selectOption(v); expect(await f("Record calls").inputValue() === v, v); }
   await f("Answer calls from").selectOption("contacts");
   await f("Answer calls from").selectOption("anyone");
   await saveForm().click();
@@ -387,6 +390,7 @@ await step("Calls: Twilio's fields, every language, voice and choice; the addres
   const c = to("/Calls.json").at(-1);
   expect(c.path === "/2010-04-01/Accounts/ACe2e/Calls.json" && c.body.To === "+919876543210" && c.body.From === "+15550001111", JSON.stringify(c.body));
   expect(c.body.Url.startsWith(`${PUBLIC}/api/channels/voice/twilio/outbound?c=voice`) && c.headers.authorization === "Basic " + Buffer.from("ACe2e:authtok-e2e").toString("base64"), c.body.Url);
+  expect(c.body.Record === "true" && c.body.RecordingStatusCallback.startsWith(`${PUBLIC}/api/channels/voice/twilio/recording?c=voice`), "the call is not recorded");
 });
 
 await step("Webhooks: token and URL saved; a test event reaches n8n; a message from n8n gets the agent's answer back in the reply", async () => {
@@ -585,10 +589,10 @@ await step("Call page: someone new in Hindi says who they are by spelling their 
   await call.evaluate(() => { window.__srLang = []; window.__said = []; });
   await hear(call, DUPLICATE);
   await call.getByRole("button", { name: "Start the call" }).click();
-  await line(call, "nirnaya", "Hello, this is Nirnaya, the support assistant.").waitFor();
-  await line(call, "nirnaya", "registered mobile number").waitFor({ timeout: 20000 });
+  await line(call, "nirnaya", "नमस्ते, मैं निर्णय हूँ").waitFor();                     // a Hindi call is answered in Hindi
+  await line(call, "nirnaya", "रजिस्टर्ड मोबाइल नंबर").waitFor({ timeout: 20000 });
   await hear(call, "my customer ID is C 1 0 0 2");
-  const a = line(call, "nirnaya", "Thank you, Meera. I've found your account.");
+  const a = line(call, "nirnaya", "धन्यवाद Meera जी, आपका अकाउंट मिल गया है।");
   await a.waitFor({ timeout: 60000 });
   expect((await a.innerText()).includes("349"), "the answer is not about the first thing she said");
   expect((await call.evaluate(() => window.__srLang)).every((l) => l === "hi-IN") && (await said(call)).every((s) => s.lang === "hi-IN"), "not Hindi");
@@ -598,7 +602,7 @@ await step("Call page: someone new in Hindi says who they are by spelling their 
   expect(!(await call.evaluate(() => window.__listening)), "still listening while muted");
   await call.getByLabel("Type a message").fill("thank you");
   await call.getByRole("button", { name: "Send", exact: true }).click();
-  await line(call, "nirnaya", "You're welcome").waitFor({ timeout: 20000 });
+  await line(call, "nirnaya", "आपका स्वागत है").waitFor({ timeout: 20000 });
   await call.getByTestId("call-status").getByText("Type your message").waitFor();
   await call.getByRole("button", { name: "Unmute" }).click();
   await call.getByTestId("call-status").getByText("Listening…").waitFor();
@@ -638,6 +642,23 @@ await step("Call page with the microphone blocked: it says so and carries on as 
   await call.getByRole("button", { name: "Send", exact: true }).click();
   await call.getByText("The call has ended.").waitFor({ timeout: 20000 });
   await call.context().close();
+});
+
+await step("Call reports: the Hindi call is there with what was said both ways, its case, and a report to download", async () => {
+  page = ws;
+  await page.bringToFront();
+  await nav("Channels").click();
+  await tab("Call reports").click();
+  const reps = await api("/api/channels/call-reports");
+  const hindi = reps.find((r) => r.channel === "call page" && r.langs.includes("hi") && r.cases.length);
+  expect(hindi, JSON.stringify(reps.slice(0, 3)));
+  await page.getByTestId("call-reports").locator(`[data-call="${hindi.id}"]`).click();
+  await page.getByTestId("call-summary").filter({ hasText: "Spoke" }).waitFor();
+  await page.getByTestId("call-transcript").getByText("आपका स्वागत है").first().waitFor();
+  await page.getByTestId("call-report").getByText(hindi.cases[0], { exact: true }).waitFor();
+  const href = await page.getByRole("link").filter({ hasText: "Download report" }).getAttribute("href");
+  const html = await (await fetch(new globalThis.URL(href, URL))).text();
+  expect(html.includes("Call report") && html.includes(hindi.cases[0]) && html.includes("आपका स्वागत है"), "the downloaded report is not the call's");
 });
 
 // ── a server with an access key ─────────────────────────────────────────────

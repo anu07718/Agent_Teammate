@@ -42,6 +42,25 @@ def request(method: str, url: str, *, json_body=None, form=None, headers: dict |
         return {"raw": raw.decode("utf-8", "replace")[:2000]}
 
 
+def fetch_bytes(url: str, *, basic: tuple[str, str] | None = None, timeout: float = 60,
+                limit: int = 60 * 1024 * 1024) -> tuple[bytes, str]:
+    """A file (a call recording): its bytes and content type. Refuses anything over `limit`."""
+    h = {"User-Agent": "Nirnaya/0.1"}
+    if basic:
+        h["Authorization"] = "Basic " + base64.b64encode(f"{basic[0]}:{basic[1]}".encode()).decode()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=timeout) as r:
+            raw = r.read(limit + 1)
+            ctype = r.headers.get("Content-Type") or "application/octet-stream"
+    except urllib.error.HTTPError as e:
+        raise ChannelError(_explain(e.code, e.read().decode("utf-8", "replace"))) from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise ChannelError(f"could not reach {urllib.parse.urlsplit(url).netloc}: {getattr(e, 'reason', e)}") from None
+    if len(raw) > limit:
+        raise ChannelError("the file is too large")
+    return raw, ctype
+
+
 def _explain(code: int, body: str) -> str:
     """Pull the provider's own message out of an error body (Graph API, Twilio, Brevo and Resend all differ)."""
     msg = body.strip()[:400]

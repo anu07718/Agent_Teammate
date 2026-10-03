@@ -5,17 +5,19 @@ from __future__ import annotations
 import asyncio
 import hmac
 import ipaddress
+import re
 import time
 import urllib.parse
 import uuid
 from typing import Callable
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
+from .. import lingo
 from ..team import clean_name
-from . import mail, voice, whatsapp
+from . import calls, mail, voice, whatsapp
 from .hub import BYE, Channels
 from .http import ChannelError
 
@@ -57,12 +59,14 @@ class CallReq(BaseModel):
 class WebStart(BaseModel):
     customer_id: str | None = None
     name: str | None = None
+    lang: str = "en"          # "en" or "hi": what the caller speaks and hears
 
 
 class WebTurn(BaseModel):
     session: str = Field(min_length=6, max_length=40)
     text: str = Field(min_length=1, max_length=2000)
     mode: str = "voice"
+    lang: str | None = None
 
 
 class WebEnd(BaseModel):
@@ -151,7 +155,10 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         conv = C().conversation(conv_id)
         if not conv:
             raise HTTPException(404, f"no conversation {conv_id}")
-        return {**C()._summary(conv), "messages": conv["messages"]}
+        call = conv["channel"] in ("voice", "web")
+        return {**C()._summary(conv), "messages": conv["messages"], "lang": conv.get("lang"),
+                "recording": conv.get("recording") if call else None,
+                "report": f"/api/channels/call-reports/{conv_id}" if call else None}
 
     @app.post("/api/channels/reply/{conv_id:path}")
     async def conv_reply(conv_id: str, body: Say):
@@ -269,6 +276,9 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         return {"ok": True, "messages": len(msgs)}
 
     # ── phone calls: Twilio ──────────────────────────────────────────────────
+    # Each call keeps its language ("en" or "hi"): the caller can press 2 or simply speak Hindi. What they say
+    # is put into English (or Hinglish) for the agents (lingo.for_agents) and the answer goes back in their
+    # language (lingo.for_caller); both are kept in the call's transcript (calls.note) for its report.
     async def _twilio(request: Request) -> tuple[dict, dict]:
         cfg = C().config()
         v = cfg["voice"]
@@ -290,6 +300,49 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
     def _public(request: Request) -> str:
         return C().config()["public_url"] or _base(request)
 
+    def _lang(conv: dict | None, v: dict) -> str:
+        return (conv or {}).get("lang") or voice.first_lang(v)
+
+    def _set_lang(cid: str, lang: str) -> None:
+        conv = C().conversation(cid)
+        if conv and conv.get("lang") != lang:
+            conv["lang"] = lang
+            C()._put(conv)
+
+    def _offer(v: dict, lang: str) -> list[tuple[str, str]]:
+        """On a line that takes both, an English caller hears how to switch to Hindi."""
+        return [(lingo.phrase("press_2", "hi"), "hi")] if v.get("language") == "both" and lang == "en" else []
+
+    def _speak(cid: str, text: str, lang: str) -> str:
+        """The agents' words in the caller's language, noted in the transcript."""
+        out = lingo.for_caller(text, lang, E().llm)
+        calls.note(C(), cid, "agent", out["text"], english=out["english"], lang=lang, via=out["via"])
+        return out["text"]
+
+    def _listen(t: voice.TwiML, v: dict, public: str, cid: str, prompt: str, lang: str, first: bool = False) -> voice.TwiML:
+        if prompt:
+            calls.note(C(), cid, "agent", prompt, lang=lang)
+        offer = _offer(v, lang) if first else []
+        return t.gather(_url(public, "turn", c=cid), prompt, also=offer, keys=v.get("language") == "both") \
+            .redirect(_url(public, "turn", c=cid, quiet=1))
+
+    async def _start_recording(cid: str, sid: str, public: str) -> None:
+        """Record a call that is already going; a Twilio trial refuses incoming calls, and the report says so."""
+        await asyncio.sleep(voice.RECORD_DELAY)        # the call must be connected before it can be recorded
+        hub = C()
+        v = hub.config()["voice"]
+        try:
+            rsid = await asyncio.to_thread(voice.start_recording, v, sid, _url(public, "recording", c=cid))
+            rec = {"status": "recording", "sid": rsid or None, "at": time.time()}
+        except ChannelError as ex:
+            rec = {"status": "failed", "error": str(ex), "at": time.time()}
+        conv = hub.conversation(cid)
+        if conv:
+            conv["recording"] = {**(conv.get("recording") or {}), **rec}
+            hub._put(conv)
+            if rec["status"] == "failed":
+                hub._log(conv, "in", f"Not recorded: {rec['error']}", kind="call", status="not recorded")
+
     @app.post("/api/channels/voice/twilio/incoming")
     async def tw_incoming(request: Request):
         v, form = await _twilio(request)
@@ -298,16 +351,28 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         conv = hub._conv(f"voice:{sid}", "voice", caller)
         conv["customer_id"] = conv.get("customer_id") or hub.identify(caller)
         conv["call_sid"] = sid
+        conv["lang"] = voice.first_lang(v)
+        if v.get("record"):
+            conv["recording"] = {"status": "starting"}
         hub._log(conv, "in", f"Call from {caller}", kind="call", status="answered")
-        t = voice.TwiML(v)
+        lang = conv["lang"]
+        t = voice.TwiML(v, lang)
         if not conv["customer_id"] and v.get("accept") == "contacts":
-            return _xml(t.say("Sorry, this line only takes calls from registered customers. Goodbye.").hangup())
+            return _xml(t.say(lingo.phrase("only_customers", lang)).hangup())
         first = (hub.customers().get(conv["customer_id"] or "") or {}).get("name", "").split(" ")[0]
-        hello = (f"Hello {first}, this is Nirnaya, the support assistant." if first else
-                 "Hello, this is Nirnaya, the support assistant.") + " How can I help you with your payment today?"
+        if lang == "hi":
+            hello = lingo.phrase("greeting_named", "hi", name=first) if first else lingo.phrase("greeting", "hi")
+        else:
+            hello = (f"Hello {first}, this is Nirnaya, the support assistant." if first else
+                     "Hello, this is Nirnaya, the support assistant.") + " How can I help you with your payment today?"
         hub._log(conv, "out", hello, kind="greeting", status="spoken")
         public = _public(request)
-        return _xml(t.gather(_url(public, "turn", c=conv["id"]), hello).redirect(_url(public, "turn", c=conv["id"], quiet=1)))
+        if v.get("record"):
+            notice = lingo.phrase("recorded", lang)
+            t.say(notice)
+            calls.note(hub, conv["id"], "agent", notice, lang=lang)
+            asyncio.get_running_loop().create_task(_start_recording(conv["id"], sid, public))
+        return _xml(_listen(t, v, public, conv["id"], hello, lang, first=True))
 
     @app.post("/api/channels/voice/twilio/outbound")
     async def tw_outbound(request: Request):
@@ -315,14 +380,18 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         hub = C()
         cid = request.query_params.get("c", "")
         conv = hub.conversation(cid)
-        t = voice.TwiML(v)
+        lang = _lang(conv, v)
+        t = voice.TwiML(v, lang)
         if not conv:
-            return _xml(t.say("Sorry, something went wrong with this call. Goodbye.").hangup())
+            return _xml(t.say(lingo.phrase("lost", lang)).hangup())
         opening = (conv.get("opening") or "Hello, this is Nirnaya, the support assistant.").strip()
         hub._log(conv, "out", opening, kind="greeting", status="spoken")
         public = _public(request)
-        return _xml(t.say(opening).gather(_url(public, "turn", c=cid), "Is there anything else I can help you with?")
-                    .redirect(_url(public, "turn", c=cid, quiet=1)))
+        if v.get("record"):
+            notice = lingo.phrase("recorded", lang)
+            t.say(notice)
+            calls.note(hub, cid, "agent", notice, lang=lang)
+        return _xml(_listen(t.say(_speak(cid, opening, lang)), v, public, cid, lingo.phrase("anything_else", lang), lang, first=True))
 
     @app.post("/api/channels/voice/twilio/turn")
     async def tw_turn(request: Request):
@@ -330,39 +399,73 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         hub = C()
         cid = request.query_params.get("c", "")
         conv = hub.conversation(cid)
-        t = voice.TwiML(v)
+        lang = _lang(conv, v)
         public = _public(request)
         if not conv:
-            return _xml(t.say("Sorry, I lost track of this call. Please call again. Goodbye.").hangup())
-        speech = (form.get("SpeechResult") or "").strip()
+            return _xml(voice.TwiML(v, lang).say(lingo.phrase("lost", lang)).hangup())
+        speech, digits = (form.get("SpeechResult") or "").strip(), (form.get("Digits") or "").strip()
+        # switching language: press 2 (or 1), or ask for it in words
+        want = "hi" if digits == "2" or (speech and lingo.ASK_HINDI.search(speech) and len(speech) < 40) else \
+            "en" if digits == "1" or (speech and lingo.ASK_ENGLISH.search(speech) and len(speech) < 40) else None
+        if want:
+            _set_lang(cid, want)
+            calls.note(hub, cid, "caller", speech or f"pressed {digits}", lang=want)
+            return _xml(_listen(voice.TwiML(v, want), v, public, cid, lingo.phrase("switched" if want == "hi" else "switched_en", "hi" if want == "hi" else "en"), want))
         if not speech:
             conv["silence"] = conv.get("silence", 0) + 1
             hub._put(conv)
+            t = voice.TwiML(v, lang)
             if conv["silence"] >= 3:
                 hub._log(conv, "out", BYE, kind="bye", status="spoken")
-                return _xml(t.say("I can't hear anything, so I'll end the call now. " + BYE).hangup())
-            return _xml(t.gather(_url(public, "turn", c=cid), "Sorry, I didn't catch that. Could you say it again?")
-                        .redirect(_url(public, "turn", c=cid, quiet=1)))
+                calls.note(hub, cid, "agent", lingo.phrase("silence_bye", lang), lang=lang)
+                return _xml(t.say(lingo.phrase("silence_bye", lang)).hangup())
+            return _xml(_listen(t, v, public, cid, lingo.phrase("again", lang), lang))
         conv["silence"] = 0
         hub._put(conv)
+        # what they said, for the agents: Hindi (Devanagari) into English or Hinglish; Hinglish as it is
+        heard = lingo.for_agents(speech, E().llm, E().tok)
+        if heard["lang"] == "hi" and lang != "hi" and v.get("language") != "en-IN":
+            lang = "hi"                                  # they spoke Hindi: the agent answers in Hindi from now on
+            _set_lang(cid, "hi")
+        calls.note(hub, cid, "caller", speech, english=heard["text"], lang=heard["lang"], via=heard["via"])
+        t = voice.TwiML(v, lang)
         t0 = time.time()
-        r = await hub.receive("voice", conv["address"], speech, conv_id=cid, meta={"confidence": form.get("Confidence")})
+        r = await hub.receive("voice", conv["address"], heard["text"], conv_id=cid,
+                              meta={"confidence": form.get("Confidence"), "original": speech if heard["text"] != speech else None,
+                                    "lang": heard["lang"]})
         if r["action"] == "reply":
+            said = _speak(cid, r["reply"], lang)
             if r.get("end"):
-                return _xml(t.say(r["reply"]).hangup())
-            return _xml(t.gather(_url(public, "turn", c=cid), r["reply"]).redirect(_url(public, "turn", c=cid, quiet=1)))
+                _ended(cid)
+                return _xml(t.say(said).hangup())
+            return _xml(_listen(t.say(said), v, public, cid, "", lang))
         if r["action"] == "ignored":
-            return _xml(t.say("Sorry, I can't help on this line. Goodbye.").hangup())
+            return _xml(t.say(lingo.phrase("cannot_help", lang)).hangup())
         o = await hub.wait_reply(cid, after=t0, timeout=7)
         if o:
-            return _xml(_spoken(t, o, public, cid))
-        return _xml(t.say("One moment, I'm checking that for you.").redirect(_url(public, "wait", c=cid, t=f"{t0:.3f}", n=1)))
+            return _xml(_spoken(t, v, o, public, cid, lang))
+        return _xml(t.say(lingo.phrase("one_moment", lang)).redirect(_url(public, "wait", c=cid, t=f"{t0:.3f}", n=1)))
 
-    def _spoken(t: voice.TwiML, o: dict, public: str, cid: str) -> voice.TwiML:
+    def _spoken(t: voice.TwiML, v: dict, o: dict, public: str, cid: str, lang: str) -> voice.TwiML:
+        said = _speak(cid, o["text"], lang)
         if o.get("end"):
-            return t.say(o["text"]).hangup()
-        return t.say(o["text"]).gather(_url(public, "turn", c=cid), "Is there anything else I can help you with?") \
-            .redirect(_url(public, "turn", c=cid, quiet=1))
+            _ended(cid)
+            return t.say(said).hangup()
+        return _listen(t.say(said), v, public, cid, lingo.phrase("anything_else", lang), lang)
+
+    def _ended(cid: str, status: str | None = None, duration: str | None = None) -> None:
+        hub = C()
+        conv = hub.conversation(cid)
+        if not conv:
+            return
+        conv["ended"] = True
+        conv["ended_at"] = conv.get("ended_at") or time.time()
+        if duration and str(duration).isdigit():
+            conv["duration"] = int(duration)
+        if status:
+            conv["call_status"] = status
+        hub._put(conv)
+        calls.save(hub, cid)
 
     @app.post("/api/channels/voice/twilio/wait")
     async def tw_wait(request: Request):
@@ -370,28 +473,105 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         hub = C()
         cid, n = request.query_params.get("c", ""), int(request.query_params.get("n", "1") or 1)
         after = float(request.query_params.get("t", "0") or 0)
-        t = voice.TwiML(v)
+        lang = _lang(hub.conversation(cid), v)
+        t = voice.TwiML(v, lang)
         public = _public(request)
         o = await hub.wait_reply(cid, after=after, timeout=9)
         if o:
-            return _xml(_spoken(t, o, public, cid))
+            return _xml(_spoken(t, v, o, public, cid, lang))
         if n >= 5:
-            return _xml(t.say("This is taking a little longer than usual. I'll send you the answer by message. "
-                              + BYE).hangup())
-        return _xml(t.say("Still checking.").redirect(_url(public, "wait", c=cid, t=f"{after:.3f}", n=n + 1)))
+            calls.note(hub, cid, "agent", lingo.phrase("too_long", lang), lang=lang)
+            _ended(cid)
+            return _xml(t.say(lingo.phrase("too_long", lang)).hangup())
+        return _xml(t.say(lingo.phrase("still", lang)).redirect(_url(public, "wait", c=cid, t=f"{after:.3f}", n=n + 1)))
 
     @app.post("/api/channels/voice/twilio/status")
     async def tw_status(request: Request):
         v, form = await _twilio(request)
         hub = C()
-        conv = hub.conversation(request.query_params.get("c", ""))
+        cid = request.query_params.get("c", "") or f"voice:{form.get('CallSid', '')}"
+        conv = hub.conversation(cid)
         st = form.get("CallStatus", "")
         if conv and st in ("completed", "busy", "no-answer", "failed", "canceled"):
-            conv["ended"] = True
             hub._log(conv, "out" if conv["id"].startswith("voice:out-") else "in",
                      f"Call {st.replace('-', ' ')}" + (f" after {form.get('CallDuration')} s" if form.get("CallDuration") else ""),
                      kind="call", status=st)
+            _ended(cid, st, form.get("CallDuration"))
         return {"ok": True}
+
+    @app.post("/api/channels/voice/twilio/recording")
+    async def tw_recording(request: Request):
+        """Twilio says a recording is ready (or that there is none): fetch it and keep it with the report."""
+        v, form = await _twilio(request)
+        hub = C()
+        cid = request.query_params.get("c", "")
+        conv = hub.conversation(cid)
+        if not conv:
+            return {"ok": True}
+        st = form.get("RecordingStatus", "")
+        rec = {**(conv.get("recording") or {}), "sid": form.get("RecordingSid") or None, "at": time.time()}
+        if form.get("RecordingDuration", "").isdigit():
+            rec["duration"] = int(form["RecordingDuration"])
+        if st == "completed" and form.get("RecordingUrl"):
+            rec["status"] = "downloading"
+            conv["recording"] = rec
+            hub._put(conv)
+            asyncio.get_running_loop().create_task(_keep(cid, form["RecordingUrl"], rec["sid"] or "rec"))
+        else:
+            rec["status"] = "absent" if st == "absent" else "failed"
+            rec["error"] = form.get("ErrorCode") and f"Twilio error {form['ErrorCode']}"
+            conv["recording"] = rec
+            hub._put(conv)
+            calls.save(hub, cid)
+        return {"ok": True}
+
+    async def _keep(cid: str, url: str, rsid: str) -> None:
+        hub = C()
+        v = hub.config()["voice"]
+        try:
+            data = await asyncio.to_thread(voice.download, v, url)
+            path = calls.recording_file(E(), cid, rsid)
+            await asyncio.to_thread(path.write_bytes, data)
+            upd = {"status": "kept", "file": path.name, "bytes": len(data)}
+        except (ChannelError, OSError) as ex:
+            upd = {"status": "failed", "error": f"could not download the recording: {ex}"}
+        conv = hub.conversation(cid)
+        if conv:
+            conv["recording"] = {**(conv.get("recording") or {}), **upd}
+            hub._put(conv)
+            hub._log(conv, "in", "Recording kept" if upd["status"] == "kept" else upd["error"], kind="call",
+                     status="recorded" if upd["status"] == "kept" else "not recorded")
+            calls.save(hub, cid)
+
+    # ── call reports ─────────────────────────────────────────────────────────
+    @app.get("/api/channels/call-reports")
+    def call_reports(limit: int = 100):
+        return calls.listing(C(), max(1, min(limit, 500)))
+
+    @app.get("/api/channels/call-reports/{cid}")
+    def call_report(cid: str):
+        rep = calls.get(C(), cid)
+        if not rep:
+            raise HTTPException(404, "no report for that call")
+        return rep
+
+    @app.get("/api/channels/call-reports/{cid}/html")
+    def call_report_html(cid: str):
+        rep = calls.get(C(), cid)
+        if not rep:
+            raise HTTPException(404, "no report for that call")
+        name = re.sub(r"[^\w-]", "_", cid)
+        return Response(calls.as_html(rep), media_type="text/html",
+                        headers={"Content-Disposition": f'attachment; filename="call-report-{name}.html"'})
+
+    @app.get("/api/channels/call-reports/{cid}/audio")
+    def call_audio(cid: str):
+        rep = calls.get(C(), cid)
+        f = ((rep or {}).get("recording") or {}).get("file")
+        path = calls.recordings_dir(E()) / f if f else None
+        if not path or not path.is_file():
+            raise HTTPException(404, "no recording kept for that call")
+        return FileResponse(path, media_type="audio/mpeg", filename=f)
 
     # ── the browser call page (talk to the agent from any Chrome or Edge) ───
     @app.get("/api/channels/web/customers")
@@ -404,41 +584,61 @@ def register(app: FastAPI, E: Callable, C: Callable[[], Channels]) -> None:
         session = uuid.uuid4().hex[:16]
         name = clean_name(body.name, "") if body.name else ""
         cust = body.customer_id if body.customer_id in hub.customers() else None
+        lang = "hi" if body.lang == "hi" else "en"
         conv = hub._conv(f"web:{session}", "web", session, name or (hub.customers()[cust]["name"] if cust else "Web caller"))
         conv["customer_id"] = cust
+        conv["lang"] = lang
         first = (hub.customers().get(cust or "") or {}).get("name", "").split(" ")[0]
-        hello = (f"Hello {first}, this is Nirnaya, the support assistant." if first else
-                 "Hello, this is Nirnaya, the support assistant.") + " How can I help you with your payment today?"
+        if lang == "hi":
+            hello = lingo.phrase("greeting_named", "hi", name=first) if first else lingo.phrase("greeting", "hi")
+        else:
+            hello = (f"Hello {first}, this is Nirnaya, the support assistant." if first else
+                     "Hello, this is Nirnaya, the support assistant.") + " How can I help you with your payment today?"
         hub._log(conv, "in", "Call started from the call page", kind="call", status="answered")
         hub._log(conv, "out", hello, kind="greeting", status="spoken")
-        return {"session": session, "greeting": hello, "customer_id": cust}
+        calls.note(hub, conv["id"], "agent", hello, lang=lang)
+        return {"session": session, "greeting": hello, "customer_id": cust, "lang": lang}
 
     @app.post("/api/channels/web/turn")
     async def web_turn(body: WebTurn):
         hub = C()
         cid = f"web:{body.session}"
-        if not hub.conversation(cid):
+        conv = hub.conversation(cid)
+        if not conv:
             raise HTTPException(404, "this call has ended; start a new one")
+        lang = body.lang if body.lang in ("en", "hi") else conv.get("lang", "en")
+        if lang != conv.get("lang"):
+            _set_lang(cid, lang)
+        heard = lingo.for_agents(body.text, E().llm, E().tok)
+        calls.note(hub, cid, "caller", body.text, english=heard["text"], lang=heard["lang"], via=heard["via"])
         t0 = time.time()
-        r = await hub.receive("web", body.session, body.text, conv_id=cid, meta={"mode": "text" if body.mode == "text" else "voice"})
+        r = await hub.receive("web", body.session, heard["text"], conv_id=cid,
+                              meta={"mode": "text" if body.mode == "text" else "voice",
+                                    "original": body.text if heard["text"] != body.text else None, "lang": heard["lang"]})
         if r["action"] == "reply":
-            return {"reply": r["reply"], "end": r.get("end", False), "case_id": None}
+            if r.get("end"):
+                _ended(cid)
+            return {"reply": _speak(cid, r["reply"], lang), "english": r["reply"], "end": r.get("end", False), "case_id": None}
         if r["action"] != "case":
-            return {"reply": "Sorry, I can't help with that here.", "end": False, "case_id": None}
+            return {"reply": _speak(cid, "Sorry, I can't help with that here.", lang), "end": False, "case_id": None}
         o = await hub.wait_reply(cid, after=t0, timeout=45)
         c = E().store.get_case(r["case_id"])
-        return {"reply": o["text"] if o else "I'm still checking; this is taking longer than usual.",
+        english = o["text"] if o else "I'm still checking; this is taking longer than usual."
+        if o and o.get("end"):
+            _ended(cid)
+        return {"reply": _speak(cid, english, lang), "english": english,
                 "end": bool(o and o.get("end")), "case_id": r["case_id"],
                 "status": (c or {}).get("status"), "route": (c or {}).get("route")}
 
     @app.post("/api/channels/web/end")
     def web_end(body: WebEnd):
         hub = C()
-        conv = hub.conversation(f"web:{body.session}")
+        cid = f"web:{body.session}"
+        conv = hub.conversation(cid)
         if conv and not conv.get("ended"):
-            conv["ended"] = True
             hub._log(conv, "in", "Call ended", kind="call", status="completed")
-        return {"ok": True}
+            _ended(cid, "completed")
+        return {"ok": True, "report": f"/api/channels/call-reports/{cid}" if conv else None}
 
     # ── any other channel, through n8n / Make / Zapier / your own code ───────
     @app.post("/api/channels/hook")

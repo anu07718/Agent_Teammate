@@ -89,7 +89,7 @@ export function CallPage() {
     setLines((l) => [...l, { who: "you", text }]);
     setPhase("thinking");
     try {
-      const r = await capi.webTurn(s, text, mode);
+      const r = await capi.webTurn(s, text, mode, lang.startsWith("hi") ? "hi" : "en");
       setLines((l) => [...l, { who: "nirnaya", text: r.reply, case_id: r.case_id }]);
       say(r.reply, () => { if (r.end) void hangUp(true); else listen(); });
     } catch (e) {
@@ -102,7 +102,7 @@ export function CallPage() {
     setErr(null);
     setLines([]);
     try {
-      const r = await capi.webStart(who || null);
+      const r = await capi.webStart(who || null, lang.startsWith("hi") ? "hi" : "en");
       setSession(r.session);
       live.current.session = r.session;
       setLines([{ who: "nirnaya", text: r.greeting }]);

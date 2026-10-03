@@ -125,7 +125,8 @@ class Channels:
     def webhooks(self, base: str) -> dict:
         b = (self.config()["public_url"] or base).rstrip("/")
         return {"whatsapp": f"{b}/api/channels/whatsapp/webhook", "waha": f"{b}/api/channels/waha/webhook",
-                "voice": f"{b}/api/channels/voice/twilio/incoming", "email": f"{b}/api/channels/email/inbound",
+                "voice": f"{b}/api/channels/voice/twilio/incoming", "voice_status": f"{b}/api/channels/voice/twilio/status",
+                "email": f"{b}/api/channels/email/inbound",
                 "hook": f"{b}/api/channels/hook", "call_page": f"{b}/call"}
 
     def snapshot(self, base: str) -> dict:
@@ -279,7 +280,8 @@ class Channels:
                 conv["last_in_id"] = meta["msg_id"]
                 conv["refs"] = " ".join(x for x in ((meta.get("references") or conv.get("refs") or "").split()
                                                    + [meta["msg_id"]]) if x)[-1800:]
-        self._log(conv, "in", text or "(empty)", msg_id=msg_id or None)
+        self._log(conv, "in", text or "(empty)", msg_id=msg_id or None, original=meta.get("original"),
+                  lang=meta.get("lang") if meta.get("original") else None)
         if not text:
             return {"action": "ignored", "why": "empty message", "conv_id": conv["id"]}
 
@@ -639,11 +641,16 @@ class Channels:
         conv = self._conv(conv_id, "voice", number)
         conv["customer_id"] = self.identify(number)
         conv["opening"] = text
+        conv["lang"] = voice.first_lang(v)
+        if v.get("record"):
+            conv["recording"] = {"status": "recording"}
         if case_id:
             conv["case_ids"].append(case_id)
         self._put(conv)
         url = f"{public}/api/channels/voice/twilio/outbound?c={conv_id}"
-        sid = await asyncio.to_thread(voice.call, v, number, url, f"{public}/api/channels/voice/twilio/status?c={conv_id}")
+        rec_url = f"{public}/api/channels/voice/twilio/recording?c={conv_id}" if v.get("record") else None
+        sid = await asyncio.to_thread(voice.call, v, number, url, f"{public}/api/channels/voice/twilio/status?c={conv_id}",
+                                      rec_url)
         conv = self.conversation(conv_id) or conv
         conv["call_sid"] = sid
         self._log(conv, "out", f"Calling {number}…", kind="call", status="ringing", by=by, case_id=case_id)

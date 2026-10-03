@@ -151,38 +151,73 @@ Open http://localhost:3000/dashboard, start the `default` session and scan the Q
 **WAHA API key** if you started WAHA with `WAHA_API_KEY`. Save and tick **Answer WhatsApp**. Without an
 HMAC key, Nirnaya accepts WAHA's calls only from your own machine or local network.
 
-## 3. Phone calls with a Twilio trial (about 10 minutes)
+## 3. Phone calls with Twilio, step by step (about 15 minutes)
 
-1. Sign up at [twilio.com/try-twilio](https://www.twilio.com/try-twilio). The trial includes 75 call
-   minutes.
-2. Get a trial phone number (Console → Phone Numbers → Buy a number; it is paid from the trial credit).
-3. **Verified Caller IDs:** add your own mobile. A trial calls only verified numbers, up to 5, in the
-   country you signed up in.
-4. Copy the **Account SID** and **Auth Token** from the Console's Account info.
-5. Under Phone Numbers → Manage → Active numbers, open your number. Under **Voice → A call comes in**,
-   choose *Webhook* and paste `https://…/api/channels/voice/twilio/incoming` (shown in Nirnaya under
-   **Calls**), method **HTTP POST**. Save.
-6. In Nirnaya: **Channels → Calls**. Paste the SID, the token and the Twilio number. Pick the
-   **Language** (English (India), Hindi, …) and the **Voice** (Raveena or Aditi for Indian English).
-   Save, then tick **Answer phone calls**.
-7. **The agent calls you:** put your verified number in **Try it** and press **Call this number**. Then
-   talk: say what went wrong with a payment. It answers, opens a case, and asks if there is anything else;
-   say *no, that's all* to finish. From India this is the cheaper way round. Calling a US trial number
-   from an Indian mobile is an international call on your own plan.
-8. **You call the agent:** ring the Twilio number from a verified phone. A contact is greeted by name;
-   anyone else is asked for their registered mobile number or customer ID, by voice.
+The agent answers your Twilio number, talks in **English or Hindi**, opens cases, and calls customers back.
+Every call can be **recorded** and gets a **report** (what was said both ways, the cases, the recording).
 
-Trial calls begin with a short notice from Twilio. Any case can call its customer from **Cases → Call**,
-and a flow can too (the **Phone call** step).
+**A. Twilio (free trial)**
+1. Sign up at [twilio.com/try-twilio](https://www.twilio.com/try-twilio) and verify your email and mobile.
+   The trial includes 75 call minutes; trial calls last at most 10 minutes.
+2. **Get a number:** Console → Phone Numbers → Manage → **Buy a number** (paid from the trial credit; a US
+   number is fine). Note it in the +1… form.
+3. **Verify the phones you will use:** Console → Phone Numbers → Manage → **Verified Caller IDs** → Add.
+   A trial account only calls verified numbers (up to 5, in the country you signed up in).
+4. **Copy the keys:** Console home → Account info: **Account SID** (AC…) and **Auth Token** (click to show).
+
+**B. A public address for Nirnaya** (Twilio calls your server)
+5. On your computer: `cloudflared tunnel --url http://localhost:8000` prints an `https://….trycloudflare.com`
+   address (free, no account). In Nirnaya: **Channels → Public address**, paste it, **Save**.
+
+**C. Nirnaya**
+6. **Channels → Calls**: paste the **Account SID**, **Auth token** and **Twilio phone number**.
+   - **Languages:** *English and Hindi* (the caller hears "for Hindi, press 2", or simply speaks Hindi),
+     *English only*, or *Hindi first*.
+   - **English voice:** Raveena or Kajal (Indian English). **Hindi voice:** Aditi (speaks Hindi and Hinglish)
+     or Kajal.
+   - **Record calls:** on by default. The caller is told the call is recorded.
+   - **Save**, then tick **Answer phone calls**.
+7. Under the form, Nirnaya shows two addresses. In Twilio, open your number (Phone Numbers → Manage → Active
+   numbers → the number) and under **Voice Configuration**:
+   - **A call comes in:** Webhook, the first address (`…/api/channels/voice/twilio/incoming`), **HTTP POST**.
+   - **Call status changes:** the second address (`…/api/channels/voice/twilio/status`), **HTTP POST**.
+   - **Save configuration**.
+
+**D. Test it**
+8. **The agent calls you** (the cheapest way from India): **Channels → Calls → Try it**, type your verified
+   number, press **Call this number**. Answer, listen to the opening, then say what went wrong, e.g. *"My
+   UPI payment of 2,450 rupees to FreshMart failed but the money was debited"*. Or in Hindi: *"मेरा 2450
+   रुपये का पेमेंट फेल हो गया लेकिन पैसा कट गया"*. Press **2** first to switch to Hindi, or just speak it.
+   Say *"no, that's all"* (or *"नहीं धन्यवाद"*) to finish.
+9. **You call the agent:** ring the Twilio number from a verified phone. A contact is greeted by name;
+   anyone else is asked for their registered mobile number or customer ID.
+10. **The report:** **Channels → Call reports**. Each call shows a summary, the transcript (the caller's own
+    words, with the English the agents read), its cases and how they ended, the recording (a player) and
+    **Download report** (a page to keep or print). A recording arrives a few seconds after the call ends.
+
+**What to know**
+- **Recording on a trial:** Twilio records calls *you place* (step 8), but a trial cannot record *incoming*
+  calls; the report says "Not recorded" with Twilio's reason. Upgrading the account lifts this (about
+  $0.0025 a minute to record, plus storage). Recordings are downloaded into `data/recordings/` next to the
+  database and are kept there; delete them in the Twilio Console if you do not want Twilio's copy.
+- **Hindi:** Twilio's Hindi recogniser writes Devanagari. With a free model on (Settings), it is translated
+  into English for the agents and their answer back into Hindi, with every number checked; without one, a
+  banking glossary turns it into Hinglish the agents read, and the Hinglish answer is spoken by the
+  bilingual voice. Trial calls begin with a short notice from Twilio.
+- Any case can call its customer from **Cases → Call**, and a flow can too (the **Phone call** step).
+- In India, tell callers a call is recorded (Nirnaya does, in their language) and keep recordings only as
+  long as you need them.
 
 ## 4. The call page: talk to the agent in a browser (free)
 
 Open `https://<your-server>/call` (or `http://127.0.0.1:8000/call` on your computer), pick who is calling
-and the language, press **Start the call** and allow the microphone. Talk as on a phone; the agent
+and the language (**हिन्दी / Hinglish** makes the agent listen and answer in Hindi), press **Start the call**
+and allow the microphone. Talk as on a phone; the agent
 answers out loud and opens cases like a call would. **Mute** lets you type instead, and **End** hangs up.
 It works on a phone or a computer, in Chrome, Edge or Safari. Chrome's speech recognition uses Google's
 speech service, so it needs the internet. In Firefox, or with the microphone blocked, the page is a chat.
-Send the link to customers: they need no account and no phone line.
+Send the link to customers: they need no account and no phone line. Each call-page call gets a report
+under **Channels → Call reports** too (the transcript and its cases; the browser does not record audio).
 
 ## 5. n8n, Telegram, Instagram and anything else (webhooks)
 
@@ -351,7 +386,7 @@ NIRNAYA_ACCESS_KEY=...       # locks the app and the API
 
 - Meta: [WhatsApp pricing](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing)
   · respond.io: [WhatsApp pricing changes in 2026](https://respond.io/blog/whatsapp-pricing-change-2026)
-- Twilio: [free trial limits](https://www.twilio.com/docs/usage/trials) · [webhook security](https://www.twilio.com/docs/usage/webhooks/webhooks-security)
+- Twilio: [free trial limits](https://www.twilio.com/docs/usage/trials) (incoming calls on a trial cannot be recorded) · [webhook security](https://www.twilio.com/docs/usage/webhooks/webhooks-security) · [recording a call in progress](https://www.twilio.com/docs/voice/api/recording-resource) · [`<Gather>` languages](https://www.twilio.com/docs/voice/twiml/gather) · [India voice pricing](https://www.twilio.com/en-us/voice/pricing/in) · [Polly bilingual voices (Aditi, Kajal)](https://docs.aws.amazon.com/polly/latest/dg/bilingual-voices.html)
 - WAHA: [waha.devlike.pro](https://waha.devlike.pro/) · [events and webhooks](https://waha.devlike.pro/docs/how-to/events/)
 - Email: [Gmail SMTP limits](https://www.serversmtp.com/limits-of-gmail-smtp-server/) · [Resend free tier](https://automationatlas.io/answers/resend-free-tier-explained-2026/)
   · [SendGrid alternatives and its free plan ending](https://dreamlit.ai/blog/best-sendgrid-alternatives)

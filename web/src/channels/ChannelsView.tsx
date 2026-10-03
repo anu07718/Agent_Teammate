@@ -1,14 +1,15 @@
 // Channels: the agents on real email, WhatsApp and phone calls. The inbox shows every conversation live;
 // the other tabs connect a provider (each field says where to find it), show the webhook address to paste
 // into the provider, and send a test. Secrets are never shown again after saving, only "saved".
-import { Copy, ExternalLink, Inbox, Mail, MessageCircle, Phone, RefreshCw, Send, Trash2, Users, Webhook } from "lucide-react";
+import { Copy, Download, ExternalLink, FileAudio, Inbox, Mail, MessageCircle, Phone, RefreshCw, Send, Trash2, Users, Webhook } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, Empty, Mono, Tabs, cx } from "../components/ui";
 import { ago, clock } from "../lib/format";
 import { openCase, toast, useUI } from "../store";
-import { capi, CHANNEL_ICON, CHANNEL_LABEL, type ChannelId, type Conv, type Snapshot } from "./api";
+import { apiBase, apiLink, withKey } from "../api";
+import { capi, CHANNEL_ICON, CHANNEL_LABEL, type CallReport, type CallReportSummary, type ChannelId, type Conv, type Snapshot } from "./api";
 
-type Tab = "inbox" | "email" | "whatsapp" | "voice" | "hook" | "contacts";
+type Tab = "inbox" | "email" | "whatsapp" | "voice" | "calls" | "hook" | "contacts";
 const inputCls = "h-8 w-full rounded-md border border-line-strong bg-panel-2 px-2.5 text-[12.5px] outline-none focus:border-accent disabled:opacity-60";
 
 interface Spec { k: string; label: string; ph?: string; hint?: React.ReactNode; options?: [string, string][]; secret?: boolean; num?: boolean; show?: (d: any) => boolean }
@@ -57,8 +58,12 @@ const VOICE: Spec[] = [
   { k: "account_sid", label: "Account SID", ph: "AC…", hint: "Twilio Console → Account info." },
   { k: "auth_token", label: "Auth token", secret: true },
   { k: "from_number", label: "Twilio phone number", ph: "+1…", hint: "The number customers call, and that calls them." },
-  { k: "language", label: "Language", options: [["en-IN", "English (India)"], ["hi-IN", "Hindi"], ["en-US", "English (US)"], ["en-GB", "English (UK)"]] },
-  { k: "voice", label: "Voice", options: [["Polly.Raveena", "Raveena (en-IN)"], ["Polly.Aditi", "Aditi (hi-IN, en-IN)"], ["Polly.Joanna", "Joanna (en-US)"], ["alice", "Alice (basic)"]] },
+  { k: "language", label: "Languages", options: [["both", "English and Hindi (press 2, or just speak Hindi)"], ["en-IN", "English (India) only"], ["hi-IN", "Hindi first"]],
+    hint: "The agents read Hindi and Hinglish and answer in the caller's language. With a free model on, Hindi is translated word for word; without one, a banking glossary does it." },
+  { k: "voice", label: "English voice", options: [["Polly.Raveena", "Raveena (en-IN)"], ["Polly.Kajal-Neural", "Kajal, neural (en-IN)"], ["Polly.Aditi", "Aditi (en-IN, hi-IN)"], ["Polly.Joanna", "Joanna (en-US)"], ["alice", "Alice (basic)"]] },
+  { k: "hindi_voice", label: "Hindi voice", options: [["Polly.Aditi", "Aditi (hi-IN, speaks Hinglish too)"], ["Polly.Kajal-Neural", "Kajal, neural (hi-IN)"]] },
+  { k: "record", label: "Record calls", options: [["true", "Record every call and keep it (the caller is told)"], ["false", "Do not record"]],
+    hint: "Both sides, kept in Nirnaya with a report (Call reports). A Twilio trial records calls you place, not incoming ones; upgrading lifts that." },
   { k: "accept", label: "Answer calls from", options: [["anyone", "Anyone (asks who they are)"], ["contacts", "Only contacts"]] },
 ];
 const HOOK: Spec[] = [
@@ -123,6 +128,7 @@ export function ChannelsView() {
           <Tabs value={tab} onChange={go} tabs={[
             { id: "inbox", label: <span className="flex items-center gap-1.5"><Inbox size={13} /> Inbox</span> },
             { id: "email", label: "Email" }, { id: "whatsapp", label: "WhatsApp" }, { id: "voice", label: "Calls" },
+            { id: "calls", label: <span className="flex items-center gap-1.5"><FileAudio size={13} /> Call reports</span> },
             { id: "hook", label: "Webhooks" }, { id: "contacts", label: <span className="flex items-center gap-1.5"><Users size={13} /> Contacts</span> },
           ]} />
           <div className="p-4">
@@ -135,8 +141,10 @@ export function ChannelsView() {
                 : [["WHATSAPP_HOOK_URL for WAHA", snap.webhooks.waha], ["WHATSAPP_HOOK_EVENTS", "message"]]} />}
               testTo="919876543210" testHint="With country code, no +. On Meta's test number it must be one of its 5 allowed numbers. Write template:hello_world to start a chat with Meta's sample template." />}
             {tab === "voice" && <ChannelForm ch="voice" specs={VOICE} snap={snap} onSaved={setSnap}
-              extra={<><Hooks rows={[["A call comes in (Twilio → Phone Numbers → your number → Voice)", snap.webhooks.voice]]} /><CallPageCard url={snap.webhooks.call_page} /></>}
+              extra={<><Hooks rows={[["A call comes in (Twilio → Phone Numbers → your number → Voice)", snap.webhooks.voice],
+                ["Call status changes (same page; ends the call's report)", snap.webhooks.voice_status]]} /><CallPageCard url={snap.webhooks.call_page} /></>}
               testTo="+919876543210" testLabel="Call this number" testHint="A trial account calls only numbers you verified in Twilio (Verified Caller IDs)." />}
+            {tab === "calls" && <CallReportsPane snap={snap} />}
             {tab === "hook" && <ChannelForm ch="hook" specs={HOOK} snap={snap} onSaved={setSnap} extra={<HookHelp snap={snap} />} testLabel="Send a test event" />}
             {tab === "contacts" && <ContactsPane snap={snap} onSaved={setSnap} reload={load} />}
           </div>
@@ -171,7 +179,7 @@ function Field({ s, d, set, cfg, locked }: { s: Spec; d: any; set: (k: string, v
     <label className="block" htmlFor={id}>
       <span className="mb-1 block caps text-faint">{s.label}</span>
       {s.options ? (
-        <select id={id} aria-label={s.label} className={inputCls} value={d[s.k] ?? ""} disabled={locked} onChange={(e) => set(s.k, e.target.value)}>
+        <select id={id} aria-label={s.label} className={inputCls} value={String(d[s.k] ?? "")} disabled={locked} onChange={(e) => set(s.k, e.target.value)}>
           {s.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       ) : (
@@ -375,7 +383,8 @@ function InboxPane({ snap }: { snap: Snapshot }) {
                   {m.case_id && <span>{m.case_id}</span>}
                   {m.status && <span className={m.status === "failed" ? "text-escalate" : ""}>{m.status}</span>}
                 </div>
-                <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                <div className="whitespace-pre-wrap break-words">{m.original ?? m.text}</div>
+                {m.original && <div className="mt-0.5 text-[11.5px] text-muted" title="What the agents read">English: {m.text}</div>}
                 {m.error && <div className="mt-1 text-[11.5px] text-escalate">{m.error}</div>}
               </div>
             ))}
@@ -435,6 +444,93 @@ function ContactsPane({ snap, onSaved, reload }: { snap: Snapshot; onSaved: (s: 
           <option value="ask">Ask who they are</option>
           {snap.customers.map((c) => <option key={c.id} value={c.id}>Treat as {byCustomer[c.id].name} ({c.id})</option>)}
         </select>
+      </div>
+    </div>
+  );
+}
+
+const OUTCOME_LABEL: Record<string, string> = { accepted: "Accepted", rejected: "Rejected", waiting: "Waiting for a person", running: "Running", "no case": "No case" };
+const REC_LABEL: Record<string, string> = { kept: "Recorded", recording: "Recording", downloading: "Saving recording", starting: "Recording", failed: "Not recorded", absent: "No audio", off: "Not recorded" };
+const LANG_LABEL: Record<string, string> = { en: "English", hi: "हिंदी" };
+const dur = (s?: number | null) => (!s ? "—" : s >= 60 ? `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s` : `${s}s`);
+
+/** Every call, phone or call page: what was said both ways (with the English the agents read), its cases and
+ *  the recording, with a report to download. */
+function CallReportsPane({ snap }: { snap: Snapshot }) {
+  const [list, setList] = useState<CallReportSummary[] | null>(null);
+  const [pick, setPick] = useState<string | null>(null);
+  const [rep, setRep] = useState<CallReport | null>(null);
+  useEffect(() => { capi.callReports().then(setList).catch(() => setList([])); }, [snap]);
+  const sel = pick ?? list?.[0]?.id ?? null;
+  useEffect(() => {
+    if (!sel) { setRep(null); return; }
+    capi.callReport(sel).then(setRep).catch(() => setRep(null));
+  }, [sel, snap]);
+  if (!list) return <Empty title="Loading…" />;
+  if (!list.length) return (
+    <Empty title="No calls yet">Call your Twilio number, place a call from a case (Call), or use the <a className="text-accent underline" href="/call" target="_blank" rel="noreferrer">call page</a>. When a call ends its report appears here, with the recording when there is one.</Empty>
+  );
+  const base = `${apiBase()}/api/channels/call-reports/${encodeURIComponent(sel ?? "")}`;
+  return (
+    <div className="grid min-h-[420px] gap-3 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)]" data-testid="call-reports">
+      <ul className="max-h-[620px] divide-y divide-line overflow-y-auto rounded-md border border-line">
+        {list.map((c) => (
+          <li key={c.id}>
+            <button data-call={c.id} onClick={() => setPick(c.id)} className={cx("w-full cursor-pointer px-3 py-2 text-left", sel === c.id ? "bg-accent/10" : "hover:bg-panel-2")}>
+              <div className="flex items-center gap-1.5 text-[12.5px]"><span aria-hidden>{c.channel === "phone" ? "📞" : "🎙"}</span>
+                <span className="truncate font-medium">{c.customer?.name ?? c.name}</span>
+                <span className="ml-auto shrink-0 text-[11px] text-faint">{c.started ? ago(c.started) : ""}</span></div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+                <span>{c.direction === "out" ? "Outgoing" : "Incoming"} · {dur(c.duration)}</span>
+                {c.langs.map((l) => <Badge key={l}>{LANG_LABEL[l] ?? l}</Badge>)}
+                <Badge tone={c.recording === "kept" ? "good" : c.recording === "failed" ? "warn" : "muted"}>{REC_LABEL[c.recording] ?? c.recording}</Badge>
+              </div>
+              <div className="mt-0.5 truncate text-[11.5px] text-faint">{OUTCOME_LABEL[c.outcome] ?? c.outcome}{c.cases.length ? ` · ${c.cases.join(", ")}` : ""}</div>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="min-w-0 rounded-md border border-line" data-testid="call-report">
+        {rep ? <div className="space-y-4 p-3">
+          <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+            <Badge>{rep.channel === "phone" ? "Phone" : "Call page"}</Badge><span className="font-medium">{rep.customer?.name ?? rep.name}</span>
+            <Mono className="text-faint">{rep.number}</Mono>
+            <a className="ml-auto" {...apiLink(withKey(`${base}/html`), `call-report-${rep.id.replace(/[^\w-]/g, "_")}.html`)}>
+              <Button size="sm" variant="ghost"><Download size={12} /> Download report</Button></a>
+          </div>
+          <p className="rounded-md bg-panel-2 px-3 py-2 text-[12.5px] leading-relaxed" data-testid="call-summary">{rep.summary}</p>
+          {rep.recording.status === "kept" ? (
+            <audio controls preload="none" className="w-full" src={withKey(`${base}/audio`)} aria-label="Call recording" />
+          ) : (
+            <p className="text-[11.5px] text-muted">Recording: {REC_LABEL[rep.recording.status] ?? rep.recording.status}{rep.recording.error ? ` — ${rep.recording.error}` : ""}</p>
+          )}
+          {rep.cases.length > 0 && (
+            <div>
+              <div className="caps mb-1 text-faint">Cases</div>
+              <ul className="space-y-1 text-[12.5px]">
+                {rep.cases.map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => openCase(c.id)}>{c.id}</Button>
+                    <span>{(c.intent ?? "a question").replace(/_/g, " ")}{c.amount ? ` · ₹${c.amount.toLocaleString("en-IN")}` : ""}</span>
+                    <span className="text-muted">· {OUTCOME_LABEL[c.outcome] ?? c.outcome} ({c.how})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div>
+            <div className="caps mb-1 text-faint">Transcript</div>
+            <div className="space-y-2" data-testid="call-transcript">
+              {rep.turns.map((t, i) => (
+                <div key={i} className={cx("max-w-[88%] rounded-lg px-3 py-2 text-[12.5px] leading-relaxed", t.who === "caller" ? "bg-panel-2" : "ml-auto bg-accent/14")}>
+                  <div className="mb-0.5 caps text-faint">{t.who === "caller" ? (rep.customer?.name ?? "Caller") : "Nirnaya"} · {clock(t.ts)}{t.lang === "hi" ? " · हिंदी" : ""}</div>
+                  <div className="whitespace-pre-wrap break-words">{t.said}</div>
+                  {t.english && <div className="mt-0.5 text-[11.5px] text-muted">English: {t.english}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div> : <Empty title="Pick a call" />}
       </div>
     </div>
   );

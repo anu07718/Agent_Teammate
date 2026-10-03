@@ -23,7 +23,7 @@ INTENTS: dict[str, list[tuple[str, float]]] = {
                      ("fraud", 3.0), ("hacked", 3.0), ("scam", 2.0), ("someone used", 3.0), ("never made", 3.0),
                      ("i did not make", 3.0), ("maine nahi kiya", 3.0)],
     "block_request": [("block my card", 3.0), ("block card", 3.0), ("block upi", 3.0), ("block my upi", 3.0),
-                      ("freeze", 2.0)],
+                      ("freeze", 2.0), ("card block", 3.0), ("upi block", 3.0), ("block kar", 2.0)],
     "kyc": [("kyc", 3.0), ("aadhaar update", 2.5), ("pan update", 2.5), ("limit", 1.2), ("re-kyc", 3.0)],
     "balance": [("balance", 2.5), ("statement", 2.5), ("mini statement", 3.0)],
 }

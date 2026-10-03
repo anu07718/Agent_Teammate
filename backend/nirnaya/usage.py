@@ -24,7 +24,8 @@ KEY, CFG = "usage", "usage_cfg"
 CURRENT: contextvars.ContextVar[dict | None] = contextvars.ContextVar("nirnaya_usage", default=None)
 DEFAULTS = {"model": "qwen3.6", "runtime": "Ollama", "price_in": 15.0, "price_out": 60.0}   # ₹ per 1M tokens
 JOBS = {"read": "Reading messages", "reply": "Wording replies", "scope": "Finance-only check",
-        "chat": "Agent chat", "digest": "Digests", "outreach": "Reading pay / ask / message tasks", "test": "Model tests"}
+        "chat": "Agent chat", "digest": "Digests", "outreach": "Reading pay / ask / message tasks", "translate": "Translating calls (Hindi ↔ English)",
+        "test": "Model tests"}
 MAX_REFS = 3000
 
 # Qwen-style counting: every digit is its own token, a short English word is one, a long one a few, Devanagari

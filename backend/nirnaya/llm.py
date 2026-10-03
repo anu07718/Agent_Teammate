@@ -583,6 +583,16 @@ class LLM:
         v = got.get("in_scope") if got else None
         return v if isinstance(v, bool) else None
 
+    def translate(self, tokenised_text: str, to: str) -> str | None:
+        """A caller's words for the agents, or the agents' answer for the caller (lingo.py checks every number)."""
+        out = self._call(
+            f"You translate what is said on a call to an Indian bank's payments support line into {to}. Keep "
+            "every number, amount, date, ID and token exactly as written. Translate only; add nothing, explain "
+            "nothing. Answer with the translation only.\n" + scope.RULE,
+            tokenised_text[:1500], max_tokens=400, temperature=0.0, job="translate")
+        out = (out or "").strip().strip('"')
+        return out if out and scope.answer_ok(out) else None
+
     # ── for Settings and the top bars ───────────────────────────────────────
     def test(self, pid: str) -> dict:
         """List the free models and ask for one word, so Settings can say whether the provider works."""

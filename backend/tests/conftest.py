@@ -5,6 +5,9 @@ import pytest
 os.environ.setdefault("NIRNAYA_LLM", "off")
 
 from nirnaya.calibration import Calibrator  # noqa: E402
+from nirnaya.channels import voice  # noqa: E402
+
+voice.RECORD_DELAY = 0
 from nirnaya.engine import Engine  # noqa: E402
 from nirnaya.llm import LLM  # noqa: E402
 from nirnaya.store import Store  # noqa: E402

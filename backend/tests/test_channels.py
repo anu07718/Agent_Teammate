@@ -338,7 +338,8 @@ def test_a_phone_call_turn_by_turn(client, engine, fake):
         "enabled": True, "account_sid": "AC1", "auth_token": "authtok", "from_number": "+15550001111", "api_url": fake.url}})
     assert client.post("/api/channels/voice/twilio/incoming", data={"CallSid": "CA1", "From": "+919876543210"}).status_code == 403
     xml = tw(client, "/api/channels/voice/twilio/incoming", CallSid="CA1", From="+919876543210", To="+15550001111").text
-    assert "<Gather input=\"speech\"" in xml and "Hello Aarav" in xml and 'language="en-IN"' in xml
+    assert "<Gather input=\"dtmf speech\"" in xml and "Hello Aarav" in xml and 'language="en-IN"' in xml
+    assert "This call is recorded" in xml and "2 दबाएँ" in xml          # told it is recorded; offered Hindi
     turn = re.search(r'action="([^"]+)"', xml).group(1).replace("&amp;", "&").replace(PUBLIC, "")
     xml = tw(client, turn, CallSid="CA1", From="+919876543210", SpeechResult=FAILED_UPI, Confidence="0.9").text
     xml = follow(client, xml, "CA1")

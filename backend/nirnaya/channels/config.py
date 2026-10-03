@@ -47,7 +47,9 @@ DEFAULTS: dict = {
         "provider": "twilio",
         "account_sid": "", "auth_token": "", "from_number": "",
         "api_url": "https://api.twilio.com",
-        "language": "en-IN", "voice": "Polly.Raveena",
+        "language": "both",       # en-IN | hi-IN | both (English first; "press 2" or Hindi speech switches)
+        "voice": "Polly.Raveena", "hindi_voice": "Polly.Aditi",
+        "record": True,           # record calls (both sides) and keep the audio in Nirnaya; the caller is told
         "accept": "anyone",
     },
     "hook": {
@@ -75,6 +77,7 @@ CHOICES = {
     ("whatsapp", "accept"): {"contacts", "anyone"},
     ("voice", "provider"): {"twilio"},
     ("voice", "accept"): {"contacts", "anyone"},
+    ("voice", "language"): {"en-IN", "hi-IN", "both"},
     ("hook", "outreach"): {"auto", "always", "never"},
 }
 CHANNELS = ("email", "whatsapp", "voice", "hook")

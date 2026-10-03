@@ -77,10 +77,11 @@ const VIEWS = [
   ["Ledger", () => page.getByRole("heading", { name: "Ledger", exact: true }).waitFor()],
   ["Benchmark", () => page.getByRole("heading", { name: "Simulated customers" }).waitFor()],
   ["Trail", () => page.getByRole("heading", { name: "Ledger Trail" }).waitFor()],
+  ["Dashboard", () => page.getByTestId("dash-kpis").waitFor()],
   ["Settings", () => page.getByText("Use Nirnaya from another agent (MCP)").waitFor()],
 ];
-await step("every view opens from its button, and the first ten from their key (1–9, 0); Settings has no key", async () => {
-  expect((await nav().getByRole("button").count()) === 11, "not eleven views");
+await step("every view opens from its button, and the first ten from their key (1–9, 0); Dashboard and Settings have none", async () => {
+  expect((await nav().getByRole("button").count()) === 12, "not twelve views");
   for (const [name, check] of VIEWS.slice(1)) { await go(name); await check(); }
   for (let i = 1; i < 10; i++) {
     await page.evaluate(() => document.activeElement?.blur()); // keys go to the page, not a focused field
@@ -89,6 +90,7 @@ await step("every view opens from its button, and the first ten from their key (
   }
   expect((await nav().getByRole("button", { name: "Trail", exact: true }).getAttribute("title")) === "Trail (0)", "Trail is not key 0");
   expect((await nav().getByRole("button", { name: "Settings", exact: true }).getAttribute("title")) === "Settings", "Settings shows a key");
+  expect((await nav().getByRole("button", { name: "Dashboard", exact: true }).getAttribute("title")) === "Dashboard", "Dashboard shows a key");
   await go("Office");
   await page.locator(".o-root").waitFor();
   await page.getByRole("button", { name: "Workspace", exact: true }).click();

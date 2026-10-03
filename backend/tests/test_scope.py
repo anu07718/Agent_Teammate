@@ -115,5 +115,11 @@ def test_a_model_answer_with_code_or_its_off_topic_signal_never_goes_out(store, 
         assert "OFF_TOPIC" in e.llm.ask_agent.__doc__ and "OFF_TOPIC" in scope.RULE
         posted = f.posts("groq")[0]["messages"][0]["content"]
         assert "Never write, explain or fix code" in posted                 # every prompt carries the rule
+        # a call's translation (Hindi ↔ English) carries it too, and code or OFF_TOPIC is never spoken
+        f.behaviour["groq"] = [("ok", "```python\nprint('hi')\n```")]
+        assert e.llm.translate("mera paisa kat gaya", "English") is None
+        assert "Never write, explain or fix code" in f.posts("groq")[-1]["messages"][0]["content"]
+        f.behaviour["groq"] = [("ok", "OFF_TOPIC")]
+        assert e.llm.translate("who is the prime minister", "Hindi") is None
     finally:
         f.server.shutdown()

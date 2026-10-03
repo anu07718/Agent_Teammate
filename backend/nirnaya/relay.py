@@ -52,6 +52,7 @@ DENY = [
     ("*", r"^/api/channels/(whatsapp|waha)/webhook"), ("*", r"^/api/channels/voice/twilio/"),
     ("*", r"^/api/channels/email/inbound"), ("POST", r"^/api/channels/hook$"), ("POST", r"^/api/team/me$"),
     ("PUT", r"^/api/pg$"), ("*", r"^/api/pg/razorpay/webhook"), ("PUT", r"^/api/outreach$"), ("PUT", r"^/api/usage$"),
+    ("GET", r"^/api/channels/call-reports/[^/]+/audio"),   # a call's voice stays with the host
 ]
 
 
