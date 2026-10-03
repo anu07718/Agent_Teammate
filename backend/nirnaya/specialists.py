@@ -6,6 +6,7 @@ the Tool Gateway's job, and only after calibration, shadow execution, the rechec
 from __future__ import annotations
 
 import math
+import re
 import time
 
 from .policy import Policy
@@ -22,8 +23,9 @@ INTENT_FIT = {"failed_debit": lambda t: t["npci_status"] in ("FAILED", "PENDING"
               "wrong_beneficiary": lambda t: bool(t.get("wrong_beneficiary"))}
 
 
-def match_txn(rails: Rails, customer_id: str, intent: str, ent: dict) -> dict:
+def match_txn(rails: Rails, customer_id: str, intent: str, ent: dict, text: str = "") -> dict:
     txns = rails.txns_for(customer_id)
+    low = (text or "").lower()
     now = time.time()
     scored = []
     for t in txns:
@@ -37,9 +39,13 @@ def match_txn(rails: Rails, customer_id: str, intent: str, ent: dict) -> dict:
         if "days_ago" in ent and abs((now - t["created_at"]) / DAY - ent["days_ago"]) <= 1.0:
             s += 1
             why.append("date matches")
+        name = t["merchant"].lower().split("@")[0].split()[0] if t["merchant"] else ""
         if "merchant" in ent and ent["merchant"].lower() in t["merchant"].lower():
             s += 2
             why.append("merchant matches")
+        elif len(name) >= 3 and re.search(rf"\b{re.escape(name)}\b", low):   # "my IRCTC payment", no "to" or "at"
+            s += 2
+            why.append("merchant named")
         fit = INTENT_FIT.get(intent)
         if fit and fit(t):
             s += 1.5
@@ -48,7 +54,7 @@ def match_txn(rails: Rails, customer_id: str, intent: str, ent: dict) -> dict:
     scored.sort(key=lambda x: -x[0])
     if not scored or scored[0][0] < 2.5:
         return {"txn_id": None, "confidence": 0.0, "why": ["no transaction matches the details given"],
-                "candidates": [t["id"] for _, t, _ in scored[:3]]}
+                "candidates": [t["id"] for _, t, _ in scored[:3]], "asked": ent.get("amount")}
     best, second = scored[0], (scored[1] if len(scored) > 1 else (0, None, []))
     conf = best[0] / (best[0] + second[0] + 1.0)
     return {"txn_id": best[1]["id"], "confidence": round(min(0.99, 0.35 + conf), 3), "why": best[2],
@@ -86,16 +92,41 @@ def plan(policy: Policy, rails: Rails, intent: str, customer_id: str, match: dic
         return {"specialist": "fraud", "txn_id": tid, "actions": acts, "facts": facts}
 
     if not tid:
-        act("request_info", reason="cannot match a transaction", agree=0.5, key="need_utr")
+        # name the customer's own nearest payments, so the answer is about them and not a form to fill
+        fit = INTENT_FIT.get(intent)
+        recent = sorted(rails.txns_for(customer_id), key=lambda x: -x["created_at"])
+        pool = ([x for x in recent if fit and fit(x)] or recent)[:3]
         facts.append("No matching transaction was found on the account for the details shared")
+        asked = match.get("asked")
+        if asked:
+            facts.append(f"The customer mentioned {rs(asked)}")
+        if pool:
+            for x in pool:
+                facts.append(f"Recent payment {x['id']}: {rs(x['amount'])} to {x['merchant']} on {_date(x['created_at'])}")
+            listed = "; ".join(f"{rs(x['amount'])} to {x['merchant']} on {_date(x['created_at'])}" for x in pool)
+            act("request_info", reason="cannot match a transaction", agree=0.5, key="need_pick" if asked else "need_pick_any",
+                vars={"list": listed, "asked": rs(asked) if asked else ""})
+        else:
+            act("request_info", reason="cannot match a transaction", agree=0.5, key="need_utr")
         return {"specialist": specialist, "txn_id": None, "actions": acts, "facts": facts}
 
     t = rails.txn(tid)
+    # the payment itself says what kind of problem it is: "my 2,000 payment failed, I want a refund" is a failed
+    # debit, and "my 1,000 payment" alone is answered by the state that payment is in
+    guessed = False
+    if intent == "refund_status" and t["npci_status"] in ("FAILED", "PENDING") and t["refund"]["status"] == "NONE":
+        intent = "failed_debit"
+    elif intent in ("other", "kyc") and tid:
+        guessed = True
+        intent = ("refund_status" if t["refund"]["status"] != "NONE" else
+                  "duplicate_charge" if t.get("duplicate_of") else "failed_debit")
     upi, debit, refund = evidence.get("upi", {}), evidence.get("debit", {}), evidence.get("refund", {})
     amount = t["amount"]
     facts += [f"Transaction {tid} of {rs(amount)} to {t['merchant']} on {_date(t['created_at'])}",
               f"UTR {t['utr']}" if t["utr"] else "No UTR from the bank yet"]
     agree = 1.0 if upi and debit else 0.5
+    if guessed:                     # the customer did not say what is wrong: nothing moves without a person
+        agree = 0.5
     pg = evidence.get("pg")
     if t.get("source") == "razorpay_test":
         if pg:

@@ -28,6 +28,10 @@ T = {
                              "someone, block your card or UPI ID in the app now. Tell me what happened and I'll help.",
         "need_utr": "I couldn't find a matching payment on your account. Could you share the 12-digit UTR, or the "
                     "amount and the date of the payment?",
+        "need_pick": "I couldn't find a payment of {asked} on your account. Your recent payments that look like this "
+                     "are: {list}. Is it one of these? Tell me the amount and the merchant, or the 12-digit UTR.",
+        "need_pick_any": "I couldn't tell which payment you mean. Your recent payments that look like this are: {list}. "
+                         "Is it one of these? Tell me the amount and the merchant, or the 12-digit UTR.",
         "one_charge": "I can see only one charge for this payment. If you were charged twice, please share the UTR of "
                       "the second debit.",
         "no_refund": "The merchant hasn't started a refund for this payment yet. Please ask them to initiate it; once "
@@ -64,6 +68,10 @@ T = {
                             "problem hai, to batayein kya hua, main check karta hoon.",
         "refuse_credential": "Apna OTP, PIN ya CVV kabhi kisi ko na batayein, humein bhi nahi. Agar share ho gaya hai to "
                              "abhi app mein card ya UPI ID block karein. Batayein kya hua, main madad karta hoon.",
+        "need_pick": "Aapke account par {asked} ka koi payment nahi mila. Aapke haal ke aise payments yeh hain: {list}. "
+                     "Kya inmein se koi hai? Amount aur merchant, ya 12-digit UTR bataiye.",
+        "need_pick_any": "Samajh nahi aaya aap kaunsa payment keh rahe hain. Aapke haal ke aise payments yeh hain: {list}. "
+                         "Kya inmein se koi hai? Amount aur merchant, ya 12-digit UTR bataiye.",
         "need_utr": "Aapke account par matching payment nahi mila. Kya aap 12-digit UTR, ya payment ka amount aur date "
                     "bata sakte hain?",
         "within_tat": "Aapka {amount} ka payment {merchant} ko UPI switch par fail hua. Paisa {due} tak apne aap aapke "
@@ -83,6 +91,11 @@ T = {
 WHAT = {"reverse_failed_debit": "a reversal of {amount}", "refund_duplicate": "a refund of {amount}",
         "tat_compensation": "compensation of {amount}", "chargeback_credit": "a provisional credit of {amount}",
         "raise_dispute": "a dispute with the other bank", "block_instrument": "a block on your {instrument}"}
+
+
+WHAT_HI = {"reverse_failed_debit": "{amount} ka reversal", "refund_duplicate": "{amount} ka refund",
+           "tat_compensation": "{amount} ka compensation", "chargeback_credit": "{amount} ka provisional credit",
+           "raise_dispute": "doosre bank ke saath dispute", "block_instrument": "aapke {instrument} par block"}
 
 
 def _t(lang: str, key: str) -> str:
@@ -115,9 +128,9 @@ def compose(case: dict) -> str:
         if d["route"] in ("ACT", "HEDGE") and d.get("committed"):
             parts.append(_t(lang, a["type"]).format(**vars_))
         elif d["route"] == "ESCALATE":
-            escalated.append(WHAT[a["type"]].format(**vars_))
+            escalated.append((WHAT_HI if lang == "hinglish" else WHAT)[a["type"]].format(**vars_))
     if escalated:
-        parts.append(_t(lang, "escalate").format(what=" and ".join(escalated)))
+        parts.append(_t(lang, "escalate").format(what=(" aur " if lang == "hinglish" else " and ").join(escalated)))
     if any(d["route"] == "HEDGE" and d.get("committed") for d in case.get("decisions", [])):
         parts.append(_t(lang, "hedge"))
     return " ".join(p for p in parts if p) or _t(lang, "unclear")

@@ -27,10 +27,23 @@ INTENTS: dict[str, list[tuple[str, float]]] = {
     "kyc": [("kyc", 3.0), ("aadhaar update", 2.5), ("pan update", 2.5), ("limit", 1.2), ("re-kyc", 3.0)],
     "balance": [("balance", 2.5), ("statement", 2.5), ("mini statement", 3.0)],
 }
-HINGLISH = ["mera", "meri", "nahi", "hua", "paisa", "kal", "abhi", "kya", "wapas", "gaya", "kiya", "hai"]
+HINGLISH = ["mera", "meri", "nahi", "hua", "paisa", "kal", "abhi", "kya", "wapas", "gaya", "kiya", "hai", "ka", "ki",
+            "hain", "mujhe", "chahiye", "kaise", "kab", "kyun", "aaya", "mila", "karo", "kijiye"]
 MERCHANT = re.compile(r"\b(?:to|at|from|on|for)\s+([A-Z][\w&'-]+(?:\s[A-Z][\w&'-]+)?)")
+_NUM = r"(\d{1,3}(?:,\d{2,3})+|\d{2,7})(?:\.\d{1,2})?"
 AMOUNT = [re.compile(r"(?:₹|rs\.?|inr|rupees?)\s?([\d,]+(?:\.\d{1,2})?)", re.I),
-          re.compile(r"\b([\d,]{2,}(?:\.\d{1,2})?)\s?(?:₹|rs\b|rupees|inr)", re.I)]
+          re.compile(r"\b([\d,]{2,}(?:\.\d{1,2})?)\s?(?:₹|rs\b|rupees|inr)", re.I),
+          # no currency said: "mera 1000 ka payment", "payment of 2000", "paid 500 to Zomato"
+          re.compile(r"\b" + _NUM + r"\s*(?:ka|ki|ke|wala|vala)\b", re.I),
+          re.compile(r"\b(?:payment|paid|pay|sent|send|transferred|debited|deducted|charged|cut)\s+(?:of\s+|for\s+)?"
+                     + _NUM + r"\b(?!\s*(?:days?|din|hours?|ghante|am|pm|digits?|baar|times?))", re.I),
+          # "my 1500 IRCTC payment", "my 500 recharge"
+          re.compile(r"\b" + _NUM + r"\s+(?:[A-Za-z][\w&'.-]*\s+){0,2}(?:payment|transaction|txn|recharge|order|bill|"
+                     r"transfer|booking|refund|charge)s?\b", re.I),
+          # last: a lone amount anywhere ("charged me twice 750"), never a phone number, UTR, ID, time or count
+          re.compile(r"(?<![\w.,:/-])(?<!\d )(?<!\bin )(?<!since )" + _NUM
+                     + r"(?![\w,:/%-]|\s\d|\s*(?:days?|din|hours?|ghante|mins?|minutes?|am|pm|digits?|baar|times?|st|nd|rd|th)\b)",
+                     re.I)]
 
 
 def extract_entities(text: str) -> dict:

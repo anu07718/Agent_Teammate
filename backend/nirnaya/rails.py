@@ -52,19 +52,88 @@ def _seed(now: float) -> dict:
         txn("T-5009", "C-1004", 3_999.0, "GadgetHub", 8, "SUCCESS", True, "412345678909",
             refund={"status": "PENDING", "initiated_at": now - 7 * DAY}),
     ]
+    txns += synthetic(now, txn)
     for c in customers.values():
         c["source"] = "demo"
     for t in txns:
         t["source"] = "demo"
     return {"customers": customers, "accounts": accounts, "txns": {t["id"]: t for t in txns},
-            "wallet_credits": [], "blocks": [], "disputes": [], "down": [], "seeded_at": now, "demo": True}
+            "wallet_credits": [], "blocks": [], "disputes": [], "down": [], "seeded_at": now, "demo": True,
+            "seed_version": SEED_VERSION}
+
+
+SEED_VERSION = 2
+
+
+def synthetic(now: float, txn) -> list[dict]:
+    """More made-up UPI payments for the demo customers, one for every kind of answer, at the amounts people
+    usually say (₹500, ₹1,000, ₹2,000…). Kept clear of the sample messages' own payments so those still match
+    the same one. All demo data: labelled so, and gone with the demo switch."""
+    rev = lambda days, amount, rrn: {"status": "REVERSED", "amount": amount, "rrn": rrn, "at": now - days * DAY}  # noqa: E731
+    done = lambda days, arn: {"status": "PROCESSED", "arn": arn, "at": now - days * DAY}                          # noqa: E731
+    pend = lambda days: {"status": "PENDING", "initiated_at": now - days * DAY}                                   # noqa: E731
+    return [
+        # Aarav: failed debits at every stage, a pending payment, a refund on its way, a double charge
+        txn("T-5101", "C-1001", 1_000.0, "Zomato", 0.6, "FAILED", False, "412345679101"),
+        txn("T-5102", "C-1001", 2_000.0, "Swiggy Instamart", 6, "FAILED", False, "412345679102"),
+        txn("T-5103", "C-1001", 500.0, "Jio Recharge", 0.05, "PENDING", False, "412345679103"),
+        txn("T-5104", "C-1001", 1_500.0, "IRCTC", 4, "FAILED", False, "412345679104",
+            reversal=rev(3, 1_500.0, "RRN410099887766")),
+        txn("T-5105", "C-1001", 3_000.0, "Amazon Pay", 5, "SUCCESS", True, "412345679105", refund=pend(2)),
+        txn("T-5106", "C-1001", 750.0, "BigBasket", 2, "FAILED", False, "412345679106", debit_status="NOT_DEBITED"),
+        txn("T-5107", "C-1001", 5_000.0, "landlord.rent@okaxis", 10, "SUCCESS", True, "412345679107"),
+        txn("T-5108", "C-1001", 999.0, "Netflix", 2, "SUCCESS", True, "412345679108"),
+        txn("T-5109", "C-1001", 999.0, "Netflix", 2, "SUCCESS", True, "412345679109", duplicate_of="T-5108"),
+        # Meera
+        txn("T-5201", "C-1002", 2_000.0, "Myntra", 5, "FAILED", False, "412345679201"),
+        txn("T-5202", "C-1002", 1_000.0, "Uber", 0.4, "FAILED", False, "412345679202"),
+        txn("T-5203", "C-1002", 4_500.0, "Croma", 6, "SUCCESS", True, "412345679203",
+            refund=done(2, "74332716045000987654321")),
+        txn("T-5204", "C-1002", 2_500.0, "Flipkart", 12, "SUCCESS", True, "412345679204", refund=pend(9)),
+        txn("T-5205", "C-1002", 10_000.0, "anil.mehta@ybl", 1, "SUCCESS", True, "412345679205", wrong_beneficiary=True),
+        txn("T-5206", "C-1002", 600.0, "Dominos", 3, "SUCCESS", True, "412345679206"),
+        txn("T-5207", "C-1002", 600.0, "Dominos", 3, "SUCCESS", True, "412345679207", duplicate_of="T-5206"),
+        txn("T-5208", "C-1002", 1_500.0, "Ola", 0.1, "PENDING", False, "412345679208"),
+        txn("T-5209", "C-1002", 1_200.0, "Rapido", 3, "FAILED", False, "412345679209",
+            reversal=rev(2, 1_200.0, "RRN410055443322")),
+        # Rohan
+        txn("T-5301", "C-1003", 7_999.0, "LuckyWin Games", 1, "SUCCESS", True, "412345679301", unrecognised=True),
+        txn("T-5302", "C-1003", 1_000.0, "PhonePe Wallet", 2, "FAILED", False, "412345679302"),
+        txn("T-5303", "C-1003", 2_000.0, "Reliance Digital", 6, "SUCCESS", True, "412345679303", refund=pend(4)),
+        txn("T-5304", "C-1003", 3_500.0, "Airtel Postpaid", 1, "SUCCESS", True, "412345679304"),
+        txn("T-5305", "C-1003", 3_500.0, "Airtel Postpaid", 1, "SUCCESS", True, "412345679305", duplicate_of="T-5304"),
+        txn("T-5306", "C-1003", 500.0, "Paytm Recharge", 0.3, "FAILED", False, "412345679306", debit_status="NOT_DEBITED"),
+        # Priya
+        txn("T-5401", "C-1004", 2_000.0, "Nykaa", 4, "FAILED", False, "412345679401"),
+        txn("T-5402", "C-1004", 1_000.0, "BookMyShow", 0.3, "FAILED", False, "412345679402"),
+        txn("T-5403", "C-1004", 15_000.0, "MakeMyTrip", 9, "SUCCESS", True, "412345679403",
+            refund=done(3, "74332716045000555444333")),
+        txn("T-5404", "C-1004", 750.0, "Starbucks", 2, "SUCCESS", True, "412345679404"),
+        txn("T-5405", "C-1004", 750.0, "Starbucks", 2, "SUCCESS", True, "412345679405", duplicate_of="T-5404"),
+        txn("T-5406", "C-1004", 25_000.0, "CryptoX Exchange", 0.4, "SUCCESS", True, "412345679406", unrecognised=True),
+        txn("T-5407", "C-1004", 3_000.0, "suresh.p@okicici", 3, "SUCCESS", True, "412345679407", wrong_beneficiary=True),
+    ]
 
 
 class Rails:
     def __init__(self, store: Store):
         self.store = store
         self.state: dict[str, Any] = store.kv_get("rails") or _seed(time.time())
+        self._top_up()
         self._save()
+
+    def _top_up(self) -> None:
+        """A demo bank saved by an older version gets the newer demo payments too (never touching what is there)."""
+        if self.state.get("seed_version", 1) >= SEED_VERSION:
+            return
+        fresh = _seed(time.time())
+        if self.state.get("demo", True):
+            for cid, c in fresh["customers"].items():
+                if cid in self.state["customers"]:
+                    for tid, t in fresh["txns"].items():
+                        if t["customer_id"] == cid and tid not in self.state["txns"] and tid >= "T-5100":
+                            self.state["txns"][tid] = t
+        self.state["seed_version"] = SEED_VERSION
 
     def _save(self) -> None:
         self.store.kv_set("rails", self.state)

@@ -314,7 +314,7 @@ class Engine:
 
     async def _s_evidence(self, case: dict, rec: dict):
         u, cid = case["understanding"], case["customer_id"]
-        match = specialists.match_txn(self.rails, cid, u["intent"], u["entities"])
+        match = specialists.match_txn(self.rails, cid, u["intent"], u["entities"], case.get("text") or "")
         case["match"] = match
         tid = match["txn_id"]
         ev: dict = {"errors": [], "instrument": u["entities"].get("instrument", "upi")}

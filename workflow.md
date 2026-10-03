@@ -67,6 +67,14 @@ What you should see:
   day was paid for the delay. With a language model on, the card also says how many **tokens** the case
   used (with none, the rules do the work and use no tokens). **Workspace → Dashboard** adds them up.
 
+**Your own questions.** The demo bank has about 40 made-up UPI payments for its four customers, covering every
+kind of answer. Try, as Aarav: *"mera 1000 ka payment"* (a failed payment whose money comes back by itself),
+*"my 2000 payment failed, I want a refund"* (reversed with compensation), *"my 1500 IRCTC payment failed"*
+(already reversed), *"my 500 recharge is stuck"* (still pending), *"my 750 BigBasket payment failed"* (no money
+was taken) or *"charged twice for Netflix 999"*. As Priya: *"where is my refund of 15000 from MakeMyTrip"*. An
+amount can be said any way (₹1,000, Rs 1000, 1000 ka, payment of 1000). When nothing matches, the agent names
+the customer's nearest payments and asks which one it is. Ledger shows them all.
+
 Click the card to fly to the desk that handled it: the rail on the left shows that agent, its chat and
 its activity. To read the whole case (each step, the evidence, the score, the reply), press **WORKSPACE**
 and pick it in **Cases**.
