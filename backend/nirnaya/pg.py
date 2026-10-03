@@ -99,6 +99,9 @@ class Razorpay:
     def payment_link(self, body: dict) -> dict:
         return self._req("POST", "/v1/payment_links", body)
 
+    def payment_link_get(self, link_id: str) -> dict:
+        return self._req("GET", f"/v1/payment_links/{link_id}")
+
 
 class PG:
     def __init__(self, store, rails, bus):
@@ -335,18 +338,31 @@ class PG:
         if not c:
             raise PGError(f"no customer {customer_id}")
         merchant = re.sub(r"[\x00-\x1f<>]", "", merchant or "").strip()[:40] or "Test merchant"
+        out = self.link_to(name=c["name"], phone=c.get("phone") or "", email=c.get("email") or "", amount=amount,
+                           description=description or f"{merchant} order",
+                           notes={"customer_id": customer_id, "customer_name": c["name"], "merchant": merchant})
+        return {**out, "customer_id": customer_id}
+
+    def link_to(self, *, name: str, phone: str = "", email: str = "", amount: float, description: str,
+                ref: str = "", notes: dict | None = None) -> dict:
+        """A test-mode payment link for anyone: a customer, or a person an agent was asked to collect from."""
         if not 1 <= float(amount) <= 100_000:
             raise PGError("a test payment is between ₹1 and ₹1,00,000 (UPI's usual limit)")
+        digits = re.sub(r"\D", "", phone or "")
+        name = re.sub(r"[\x00-\x1f<>]", "", name or "").strip()[:60] or "Customer"
         body = {"amount": paise(amount), "currency": "INR",
-                "description": (description or f"{merchant} order")[:200],
-                "customer": {"name": c["name"], **({"contact": f"+91{c['phone'][-10:]}"} if c.get("phone") else {}),
-                             **({"email": c["email"]} if c.get("email") else {})},
+                "description": re.sub(r"[\x00-\x1f<>]", "", description or "").strip()[:200] or "Payment request",
+                "customer": {"name": name, **({"contact": f"+91{digits[-10:]}"} if len(digits) >= 10 else {}),
+                             **({"email": email} if email else {})},
                 "notify": {"sms": False, "email": False}, "reminder_enable": False,
-                "notes": {"customer_id": customer_id, "customer_name": c["name"], "merchant": merchant},
+                "notes": notes or {"customer_name": name, "nirnaya_ref": ref, **({"phone": digits[-10:]} if digits else {})},
                 "expire_by": int(time.time()) + 24 * 3600}
         link = self.client().payment_link(body)
-        return {"id": link.get("id"), "short_url": link.get("short_url"), "status": link.get("status"),
-                "amount": amount, "customer_id": customer_id}
+        return {"id": link.get("id"), "short_url": link.get("short_url"), "status": link.get("status"), "amount": amount}
+
+    def link_status(self, link_id: str) -> str:
+        """created, partially_paid, paid, expired or cancelled, as Razorpay has it now."""
+        return str(self.client().payment_link_get(link_id).get("status") or "unknown")
 
 
 def register(app, E) -> None:

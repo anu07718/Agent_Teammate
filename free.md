@@ -15,6 +15,7 @@ your own machine. The services below are optional extras, and each one says what
 | WhatsApp | Meta's WhatsApp Cloud API, free test number | [channels.md](channels.md) | no | |
 | Phone calls | the call page, `/call`: customers talk to the agent from Chrome, Edge or Safari | free, no account | no | |
 | Phone calls on a real number | Twilio | **a trial credit only**: there is no forever-free phone line | no for the trial | the trial ends; use the call page |
+| Sending for the agents (optional) | n8n: self-host the free community edition (`npx n8n` or Docker), or n8n Cloud | self-hosted: free; n8n Cloud: a trial, then paid | no for self-hosted | Nirnaya sends from its own channels instead |
 | Webhooks from the internet | Cloudflare quick tunnel (`cloudflared tunnel --url …`) | free, no account | no | |
 | Error monitoring (optional) | Sentry, Developer plan | free for one person | no | errors stop being collected |
 

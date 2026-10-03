@@ -508,6 +508,18 @@ class LLM:
             tokenised_text, json_mode=True, max_tokens=400, temperature=0.0)
         return normalise_extract(extract_json(out or ""))
 
+    def extract_outreach(self, tokenised_text: str) -> dict | None:
+        """What an instruction to the agents asks for, when the rules could not tell (contacts are tokens here)."""
+        out = self._call(
+            "You read one instruction a bank's staff gave its agents about paying someone, asking someone for money, "
+            "messaging someone or calling someone. Emails and phone numbers are already tokens; never guess them.\n"
+            "action is pay (send them money), request (ask them for money), message, call, or none.\n"
+            'Answer with one JSON object and nothing else: {"action": "...", "name": "first name" or null, '
+            '"amount": number or null, "channels": ["email" | "whatsapp" | "call" | "sms"], "reason": "short" or null}\n'
+            + scope.RULE, tokenised_text[:800], json_mode=True, max_tokens=200, temperature=0.0)
+        got = extract_json(out or "")
+        return got if isinstance(got, dict) else None
+
     def draft_reply(self, facts: list[str], template: str, language: str) -> str | None:
         lang = "Hinglish (Hindi in Latin script, mixed with English)" if language == "hinglish" else "English"
         out = self._call(

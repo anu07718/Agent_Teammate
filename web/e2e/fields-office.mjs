@@ -62,7 +62,7 @@ await step("the department menu lists all six, and each changes what the bar ask
     await toDept(d);
     const ph = await panel().getByRole("textbox", { name: "Task" }).getAttribute("placeholder");
     const isCase = d === "INTAKE" || d === "RESOLUTION";
-    expect(isCase ? ph === "Type a customer message…" : ph.startsWith("Type a task for"), `${d}: ${ph}`);
+    expect(isCase ? ph.startsWith("Type a customer message") : ph.startsWith("Type a task for"), `${d}: ${ph}`);
     expect(await panel().getByRole("combobox", { name: "Customer" }).count() === (isCase ? 1 : 0), `${d}: customer picker`);
   }
 });

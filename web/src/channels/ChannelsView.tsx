@@ -64,6 +64,10 @@ const VOICE: Spec[] = [
 const HOOK: Spec[] = [
   { k: "token", label: "Token", secret: true, hint: "Any long random text. Callers send it as X-Nirnaya-Token." },
   { k: "url", label: "Send replies and case events to", ph: "https://your-n8n/webhook/nirnaya", hint: "Optional: an n8n Webhook node, Make or Zapier URL." },
+  { k: "outreach_url", label: "Agents' outreach URL (n8n)", ph: "https://you.app.n8n.cloud/webhook/nirnaya-outreach",
+    hint: "The n8n workflow that delivers the agents' messages and calls. Empty: the URL above. Keep them apart so case events do not reach it." },
+  { k: "outreach", label: "Agents' outreach (pay, ask, message, call) goes through n8n", options: [["auto", "For channels not set up here"], ["always", "Always"], ["never", "Never"]],
+    hint: "The n8n workflow sends by Gmail, WhatsApp or Twilio and answers whether it worked. Settings → Outreach has its limits and a Test." },
 ];
 const PRESETS: Record<string, Record<string, unknown>> = {
   Gmail: { imap_host: "imap.gmail.com", imap_port: 993, smtp_host: "smtp.gmail.com", smtp_port: 587, smtp_security: "starttls", receive: "imap", send: "smtp" },

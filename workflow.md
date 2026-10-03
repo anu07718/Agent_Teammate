@@ -298,6 +298,39 @@ Approvals. On a phone, the tab bar at the bottom has Office, Cases, Approvals, C
 Supervisor and Settings. On a phone, Cases shows the list; tap a case to open it and **◂ Cases** to go
 back. A case reached from Channels or Approvals opens straight away.
 
+### Tell the agents to pay, ask, message or call someone
+
+Type it to **Intake** in the office (or say it in any agent's chat), the way you would say it to a person:
+
+- `Pay ₹500 to anushka@example.com for dinner`
+- `Ask Rahul +91 98765 43210 for ₹1,200 on WhatsApp and call him if he hasn't paid in 2 hours`
+- `Email priya@example.com: your refund of ₹349 is processed`
+- `Call Rohan 9988776655 about the ₹2,000 he owes`
+- `anushka ko 500 bhej do` · `rahul se 2000 maango`
+
+While you type, the line says what is missing and asks for it: *How much?*, *What's Anushka's email or
+phone number?*, *What is the call about?* Someone the agents met before (an earlier task, a ledger
+customer, Channels → Contacts) is found by name. When nothing is missing, the line shows the desks it will
+go through and how it will be sent (from Nirnaya, or through n8n).
+
+**ADD**, and the card shows each desk as it works: Sentry screens it, the Tokeniser masks the email and
+phone, Triage reads it, Accounts & KYC prepares a payment (or the UPI desk a request), Risk & Fraud checks
+the payee, the amount, today's total and how often this person was contacted, the Router routes it, the
+Seal Keeper seals a payment, and after your OK Commit pays it through the Tool Gateway once. The Responder
+words the message, the Promise Guard checks every amount and link in it, the Responder sends it, and the
+Ledger Trail records it.
+
+- **A payment out always waits for your OK** (click the card, then **APPROVE** in the rail, or use
+  Approvals). It is sealed: if another payment moves the float before you approve, nothing is paid.
+  Payouts are simulated (the Ledger's Payouts sheet) and their message says so.
+- **A request for money** goes out without an OK: a Razorpay test-mode payment link when Razorpay is
+  connected, otherwise a request to pay your UPI ID (Settings → Outreach).
+- **"If he hasn't paid in 2 hours, call him"** books a follow-up: at that time the UPI desk checks the
+  link, and only if it is unpaid the reminder goes out.
+- **Only messages about money**: "happy birthday" or anything not about a payment is refused. Limits (one
+  payment, a day, a request, messages to one person an hour) are in Settings → Outreach.
+- In chat, the agent asks one question at a time and carries on when you answer; say **cancel** to drop it.
+
 ### Real payments and your own data
 
 The demo bank's payments are made up, and say so. For real ones (all free, see [docs/upi.md](docs/upi.md)):

@@ -20,7 +20,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from . import ops as ops_mod
-from . import schedule, scope
+from . import outreach, schedule, scope
 from .agents import DEPARTMENTS
 from .ops import KINDS, Ops
 from .team import Team, clean_name
@@ -214,7 +214,7 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
     @app.get("/api/office/interpret")
     def interpret(dept: str, text: str = ""):
         dept_ok(dept)
-        return ops_mod.interpret(dept, text)
+        return ops_mod.interpret(dept, text, ctx=O().ctx())
 
     @app.post("/api/office/tasks")
     async def add_task(body: OfficeTask):
@@ -224,9 +224,15 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
         due = _seconds(body.at) if body.at else None
         if due and due < time.time() - 60:
             raise HTTPException(400, "that time has passed; pick one that is still ahead")
-        it = ops_mod.interpret(body.dept, body.text, when=body.when)
-        if it.get("problem") and it["kind"] in ("routine", "off_topic"):
+        it = ops_mod.interpret(body.dept, body.text, when=body.when, ctx=O().ctx())
+        if it.get("problem") and it["kind"] in ("routine", "off_topic", "outreach"):
             raise HTTPException(400, it["problem"])
+        if it["kind"] == "outreach":            # pay, ask for money, message or call someone
+            try:
+                op = await outreach.create(O().ctx(), body.text, by=by, due_at=due)
+            except ValueError as ex:
+                raise HTTPException(400, str(ex))
+            return {"kind": "op", "op": op}
         if it["kind"] == "routine":
             r = R().add(it["op_kind"], it["when"], text=it["text"], title=it["title"], needs_ok=body.needs_ok, by=by)
             return {"kind": "routine", "routine": r, "guessed": it.get("guessed")}
@@ -341,6 +347,11 @@ def register(app: FastAPI, E: Callable, R: Callable, O: Callable[[], Ops], T: Ca
         e = E()
         a = e.roster.agents[body.agent]
         text, low = body.text.strip(), body.text.strip().lower()
+        # pay / ask / message / call someone — and the answer to a question such a task is waiting on
+        # (before the topic check: "anushka@gmail.com" on its own is an answer, not a question about money)
+        got = await outreach.chat(O().ctx(), body.agent, text, by)
+        if got:
+            return got
         sc = await asyncio.to_thread(scope.check, text, scope.STAFF, e.llm if e.llm.enabled else None)
         if not sc["in_scope"]:                 # finance only, before any rule or model sees it
             return {"reply": scope.refusal(scope.STAFF, sc["category"]), "via": "finance-only guard",

@@ -124,6 +124,13 @@ class Gateway:
             Tool("notify.send", "Messaging", "Send the reply on the customer's channel", "write",
                  _obj({"customer_id": {"type": "string"}, "text": {"type": "string"}}, ["customer_id", "text"]),
                  None),
+            Tool("payout.send", "Core banking", "Pay someone outside the bank from the float (sealed, after a person's OK)",
+                 "write", _obj({"amount": {"type": "number"}, "to": {"type": "object"}}, ["amount", "to"]), None,
+                 moves_money=True),
+            Tool("pg.link", "Razorpay (test)", "Create a payment link to ask someone for money (test mode)", "write",
+                 _obj({"amount": {"type": "number"}, "to": {"type": "object"}}, ["amount", "to"]), None),
+            Tool("outreach.send", "Messaging", "Send a message or place a call to someone (here or through n8n)", "write",
+                 _obj({"channel": {"type": "string"}, "text": {"type": "string"}}, ["channel", "text"]), None),
         ]
         self.tools = {t.name: t for t in reads + writes}
 
@@ -245,6 +252,84 @@ class Gateway:
                    "undo": undo if at.reversible and undo else None, "idempotency_key": idem}
         self.store.idem_put(idem, tool, receipt)
         return receipt
+
+    # ── outreach: paying, asking and messaging people outside the bank ───────
+    def seal_payout(self, payload: dict) -> str:
+        """The seal a person approves: the payee, the amount, the float's version and the policy."""
+        return seal_mod.compute({"payout": payload}, {"ok": True}, self.rails.float_version(), self.policy.policy_hash())
+
+    def execute_payout(self, *, op_id: str, payload: dict, seal: str, agent: str = "commit") -> dict:
+        """Pay once, only if the seal still matches: if the float moved (another payout) or the policy changed
+        since the person saw it, the old approval does not apply."""
+        idem = f"{op_id}:payout"
+        prior = self.store.idem_get(idem)
+        if prior:
+            return {**prior, "replayed": True}
+        check = seal_mod.verify(seal, {"payout": payload}, {"ok": True}, self.rails.float_version(),
+                                self.policy.policy_hash())
+        if not check["ok"]:
+            self.bus.publish("seal.broken", case_id=op_id, expected=check["expected"][:12], actual=check["actual"][:12])
+            return {"ok": False, "reason": "seal_mismatch", "seal": check}
+        amount = float(payload.get("amount") or 0)
+        try:
+            res = self._guarded("payout.send", lambda: self.rails.payout(to=payload["to"], amount=amount,
+                                                                         reason=payload.get("reason"), op_id=op_id),
+                                agent=agent, case_id=op_id)
+        except GatewayError as e:
+            return {"ok": False, "error": str(e)}
+        receipt = {"ok": True, "action": "payout", "tool": "payout.send", "amount": amount, "result": res,
+                   "undo": None, "idempotency_key": idem}
+        self.store.idem_put(idem, "payout.send", receipt)
+        return receipt
+
+    def request_link(self, *, op_id: str, to: dict, amount: float, description: str, agent: str = "commit") -> dict:
+        idem = f"{op_id}:link"
+        prior = self.store.idem_get(idem)
+        if prior:
+            return {**prior, "replayed": True}
+        if not self.pg:
+            return {"ok": False, "error": "the payment gateway is not set up"}
+        try:
+            res = self._guarded("pg.link", lambda: self.pg.link_to(name=to.get("name") or "", email=to.get("email") or "",
+                                                                     phone=to.get("phone") or "", amount=amount,
+                                                                     description=description, ref=op_id),
+                                agent=agent, case_id=op_id)
+        except GatewayError as e:
+            return {"ok": False, "error": str(e)}
+        receipt = {"ok": True, "action": "request", "tool": "pg.link", "amount": amount, "result": res,
+                   "undo": None, "idempotency_key": idem}
+        self.store.idem_put(idem, "pg.link", receipt)
+        return receipt
+
+    async def outreach_send(self, op_id: str, channel: str, go: Callable[[], Any], agent: str = "responder") -> dict:
+        """One message or call, once per task and channel (a retry finds the first send), with the breaker."""
+        idem = f"{op_id}:send:{channel}"
+        prior = self.store.idem_get(idem)
+        if prior:
+            return {**prior, "replayed": True}
+        tool = self.tools["outreach.send"]
+        now = time.time()
+        if tool.open_until > now:
+            raise GatewayError(f"outreach.send is paused after {BREAKER_THRESHOLD} consecutive failures")
+        if self.rails.is_down(tool.system):
+            raise GatewayError(f"{tool.system} is not responding")
+        t0 = time.perf_counter()
+        try:
+            out = await go()
+        except Exception as e:
+            tool.fails += 1
+            if tool.fails >= BREAKER_THRESHOLD:
+                tool.open_until = now + BREAKER_COOLDOWN_S
+            self.bus.publish("tool.called", tool="outreach.send", system=tool.system, agent=agent, case_id=op_id,
+                             ok=False, error=str(e))
+            raise
+        tool.fails, tool.calls = 0, tool.calls + 1
+        tool.last_ms = round((time.perf_counter() - t0) * 1000, 2)
+        self.bus.publish("tool.called", tool="outreach.send", system=tool.system, agent=agent, case_id=op_id, ok=True,
+                         ms=tool.last_ms)
+        out = out if isinstance(out, dict) else {}
+        self.store.idem_put(idem, "outreach.send", out)
+        return out
 
     def undo(self, undo: dict, *, case_id: str) -> None:
         r = self.rails

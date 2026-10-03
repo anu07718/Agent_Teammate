@@ -21,7 +21,7 @@ PORT="${PORT:-8000}"
 KPORT=$((PORT + 1))
 PY="${PY:-python3}"
 WINE="${WINE:-$(command -v /opt/wine-stable/bin/wine wine 2>/dev/null | head -1)}"
-ALL="run workflow fields-office fields-workspace fields-flows flows team phone-client channels workspace audit"
+ALL="run workflow outreach fields-office fields-workspace fields-flows flows team phone-client channels workspace audit"
 SUITES="${SUITES:-$ALL}"
 [ "${QUICK:-0}" = "1" ] && SUITES="$(echo " $SUITES " | sed 's/ fields-office / /; s/ audit / /')"
 mkdir -p "$OUT/data" "$OUT/shots"

@@ -142,6 +142,14 @@ old approval is not used. This is tested.
 The Sentry blocks injected instructions before any agent reads them. Even past that, an agent can only
 propose: the Tool Gateway applies policy caps, and every gateway refund needs a person.
 
+**"Can the agents pay someone just because they were told to?"**
+They can prepare it; they cannot do it alone. "Pay ₹500 to Anushka" walks through Sentry, the Tokeniser,
+Triage, Accounts & KYC, Risk & Fraud (payee, amount, today's total, how often this person was contacted),
+the Router and the Seal Keeper, then waits for a named person. The seal covers the payee, the amount, the
+float's version and the policy: if another payment moves the float first, the old approval pays nothing.
+Payouts here are simulated and the message says so; a bank would put its own payout rail behind the same
+Gateway call.
+
 **"Can someone use it as a free chatbot?"**
 No. Every way in (customer messages on every channel, questions to an agent, department tasks) passes a
 finance-only gate first: code, general knowledge and random questions get a short refusal, and the case is

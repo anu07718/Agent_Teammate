@@ -14,6 +14,8 @@ export interface Op {
   due_at: number | null; waiting_at: number | null; result: string | null; ok: boolean | null; needs_ok: boolean; ask: string | null;
   approved: boolean; rejected: boolean; note: string | null; late: boolean; case_id: string | null; tools: string[];
   approved_by?: string; rejected_by?: string;
+  // outreach (pay / ask / message / call someone): the desks it went through, and the one working now
+  doing?: string | null; steps?: { agent: string; name: string; doing: string; ok: boolean | null; note: string }[]; plan_steps?: number;
 }
 export interface Routine {
   id: string; kind: string; title: string; text: string; dept: PodId; agent: string; when: any; desc: string;
@@ -28,7 +30,9 @@ export interface OfficeSnap {
   flow_waits: { run_id: string; node: string; flow: string; flow_id?: string; question: string; since: number; by: string }[];
 }
 export interface Interpretation {
-  kind: "case" | "op" | "routine" | "error"; dept?: PodId; agent?: string; title?: string; op_kind?: string;
+  kind: "case" | "op" | "routine" | "error" | "outreach" | "off_topic"; dept?: PodId; agent?: string; title?: string; op_kind?: string;
+  steps?: { agent: string; doing: string }[]; routes?: Record<string, string | null>; found?: string | null;
+  task?: { money: string | null; amount: number | null; name: string | null; email: string | null; phone: string | null; channels: string[] };
   when?: any; when_desc?: string; next_at?: number | null; needs_ok?: boolean; problem?: string | null; guessed?: string | null;
   intent?: string; confidence?: number; can?: string[];
 }
@@ -175,7 +179,8 @@ export function deriveTasks(app: AppState | null, snap: OfficeSnap | null, podOf
     const at = (o.done_at || o.waiting_at || o.started_at || o.created_at) * 1000;
     out.push({
       id: o.id, kind: "op", dept: o.dept, agent: o.agent, title: o.title, state: o.state === "next" ? "doing" : o.state,
-      progress: o.state === "done" ? 1 : o.state === "doing" ? 0.5 : 0, changedAt: at, addedAt: o.created_at * 1000,
+      progress: o.state === "done" ? 1 : o.kind === "outreach" && o.plan_steps ? Math.min(0.95, (o.steps?.length ?? 0) / o.plan_steps)
+        : o.state === "doing" ? 0.5 : 0, changedAt: at, addedAt: o.created_at * 1000,
       doneAt: o.done_at ? o.done_at * 1000 : undefined, dueAt: o.due_at ? o.due_at * 1000 : undefined,
       routine: o.routine, late: o.late, approved: o.approved, ok: o.ok, op: o,
     });

@@ -134,6 +134,16 @@ Three example flows come with it: a morning audit check, a duplicate-charge dril
 
 ![A flow waiting for a person's OK](docs/screenshots/flows-builder.png)
 
+### Tell the agents to pay, ask, message or call someone
+
+Type "pay ₹500 to anushka@example.com for dinner" or "ask Rahul 98765 43210 for ₹1,200 on WhatsApp and
+call him if he hasn't paid in 2 hours" to Intake, or say it in any agent's chat. The agents ask for what is
+missing (how much, an email or a phone), pick the desks for each part (Sentry, Tokeniser, Triage, Accounts
+& KYC or the UPI desk, Risk & Fraud, Router, Seal Keeper, Commit, Responder, Promise Guard, Ledger Trail),
+and send it by email, WhatsApp, a call or SMS: from Nirnaya, or through an n8n workflow that delivers with
+Gmail, WhatsApp Business or Twilio. A payment out always waits for a person and is sealed; a request is a
+Razorpay test-mode link; only messages about money go out (`backend/nirnaya/outreach.py`, channels.md).
+
 ### Real payments and your own data
 
 The demo bank is there for the scripted scenes, and it is labelled. Two ways to work on real payments,

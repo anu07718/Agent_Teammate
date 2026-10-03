@@ -232,6 +232,41 @@ class Rails:
         self._touch(t)
         self._save()
 
+    # ── payouts to people outside the bank (outreach), from the business float ──
+    FLOAT_START = 5_00_000.0
+
+    def _float(self) -> dict:
+        f = self.state.setdefault("float", {"id": "FLOAT-0001", "balance": self.FLOAT_START, "version": 1})
+        self.state.setdefault("payouts", [])
+        return f
+
+    def float_balance(self) -> float:
+        return float(self._float()["balance"])
+
+    def float_version(self) -> str:
+        f = self._float()
+        return f"{f['id']}@{f['version']}"
+
+    def payouts(self) -> list[dict]:
+        self._float()
+        return list(self.state["payouts"])
+
+    def payout(self, *, to: dict, amount: float, reason: str | None, op_id: str) -> dict:
+        """Pay someone outside the bank from the float. Simulated: it records the payout, no money leaves."""
+        f = self._float()
+        amount = round(float(amount), 2)
+        if amount <= 0:
+            raise ValueError("a payout must be more than ₹0")
+        if amount > f["balance"]:
+            raise ValueError(f"the float has only ₹{f['balance']:,.2f}")
+        f["balance"] = round(f["balance"] - amount, 2)
+        f["version"] += 1
+        p = {"id": f"PO-{len(self.state['payouts']) + 1:04d}", "to": {k: to.get(k) for k in ("name", "email", "phone")},
+             "amount": amount, "reason": reason, "op_id": op_id, "at": time.time(), "status": "SENT", "simulated": True}
+        self.state["payouts"].append(p)
+        self._save()
+        return p
+
     def wallet_credit(self, cid: str, amount: float, reason: str, tid: str | None = None) -> dict:
         acct = self.state["customers"][cid]["account"]
         credit = {"id": f"W-{len(self.state['wallet_credits']) + 1:04d}", "customer_id": cid, "amount": amount,

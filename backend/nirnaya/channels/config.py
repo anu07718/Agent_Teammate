@@ -54,6 +54,9 @@ DEFAULTS: dict = {
         "enabled": False,
         "token": "",              # callers send it as X-Nirnaya-Token (or ?token=)
         "url": "",                # replies and case events are POSTed here (an n8n Webhook node, say)
+        "outreach_url": "",       # the n8n workflow that delivers the agents' outreach (empty: the URL above)
+        "outreach": "auto",       # the agents' pay/ask/message/call tasks go through n8n: auto (for channels not
+                                  # set up here) | always | never
     },
 }
 
@@ -72,6 +75,7 @@ CHOICES = {
     ("whatsapp", "accept"): {"contacts", "anyone"},
     ("voice", "provider"): {"twilio"},
     ("voice", "accept"): {"contacts", "anyone"},
+    ("hook", "outreach"): {"auto", "always", "never"},
 }
 CHANNELS = ("email", "whatsapp", "voice", "hook")
 

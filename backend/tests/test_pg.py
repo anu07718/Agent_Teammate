@@ -77,6 +77,9 @@ class FakeRazorpay:
                         if p["amount_refunded"] == p["amount"]:
                             p["status"] = "refunded"
                         return self._send(200, r)
+                if parts[:2] == ["v1", "payment_links"] and len(parts) == 3 and method == "GET":
+                    link = next((x for x in rz.links if x["id"] == parts[2]), None)
+                    return self._send(200, link) if link else self._err(400, "The id provided does not exist")
                 if parts[:2] == ["v1", "payment_links"] and method == "POST":
                     link = {"id": f"plink_{len(rz.links) + 1:014d}", "short_url": f"https://rzp.io/i/test{len(rz.links) + 1}",
                             "status": "created", **body}

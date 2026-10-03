@@ -98,7 +98,8 @@ export function Panel(p: Props) {
     const text = p.text.trim().replace(/[.!]+$/, "");
     if (!text || busy) return;
     setBusy(true);
-    setSaid({ html: isCase ? `Opening a case — <b>Sentry</b> screens it first…` : `Handing it to ${POD_STYLE[dept].name.toLowerCase()}…`, tone: "busy" });
+    const outreach = hint?.kind === "outreach";
+    setSaid({ html: outreach ? `Handing it to the desks — <b>Sentry</b> screens it first…` : isCase ? `Opening a case — <b>Sentry</b> screens it first…` : `Handing it to ${POD_STYLE[dept].name.toLowerCase()}…`, tone: "busy" });
     try {
       const body: any = { dept, text: text[0].toUpperCase() + text.slice(1) };
       if (isCase) Object.assign(body, { customer_id: customer, channel });
@@ -108,6 +109,7 @@ export function Panel(p: Props) {
       setRepeat(false);
       if (r.kind === "case" && r.case) setSaid({ html: `Added — <b>${r.case.id}</b> is with <b>Sentry</b>; triage names the desk in a moment.` });
       else if (r.kind === "routine" && r.routine) setSaid({ html: `Routine set — <b>${p.nameOf(r.routine.agent)}</b> · ${r.routine.desc} · next ${until(r.routine.next_at)}${r.routine.needs_ok ? " · waits for your OK" : ""}` });
+      else if (r.op && r.op.kind === "outreach") setSaid({ html: r.op.state === "scheduled" ? `Booked — <b>${r.op.id}</b> runs ${dayTime(r.op.due_at! * 1000)}` : `On it as <b>${r.op.id}</b>${r.op.needs_ok ? " — it will wait for your OK before any money moves" : ""}.` });
       else if (r.op) setSaid({ html: r.op.state === "scheduled" ? `Booked — <b>${p.nameOf(r.op.agent)}</b> runs it ${dayTime(r.op.due_at! * 1000)}` : `Added — <b>${p.nameOf(r.op.agent)}</b> has it${r.op.needs_ok ? " and will ask for your OK" : ""}.` });
       if (r.kind === "routine") setFilter("sched");
       void refreshOffice();
@@ -129,6 +131,11 @@ export function Panel(p: Props) {
       return `<span class="av" style="border-color:${c};background:${c}55">${p.nameOf(agent)[0]}</span>`;
     };
     if (hint.problem) return { html: esc(hint.problem), tone: "err" as const };
+    if (hint.kind === "outreach") {
+      const desks = [...new Set((hint.steps ?? []).map((s) => s.agent))];
+      const via = Object.entries(hint.routes ?? {}).map(([c, r]) => `${c === "call" ? "call" : c === "sms" ? "SMS" : c === "whatsapp" ? "WhatsApp" : "email"} via ${r === "native" ? "Nirnaya" : r}`).join(", ");
+      return { html: `${desks.map(av).join("")}<b>${esc(hint.title ?? "")}</b> · ${desks.length} desks${via ? ` · ${esc(via)}` : ""}${hint.found ? ` · contact from ${esc(hint.found)}` : ""}${hint.needs_ok ? " · <b>waits for your OK</b>" : ""}` };
+    }
     if (hint.kind === "routine") return { html: `${av(hint.agent!)}⏱ Routine · <b>${hint.when_desc}</b> · <b>${p.nameOf(hint.agent!)}</b> in ${POD_STYLE[hint.dept!].name.toLowerCase()} · next ${until(hint.next_at)}${hint.needs_ok ? " · waits for your OK" : ""}${hint.guessed ? ` · “${esc(hint.guessed)}” taken as ${hint.when?.at}` : ""}` };
     if (repeat) return { html: `⏱ Repeats ${CADENCES.find((c) => c[0] === cad)?.[1].toLowerCase()}${cad === "hourly" || cad === "m5" ? "" : " at " + at} · the office names the desk when you press Add` };
     if (hint.kind === "case") return { html: `${av(hint.agent!)}Probably <b>${p.nameOf(hint.agent!)}</b> · triage confirms when you press Add · ${esc(app?.customers.find((c) => c.id === customer)?.name.split(" ")[0] ?? "")} (${customer}) over ${channel}` };
@@ -158,7 +165,7 @@ export function Panel(p: Props) {
             <span className="o-caps">{POD_STYLE[dept].name}</span> ▾
           </button>
           <textarea ref={inRef} className="o-in" rows={1} value={p.text} aria-label="Task"
-            placeholder={isCase ? "Type a customer message…" : `Type a task for ${POD_STYLE[dept].name.toLowerCase()}…`}
+            placeholder={isCase ? (dept === "intake" ? "Type a customer message, or “pay / ask / message / call someone…”" : "Type a customer message…") : `Type a task for ${POD_STYLE[dept].name.toLowerCase()}…`}
             onChange={(e) => { p.setText(e.target.value); setSaid(null); }}
             onKeyDown={(e) => {
               e.stopPropagation();
@@ -265,7 +272,8 @@ function Row({ t, isNew, scoped, nameOf, onRow, onCalendar }: { t: OTask; isNew:
   if (refused && t.state === "done") { chip = "fail"; label = "REFUSED"; }
   if (failed) { chip = "fail"; label = t.op?.rejected ? "NOT RUN" : "FLAGGED"; }
   let meta = who;
-  if (t.state === "doing") meta += t.kind === "case" ? ` · step ${Math.max(1, Math.round(t.progress * 10))} of 10 · ${t.c?.step ?? ""}` : " · working";
+  if (t.state === "doing") meta += t.kind === "case" ? ` · step ${Math.max(1, Math.round(t.progress * 10))} of 10 · ${t.c?.step ?? ""}`
+    : t.op?.kind === "outreach" && t.op.doing ? ` · ${esc(t.op.doing)}` : " · working";
   if (t.state === "waiting") meta = `<span class="o-amb">waiting ${span(Date.now() - t.changedAt)} for an OK</span> · ${who}${t.kind === "case" ? " · sealed" : t.kind === "flow" ? " · a flow asks" : ""}`;
   if (t.state === "scheduled") meta += ` · runs ${t.dueAt ? dayTime(t.dueAt) : ""}`;
   if (t.state === "done") {

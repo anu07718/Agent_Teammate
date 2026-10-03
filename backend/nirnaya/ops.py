@@ -15,7 +15,7 @@ import re
 import time
 from typing import Callable
 
-from . import benchmark, schedule, scope, specialists
+from . import benchmark, outreach, schedule, scope, specialists
 from . import guard as promise_guard
 from .agents import DEPARTMENTS, Roster
 from .gateway import GatewayError
@@ -89,7 +89,7 @@ def can_do(dept: str) -> list[str]:
     return [KINDS[k]["help"] for k in KINDS if KINDS[k]["dept"] == dept]
 
 
-def interpret(dept: str, text: str, when: dict | None = None) -> dict:
+def interpret(dept: str, text: str, when: dict | None = None, ctx: "outreach.Ctx | None" = None) -> dict:
     """What the office will do with this sentence, before it does it (the bar's hint)."""
     text = (text or "").strip()
     if dept not in DEPT_NAME:
@@ -98,6 +98,8 @@ def interpret(dept: str, text: str, when: dict | None = None) -> dict:
     if not sc["in_scope"]:
         return {"kind": "off_topic", "dept": dept, "category": sc["category"],
                 "problem": "Finance only: " + scope.refusal(scope.STAFF, sc["category"])}
+    if dept in CASE_PODS and outreach.looks_like(text):   # "pay ₹500 to Anushka", "call Rahul about the ₹2,000"
+        return outreach.plan(text, ctx)
     parsed = {"when": when, "text": text, "needs_time": False, "needs_day": False, "guessed": None} if when \
         else schedule.parse(text)
     if parsed and dept in CASE_PODS and not when and kind_for(parsed["text"], dept, routine=True) != "sample":
@@ -156,9 +158,13 @@ def title_for(kind: str, text: str) -> str:
 class Ops:
     """The op list lives in the store, so it survives a restart like everything else."""
 
-    def __init__(self, get_engine: Callable):
+    def __init__(self, get_engine: Callable, get_channels: Callable = lambda: None):
         self.E = get_engine
+        self.C = get_channels
         self._running: set[asyncio.Task] = set()
+
+    def ctx(self) -> "outreach.Ctx":
+        return outreach.Ctx(self.E(), self.C(), self)
 
     # ── storage ──────────────────────────────────────────────────────────────
     def all(self) -> list[dict]:
@@ -191,7 +197,7 @@ class Ops:
     def create(self, kind: str, *, dept: str, agent: str, title: str, text: str = "", by: str = "you",
                routine: str | None = None, due_at: float | None = None, needs_ok: bool | None = None,
                customer_id: str | None = None, channel: str | None = None, late: bool = False,
-               done: tuple[bool, str] | None = None) -> dict:
+               done: tuple[bool, str] | None = None, extra: dict | None = None) -> dict:
         """A new op. `done` records one that already ran (a quiet routine that found something)."""
         now = time.time()
         op = {"id": self._next_id(), "kind": kind, "dept": dept, "agent": agent, "title": title, "text": text,
@@ -199,7 +205,7 @@ class Ops:
               "started_at": None, "done_at": None, "due_at": due_at, "waiting_at": None, "result": None, "ok": None,
               "needs_ok": bool(KINDS.get(kind, {}).get("needs_ok")) if needs_ok is None else needs_ok, "ask": None,
               "approved": False, "rejected": False, "note": None, "late": late, "case_id": None, "tools": [],
-              "customer_id": customer_id, "channel": channel}
+              "customer_id": customer_id, "channel": channel, **(extra or {})}
         if done:
             op.update(state="done", started_at=now, done_at=now, ok=done[0], result=done[1])
         self._put(op)
@@ -217,6 +223,8 @@ class Ops:
         if not op:
             return None
         e = self.E()
+        if op["kind"] == "outreach":
+            return await self._run_outreach(op, approved)
         if op["needs_ok"] and not approved:
             op.update(state="waiting", waiting_at=time.time(), ask=ask_for(e, op))
             e.roster.waiting(op["agent"], op["id"], "waiting for your OK")
@@ -242,6 +250,28 @@ class Ops:
                        {"op": op["id"], "kind": op["kind"], "ok": ok, "by": op["by"]})
         return self._put(op)
 
+    async def _run_outreach(self, op: dict, approved: bool) -> dict:
+        """Pay, ask, message or call someone: the desks run the first half, a payment waits for a person, then the rest."""
+        e = self.E()
+        op.update(state="doing", started_at=op.get("started_at") or time.time())
+        self._put(op)
+        try:
+            out = await outreach.run(self.ctx(), op, approved=approved)
+        except Exception as ex:  # a task that fails says so on its card; it never takes the office down
+            log.exception("outreach %s failed", op["id"])
+            out = {"ok": False, "result": f"Could not finish: {ex}", "extra": {}}
+        op = self.get(op["id"]) or op
+        if out.get("wait"):
+            op.update(state="waiting", waiting_at=time.time(), ask=out["ask"], needs_ok=True, doing="Support Lead: your OK")
+            e.roster.waiting("human", op["id"], "waiting for your OK")
+            e.bus.publish("agent.status", agent="human", status="waiting", case_id=op["id"], doing="waiting for your OK",
+                          department="oversight")
+            return self._put(op)
+        op.update(state="done", done_at=time.time(), ok=out["ok"], result=out["result"], doing=None,
+                  approved=approved or op["approved"], **(out.get("extra") or {}))
+        e.trail.append("-", "office.op", op["agent"], {"op": op["id"], "kind": op["kind"], "ok": out["ok"], "by": op["by"]})
+        return self._put(op)
+
     def approve(self, op_id: str, by: str = "you") -> dict:
         op = self.get(op_id)
         if not op or op["state"] != "waiting":
@@ -259,8 +289,11 @@ class Ops:
         e = self.E()
         who = "you" if by == "you" else by
         op.update(state="done", done_at=time.time(), ok=False, rejected=True, note=note or None, rejected_by=by,
-                  result=f"Not run: {who} said no" + (f" — “{note}”" if note else "") + ".")
+                  result=f"Not run: {who} said no" + (f" — “{note}”" if note else "") + ".", doing=None)
         e.roster.idle(op["agent"])
+        if op["kind"] == "outreach":
+            e.roster.idle("human")
+            e.bus.publish("agent.status", agent="human", status="idle", case_id=None, doing=None, department="oversight")
         e.bus.publish("agent.status", agent=op["agent"], status="idle", case_id=None, doing=None, department=op["dept"])
         e.trail.append("-", "office.op.rejected", by, {"op": op_id, "note": note})
         return self._put(op)

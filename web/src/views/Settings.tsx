@@ -4,6 +4,7 @@ import { api, apiBase, setApiBase } from "../api";
 import { Badge, Button, Card, KV, Mono } from "../components/ui";
 import { connect, toast, useUI } from "../store";
 import { LlmCard } from "./LlmCard";
+import { OutreachCard } from "./OutreachCard";
 
 export function SettingsView() {
   const integ = useUI((s) => s.app?.integrations);
@@ -46,6 +47,7 @@ export function SettingsView() {
           ) : "—"}
         </Card>
         <LlmCard />
+        <OutreachCard />
         <Card title="Use Nirnaya from another agent (MCP)" className="lg:col-span-2">
           <p className="mb-2 text-[12.5px] text-muted">Any MCP client, such as a bank's existing chatbot, can submit cases, read their status, query the graph and memory, or ask the Confidence Layer to score an action it is about to take. Money-moving tools are not exposed: they only run inside Nirnaya, behind the Seal.</p>
           <pre className="overflow-x-auto rounded-md bg-panel-2 p-3 text-[11.5px]">{JSON.stringify({ mcpServers: { nirnaya: { type: "http", url: mcpUrl } } }, null, 2)}</pre>

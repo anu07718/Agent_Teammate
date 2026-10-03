@@ -211,6 +211,43 @@ account. The same applies to Telegram's bot token.
 **From Nirnaya to n8n:** a flow's **Call a webhook** step POSTs the run (case, route, result, who wrote
 and what they said) to any URL.
 
+### The agents' outreach through n8n (pay, ask, message, call)
+
+When you tell the agents "pay ₹500 to anushka@example.com" or "ask Rahul 98765 43210 for ₹1,200 on
+WhatsApp", Nirnaya decides everything (who, how much, whether a person must approve) and sends the message
+itself if that channel is set up here. Otherwise it POSTs the finished message to n8n, which delivers it
+with Gmail, WhatsApp Business or Twilio and answers whether it worked. **Channels → Webhooks → Agents'
+outreach goes through n8n**: *for channels not set up here* (default), *always*, or *never*.
+
+The workflow: **Webhook** (`POST /webhook/nirnaya-outreach`, responds with a node) → **Settings (edit
+me)** (the shared token, your WhatsApp phone number ID, your Twilio number, the sender name) → **Read the
+task** → **Token matches?** (no: `401 {"ok": false, "error": "bad token"}`) → **Dry run?** (yes: it answers
+which channels are ready and sends nothing) → **Which channel?** → *Send the email* (Gmail) / *Send the
+WhatsApp* / *Place the call* (Twilio) / *Send the SMS* (Twilio) → **Sent** or **Not sent** → **Tell
+Nirnaya** `{"ok", "channel", "id", "error"}`. A channel whose settings are empty answers "not set up"; a
+send node that is switched off can never be reported as sent (Sent needs the provider's message id).
+
+What Nirnaya sends (`X-Nirnaya-Token` header = Channels → Webhooks → Token):
+```json
+{ "event": "outreach.send", "dry_run": false, "op_id": "OP-1042", "channel": "email",
+  "to": { "name": "Anushka", "email": "anushka@example.com", "phone": "+919876543210" },
+  "subject": "Payment request: ₹1,200 from Karthik", "text": "Hi Anushka, Karthik has asked you for ₹1,200 …",
+  "lang": "en", "money": { "kind": "request", "amount": 1200, "currency": "INR", "link": "https://rzp.io/…", "test_mode": true },
+  "from": { "name": "Karthik", "by": "Karthik" } }
+```
+
+To set it up in your n8n: open the workflow, put the same token in **Settings (edit me)** and in Nirnaya
+(Channels → Webhooks → Token), connect **Gmail** in *Send the email* (Sign in with Google) and switch that
+node on, then **Publish**. WhatsApp and Twilio are optional: connect their credentials, fill in the phone
+number ID or the Twilio number in Settings, switch the node on and publish again. Put the workflow's
+production URL in Nirnaya → Channels → Webhooks → **Agents' outreach URL (n8n)** (its own field, so replies and
+case events from webhook channels never reach it), and press **Test n8n** in Settings → Outreach: it sends a
+dry run. The workflow's webhook only runs for `"event": "outreach.send"`; anything else is answered without
+using an execution.
+
+WhatsApp's rule still applies through n8n: a business can only send free text to someone who messaged it
+in the last 24 hours; anyone else needs an approved template.
+
 ## 6. Flows that answer on the channels
 
 In **Flows → Builder**, set the **Start** to *when a message arrives*, pick the channel and, if you like,

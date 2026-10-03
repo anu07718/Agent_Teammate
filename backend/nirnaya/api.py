@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, benchmark, channels, docparse, feed, flows, office, pg, relay, reports
+from . import __version__, benchmark, channels, docparse, feed, flows, office, outreach, pg, relay, reports
 from .agents import DEPARTMENTS
 from .engine import Engine
 from .policy import GRAPH_HASH, SUPERSTEPS
@@ -103,7 +103,7 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
     async def lifespan(app: FastAPI):
         eng = engine or Engine()
         state["engine"] = eng
-        state["ops"] = Ops(lambda: state["engine"])
+        state["ops"] = Ops(lambda: state["engine"], lambda: state.get("channels"))
         state["routines"] = Routines(eng, state["ops"])
         state["team"].hook(eng.bus)
         state["flows"] = flows.Flows(lambda: state["engine"], lambda: state["ops"], lambda: state["team"],
@@ -129,6 +129,7 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
 
     state["team"] = Team(lambda: state["engine"])
     app = FastAPI(title="Nirnaya", version=__version__, lifespan=lifespan)
+    app.state.nirnaya = state
 
     @app.middleware("http")
     async def access_key(request: Request, call_next):
@@ -451,9 +452,50 @@ def create_app(engine: Engine | None = None, *, background: bool = True) -> Fast
                          if t.get("pg") else None, "duplicate_of": t.get("duplicate_of")})
         accts = [{"account": tok(a["id"]), "customer_id": a["customer_id"], "balance": a["balance"],
                   "version": a["version"]} for a in e.rails.state["accounts"].values()]
+        payouts = [{**p, "to": {"name": p["to"].get("name"), "email": outreach.mask(p["to"].get("email") or ""),
+                                "phone": outreach.mask(p["to"].get("phone") or "")}} for p in e.rails.payouts()]
         return {"transactions": txns, "accounts": accts, "wallet_credits": e.rails.state["wallet_credits"],
                 "disputes": e.rails.state["disputes"], "blocks": e.rails.state["blocks"],
-                "down": e.rails.state.get("down", [])}
+                "down": e.rails.state.get("down", []), "payouts": payouts,
+                "float": {"balance": e.rails.float_balance(), "version": e.rails.float_version()}}
+
+    # ── outreach: the agents pay, ask, message or call someone (outreach.py) ──
+    @app.get("/api/outreach")
+    def outreach_get():
+        ctx = state["ops"].ctx()
+        people = [{"name": p["name"], "email": outreach.mask(p.get("email") or ""), "phone": outreach.mask(p.get("phone") or ""),
+                   "last": p.get("last")} for p in (E().store.kv_get(outreach.PEOPLE) or {}).values()]
+        return {"settings": ctx.settings(), "routes": {c: ctx.route(c) for c in outreach.CHANNELS},
+                "people": sorted(people, key=lambda p: -(p["last"] or 0))[:50],
+                "float": E().rails.float_balance(), "paid_today": ctx.paid_today()}
+
+    @app.put("/api/outreach")
+    def outreach_put(body: dict = Body(...)):
+        try:
+            return {"settings": state["ops"].ctx().update(body)}
+        except ValueError as ex:
+            raise HTTPException(400, str(ex))
+
+    @app.get("/api/outreach/plan")
+    def outreach_plan(text: str = ""):
+        return outreach.plan(text, state["ops"].ctx())
+
+    @app.post("/api/outreach/test")
+    async def outreach_test():
+        """A dry run to the n8n workflow: it checks the token and answers, and sends nothing."""
+        ch = state.get("channels")
+        if ch is None:
+            raise HTTPException(503, "channels are not running")
+        payload = {"event": "outreach.send", "dry_run": True, "op_id": "TEST", "channel": "email",
+                   "to": {"name": "Test", "email": "test@example.com", "phone": "+919876543210"},
+                   "subject": "Nirnaya test", "text": "A dry run from Nirnaya: nothing is sent.", "lang": "en",
+                   "money": {"kind": None, "amount": None, "currency": "INR", "link": None, "test_mode": False},
+                   "from": {"name": state["ops"].ctx().settings()["from_name"], "by": "test"}}
+        try:     # like the model's Test: a "no" is an answer to show, not a failed request
+            r = await asyncio.to_thread(outreach.post_n8n, ch, payload)
+        except Exception as ex:
+            return {"ok": False, "error": str(ex)}
+        return {"ok": True, "answer": r}
 
     # ── fed data: your own customers and payments, checked row by row (feed.py) ──
     def _data_changed(e, what: str):

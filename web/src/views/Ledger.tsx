@@ -40,6 +40,9 @@ export function LedgerView() {
             rows: [...data.wallet_credits.map((w: any) => [w.id, w.customer_id, w.reason, w.amount, w.status]),
                    ...data.disputes.map((d: any) => [d.id, d.txn_id, d.kind, "", d.status]),
                    ...data.blocks.map((b: any) => [b.id, b.customer_id, `block ${b.instrument}`, "", b.status])] },
+          { id: "payouts", name: "Payouts", header: ["Payout", "To", "Email", "Phone", "Amount ₹", "For", "Status", "Task"], widths: [80, 120, 150, 110, 90, 150, 110, 80],
+            rows: (data.payouts ?? []).map((p: any) => [p.id, p.to?.name ?? "", p.to?.email ?? "", p.to?.phone ?? "", p.amount, p.reason ?? "",
+                                                         p.simulated ? `${p.status} (simulated)` : p.status, p.op_id]) },
         ], theme === "dark");
       } catch {
         setFailed(true);
@@ -112,6 +115,7 @@ export function LedgerView() {
           </Card>
           <Card title="Accounts">
             <ul className="space-y-1 text-[12px]">
+              {data?.float && <li className="flex justify-between gap-2" data-testid="float"><span className="text-muted">Float (payouts)</span><span className="tabular">{inr(data.float.balance, true)}</span><Badge>{data.float.version.split("@")[1] ? `v${data.float.version.split("@")[1]}` : ""}</Badge></li>}
               {data?.accounts.map((a: any) => (
                 <li key={a.account} className="flex justify-between gap-2"><span className="font-mono text-muted">{a.account}</span><span className="tabular">{inr(a.balance, true)}</span><Badge>v{a.version}</Badge></li>
               ))}
